@@ -3,7 +3,7 @@ import { Trip, ColetaTipoViagemOption, EmailTemplate, ColetaOpConfig, ColetaDocO
 import { db, supabase } from '../../utils/storage';
 import SmartOperationTable from './operations/SmartOperationTable';
 import FeedbackModal from '../shared/FeedbackModal';
-import { Mail, Settings, Send, X, Copy } from 'lucide-react';
+import { Mail, Settings, Send, X, Copy, ClipboardCopy, Check } from 'lucide-react';
 import EmailGeneratorModal from './email/EmailGeneratorModal';
 import CustomSelect from '../shared/CustomSelect';
 
@@ -13,6 +13,21 @@ interface ColetaDoDiaTabProps {
   emailTemplates: EmailTemplate[];
   onRefresh: () => Promise<void>;
 }
+
+const CopyBtn: React.FC<{ text: string; title?: string }> = ({ text, title }) => {
+  const [copied, setCopied] = React.useState(false);
+  if (!text || text === '---') return null;
+  return (
+    <button
+      type="button"
+      title={title || `Copiar: ${text}`}
+      onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}
+      className="p-0.5 rounded text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-all shrink-0"
+    >
+      {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <ClipboardCopy className="w-3 h-3" />}
+    </button>
+  );
+};
 
 const ToggleIconBtn: React.FC<{
   checked: boolean;
@@ -638,6 +653,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
                   </span>
                 )}
                 <span className={`font-black text-[10px] ${nfReady ? 'text-emerald-700' : 'text-slate-900'}`}>{t.os}</span>
+                <CopyBtn text={t.os} title="Copiar OS" />
               </div>
               {nfReady && (
                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-100 border border-emerald-200 text-[7px] font-black text-emerald-700 uppercase tracking-tight w-fit">
@@ -683,9 +699,13 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       sortValue: (t: Trip) => t.booking || t.ship || '',
       render: (t: Trip) => (
         <div className="flex flex-col gap-0.5">
-          <span className="font-black text-slate-900 text-[10px]">{t.booking || '---'}</span>
+          <div className="flex items-center gap-1">
+            <span className="font-black text-slate-900 text-[10px]">{t.booking || '---'}</span>
+            <CopyBtn text={t.booking} title="Copiar Booking" />
+          </div>
           <div className="flex items-center gap-1.5">
             <span className="text-[8px] font-bold text-slate-500 uppercase">{t.ship || '---'}</span>
+            <CopyBtn text={t.ship} title="Copiar Navio" />
             <span className="text-[8px] font-black text-blue-600 bg-blue-50 px-1 rounded">SSZ</span>
           </div>
         </div>
@@ -697,10 +717,15 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       sortValue: (t: Trip) => t.container || '',
       render: (t: Trip) => (
         <div className="flex flex-col gap-0.5">
-          <span className="font-black text-slate-900 text-[10px]">{t.container || '---'}</span>
+          <div className="flex items-center gap-1">
+            <span className="font-black text-slate-900 text-[10px]">{t.container || '---'}</span>
+            <CopyBtn text={t.container} title="Copiar Container" />
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-[8px] font-bold text-slate-500">T: {t.tara || '---'}</span>
+            <CopyBtn text={t.tara} title="Copiar Tara" />
             <span className="text-[8px] font-bold text-emerald-600">L: {t.seal || '---'}</span>
+            <CopyBtn text={t.seal} title="Copiar Lacre" />
           </div>
         </div>
       )
@@ -713,6 +738,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-black text-slate-900 text-[10px] uppercase">{t.driver.name || '---'}</span>
+            <CopyBtn text={t.driver.name} title="Copiar nome do motorista" />
             {t.sentNF && (
               <span
                 className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-100 border border-emerald-200 text-[7px] font-black text-emerald-700 uppercase tracking-tight shrink-0"
@@ -725,10 +751,13 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
               </span>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
             <span className="text-[8px] font-medium text-slate-500">{removePunctuation(t.driver.cpf)}</span>
+            <CopyBtn text={removePunctuation(t.driver.cpf)} title="Copiar CPF" />
             <span className="text-[8px] font-black text-slate-700 bg-slate-100 px-1 rounded">{removePunctuation(t.driver.plateHorse)}</span>
+            <CopyBtn text={removePunctuation(t.driver.plateHorse)} title="Copiar placa cavalo" />
             <span className="text-[8px] font-black text-slate-700 bg-slate-100 px-1 rounded">{removePunctuation(t.driver.plateTrailer)}</span>
+            <CopyBtn text={removePunctuation(t.driver.plateTrailer)} title="Copiar placa carreta" />
           </div>
         </div>
       )
@@ -739,11 +768,15 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       sortValue: (t: Trip) => t.customer?.name || '',
       render: (t: Trip) => (
         <div className="flex flex-col gap-0.5">
-          <span className="font-black text-slate-900 text-[10px] uppercase whitespace-normal break-words" title={t.customer.name}>
-            {t.customer.legalName ? `${t.customer.legalName} (${t.customer.name})` : t.customer.name || '---'}
-          </span>
+          <div className="flex items-center gap-1">
+            <span className="font-black text-slate-900 text-[10px] uppercase whitespace-normal break-words" title={t.customer.name}>
+              {t.customer.legalName ? `${t.customer.legalName} (${t.customer.name})` : t.customer.name || '---'}
+            </span>
+            <CopyBtn text={t.customer.name} title="Copiar cliente" />
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-[8px] font-medium text-slate-400">{t.customer.cnpj || '---'}</span>
+            <CopyBtn text={t.customer.cnpj} title="Copiar CNPJ" />
             <span className="text-[8px] font-black text-slate-600 uppercase">{t.customer.city || '---'}</span>
           </div>
         </div>
