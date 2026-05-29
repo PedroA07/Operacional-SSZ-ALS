@@ -460,13 +460,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             gateDry:      r.terminal === 'EMBRAPORT' ? r.dead_line_str : r.gate_dry,
             gateReefer:   r.terminal === 'EMBRAPORT' ? undefined        : r.gate_reefer,
             deadLineStr:  r.terminal === 'EMBRAPORT' ? r.gate_dry       : r.dead_line_str,
-            dtPrevChegada: r.dt_prev_chegada,
-            dtChegada:     r.dt_chegada,
-            dtPrevAtrac:   r.dt_prev_atrac,
-            dtAtracacao:   r.dt_atracacao,
-            dtPrevSaida:   r.dt_prev_saida,
-            dtSaida:       r.dt_saida,
-            fetchedAt:     r.fetched_at,
+            dtPrevChegada:  r.dt_prev_chegada,
+            dtChegada:      r.dt_chegada,
+            dtPrevAtrac:    r.dt_prev_atrac,
+            dtAtracacao:    r.dt_atracacao,
+            dtPrevSaida:    r.dt_prev_saida,
+            dtSaida:        r.dt_saida,
+            prevGateDry:    r.prev_gate_dry    ?? undefined,
+            prevGateReefer: r.prev_gate_reefer ?? undefined,
+            fetchedAt:      r.fetched_at,
           } as TerminalVessel)));
         });
 
@@ -598,10 +600,19 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     if (!vessel) return null;
     const now = new Date();
     const isReefer = /R/i.test(containerType || '');
+
+    // Abertura efetiva (gate já aberto)
     const gateStr = isReefer
       ? (vessel.gateReefer || vessel.gateDry)
       : (vessel.gateDry || vessel.gateReefer);
     const gateDt = parseFlexDate(gateStr || '');
+
+    // Previsão de abertura (gate ainda não aberto — Santos Brasil PREVISAO_LIBERACAO)
+    const prevGateStr = isReefer
+      ? (vessel.prevGateReefer || vessel.prevGateDry)
+      : (vessel.prevGateDry || vessel.prevGateReefer);
+    const prevGateDt = parseFlexDate(prevGateStr || '');
+
     const deadDt = parseFlexDate(vessel.deadLineStr || '');
 
     const fmtDate = (d: Date) =>
@@ -636,12 +647,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
 
     if (effectiveStatus === 'GATE FECHADO') {
+      // Usa abertura efetiva se disponível, senão usa previsão (azul) como indicador
+      const aberturaRef = (gateDt && gateDt > now) ? gateDt : (prevGateDt && prevGateDt > now ? prevGateDt : null);
+      const isPreview   = !gateDt && !!prevGateDt;
       return (
         <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-red-500/10 text-red-600 border-red-500/30">
           <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-500"/>
           Gate Fechado
-          {gateDt && gateDt > now && (
-            <span className="font-bold text-red-400 normal-case ml-0.5">• Abre {fmtDate(gateDt)}</span>
+          {aberturaRef && (
+            <span className={`font-bold normal-case ml-0.5 ${isPreview ? 'text-blue-400' : 'text-red-400'}`}>
+              • {isPreview ? '~Abre' : 'Abre'} {fmtDate(aberturaRef)}
+            </span>
           )}
         </span>
       );
@@ -710,13 +726,18 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
     const rows: { label: string; value: string; actual: boolean }[] = [];
 
-    const chegFmt  = fmtShort(vessel.dtChegada) || fmtShort(vessel.dtPrevChegada);
-    const atracFmt = fmtShort(vessel.dtAtracacao) || fmtShort(vessel.dtPrevAtrac);
-    const saidaFmt = fmtShort(vessel.dtSaida) || fmtShort(vessel.dtPrevSaida);
+    const chegFmt     = fmtShort(vessel.dtChegada) || fmtShort(vessel.dtPrevChegada);
+    const atracFmt    = fmtShort(vessel.dtAtracacao) || fmtShort(vessel.dtPrevAtrac);
+    const saidaFmt    = fmtShort(vessel.dtSaida) || fmtShort(vessel.dtPrevSaida);
+    // Previsão de abertura do gate — só mostra se ainda não há abertura efetiva
+    const prevAberFmt = !vessel.gateDry && !vessel.gateReefer
+      ? (fmtShort(vessel.prevGateDry) || fmtShort(vessel.prevGateReefer))
+      : null;
 
-    if (chegFmt)  rows.push({ label: vessel.dtChegada  ? 'Chegada'   : 'Prev. Cheg.',  value: chegFmt,  actual: !!vessel.dtChegada });
-    if (atracFmt) rows.push({ label: vessel.dtAtracacao ? 'Atracação' : 'Prev. Atrac.', value: atracFmt, actual: !!vessel.dtAtracacao });
-    if (saidaFmt) rows.push({ label: vessel.dtSaida    ? 'Saída'     : 'Prev. Saída',  value: saidaFmt, actual: !!vessel.dtSaida });
+    if (chegFmt)     rows.push({ label: vessel.dtChegada   ? 'Chegada'    : 'Prev. Cheg.',   value: chegFmt,     actual: !!vessel.dtChegada });
+    if (atracFmt)    rows.push({ label: vessel.dtAtracacao  ? 'Atracação'  : 'Prev. Atrac.',  value: atracFmt,    actual: !!vessel.dtAtracacao });
+    if (saidaFmt)    rows.push({ label: vessel.dtSaida      ? 'Saída'      : 'Prev. Saída',   value: saidaFmt,    actual: !!vessel.dtSaida });
+    if (prevAberFmt) rows.push({ label: 'Prev. Abertura', value: prevAberFmt, actual: false });
 
     if (rows.length === 0) return null;
 

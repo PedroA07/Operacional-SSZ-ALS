@@ -756,9 +756,11 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
         dtPrevChegada: r.dt_prev_chegada, dtChegada: r.dt_chegada,
         dtPrevAtrac: r.dt_prev_atrac, dtAtracacao: r.dt_atracacao,
         dtPrevSaida: r.dt_prev_saida, dtSaida: r.dt_saida,
-        gateDry:     r.terminal === 'EMBRAPORT' ? r.dead_line_str : r.gate_dry,
-        gateReefer:  r.terminal === 'EMBRAPORT' ? undefined        : r.gate_reefer,
-        deadLineStr: r.terminal === 'EMBRAPORT' ? r.gate_dry       : r.dead_line_str,
+        gateDry:       r.terminal === 'EMBRAPORT' ? r.dead_line_str : r.gate_dry,
+        gateReefer:    r.terminal === 'EMBRAPORT' ? undefined        : r.gate_reefer,
+        deadLineStr:   r.terminal === 'EMBRAPORT' ? r.gate_dry       : r.dead_line_str,
+        prevGateDry:   r.prev_gate_dry    ?? undefined,
+        prevGateReefer: r.prev_gate_reefer ?? undefined,
         servico: r.servico, fetchedAt: r.fetched_at,
       } as TerminalVessel)));
       setTVAt(rows[0]?.fetched_at ?? null);
@@ -1144,6 +1146,7 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                     <th className="bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Prev. Saída</th>
                     <th className="bg-[#0a101c] px-3 py-2.5 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Saída</th>
                     <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Dead-Line</th>
+                    <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-blue-600/60 uppercase tracking-widest whitespace-nowrap">Prev. Abertura</th>
                     <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate Dry</th>
                     <th className="bg-[#0a101c] px-3 py-2.5 text-center font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gate Reefer</th>
                   </tr>
@@ -1198,6 +1201,11 @@ const NaviosTab: React.FC<NaviosTabProps> = ({ user, trips }) => {
                         <td className="px-3 py-2 text-center whitespace-nowrap">
                           {v.deadLineStr
                             ? <span className={`font-black ${dlExpired ? 'text-red-400' : 'text-orange-400'}`}>{fmtCell(v.deadLineStr)}</span>
+                            : <span className="text-slate-700">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-center whitespace-nowrap">
+                          {(v.prevGateDry || v.prevGateReefer)
+                            ? <span className="font-black text-blue-400">{fmtCell(v.prevGateDry || v.prevGateReefer)}</span>
                             : <span className="text-slate-700">—</span>}
                         </td>
                         <td className="px-3 py-2 text-center whitespace-nowrap">

@@ -841,8 +841,10 @@ export interface TerminalVessel {
   dtAtracacao?: string;
   dtPrevSaida?: string;
   dtSaida?: string;
-  gateDry?: string;
+  gateDry?: string;         // Liberação efetiva (gate já aberto)
   gateReefer?: string;
+  prevGateDry?: string;     // Previsão de abertura (Santos Brasil PREVISAO_LIBERACAO_DRY)
+  prevGateReefer?: string;
   deadLineStr?: string;
   servico?: string;
   fetchedAt?: string;
