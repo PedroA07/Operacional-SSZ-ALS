@@ -190,6 +190,9 @@ export const tripRepository = {
     const { id: _pid, ...payloadWithoutId } = payload as any;
     const osKey = trip.os?.trim().toUpperCase();
 
+    // Para INSERT, gera UUID real pois a coluna id não tem DEFAULT no banco.
+    const insertPayload = isExisting ? payloadWithoutId : { id: crypto.randomUUID(), ...payloadWithoutId };
+
     // Tenta salvar e, se houver conflito de OS (23505), faz UPDATE pelo OS como fallback.
     // Isso resolve casos em que o id em memória divergiu do registro real no banco.
     const doSave = async (p: Record<string, unknown>) => {
@@ -208,7 +211,7 @@ export const tripRepository = {
       return result;
     };
 
-    const { error } = await doSave(payloadWithoutId);
+    const { error } = await doSave(insertPayload);
 
     if (error) {
       // Coluna inexistente no banco (migration ainda não aplicada) — remove o campo e tenta de novo
@@ -228,7 +231,7 @@ export const tripRepository = {
         // Fallback genérico: tenta também sem coleta_order_index sempre que o erro for de coluna
         if (!columnsToRemove.includes('coleta_order_index')) columnsToRemove.push('coleta_order_index');
 
-        const retryPayload = { ...payloadWithoutId };
+        const retryPayload = { ...insertPayload };
         columnsToRemove.forEach(col => delete (retryPayload as any)[col]);
 
         console.warn(`Colunas ausentes no banco [${columnsToRemove.join(', ')}] — tentando salvar sem elas...`);
