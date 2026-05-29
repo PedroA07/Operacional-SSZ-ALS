@@ -365,6 +365,7 @@ function buildCardHtml(params: {
 
 const ValoresPreStackingTab: React.FC = () => {
   const [copied, setCopied] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
   const [showEstadia, setShowEstadia] = useState(true);
   const [showEntreMargem, setShowEntreMargem] = useState(true);
 
@@ -451,6 +452,13 @@ const ValoresPreStackingTab: React.FC = () => {
 
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleCopyText = () => {
+    navigator.clipboard.writeText(buildPlainText()).then(() => {
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 2500);
+    });
   };
 
   const buildPlainText = () => {
@@ -639,57 +647,77 @@ const ValoresPreStackingTab: React.FC = () => {
         <div className="bg-white rounded-3xl border border-slate-100 shadow-xl flex flex-col h-full overflow-hidden">
 
           {/* Header */}
-          <div className="px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
-            <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="px-5 pt-4 pb-3 border-b border-slate-100 shrink-0">
+            <div className="flex items-center justify-between gap-2 mb-3">
               <div>
-                <h3 className="text-[13px] font-black text-slate-800 tracking-tight">Prévia do E-mail</h3>
-                <p className="text-[10px] text-slate-400 font-medium mt-0.5">Card copiado como HTML formatado</p>
+                <h3 className="text-[12px] font-black text-slate-800 tracking-tight">Prévia do E-mail</h3>
+                <p className="text-[9px] text-slate-400 font-medium mt-0.5">Escolha o formato para copiar</p>
               </div>
-              <button onClick={handleCopy}
-                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 shadow-sm ${
-                  copied ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-slate-900 text-white hover:bg-blue-600 shadow-slate-200'
-                }`}>
-                {copied ? (
-                  <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>Copiado!</>
-                ) : (
-                  <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>Copiar card</>
-                )}
-              </button>
+              <div className="flex items-center gap-1.5">
+                {/* Copiar texto plano */}
+                <button onClick={handleCopyText}
+                  title="Copiar como texto simples"
+                  className={`flex items-center gap-1 px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all active:scale-95 border ${
+                    copiedText
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-600'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300 hover:text-blue-600'
+                  }`}>
+                  {copiedText ? (
+                    <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>Ok!</>
+                  ) : (
+                    <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7"/></svg>Texto</>
+                  )}
+                </button>
+                {/* Copiar card HTML */}
+                <button onClick={handleCopy}
+                  title="Copiar card formatado (HTML para e-mail)"
+                  className={`flex items-center gap-1 px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all active:scale-95 shadow-sm ${
+                    copied
+                      ? 'bg-emerald-500 text-white shadow-emerald-100'
+                      : 'bg-slate-900 text-white hover:bg-blue-600 shadow-slate-200'
+                  }`}>
+                  {copied ? (
+                    <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>Copiado!</>
+                  ) : (
+                    <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>Card</>
+                  )}
+                </button>
+              </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               <Toggle label="Estadia" value={showEstadia} onChange={setShowEstadia} />
               <Toggle label="Entre Margem" value={showEntreMargem} onChange={setShowEntreMargem} />
             </div>
           </div>
 
           {/* Card preview area */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-slate-50/60">
-            <div className="max-w-lg mx-auto">
-              <div className="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-slate-50/60">
+            <div className="max-w-sm mx-auto">
+              <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden">
 
                 {/* Top stripe */}
-                <div className="h-1.5 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600" />
+                <div className="h-1 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600" />
 
                 {/* Card header */}
-                <div className="px-8 pt-7 pb-5 text-center border-b border-slate-100">
-                  <div className="w-11 h-11 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-blue-100">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="px-5 pt-4 pb-3 text-center border-b border-slate-100">
+                  <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-md shadow-blue-100">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/>
                     </svg>
                   </div>
-                  <h2 className="text-base font-black text-slate-800 uppercase tracking-widest">
+                  <h2 className="text-[13px] font-black text-slate-800 uppercase tracking-widest leading-tight">
                     {container || 'DESCRIÇÃO'}
                   </h2>
                   {container && (
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">DESCRIÇÃO</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-0.5">DESCRIÇÃO</p>
                   )}
                 </div>
 
                 {/* Pré-Stacking rows */}
                 {hasAnyValue ? (
-                  <div className="px-8 py-5">
-                    <div className="text-[9px] font-black text-blue-500 uppercase tracking-[0.25em] mb-3">Pré-Stacking</div>
-                    <div className="space-y-0.5">
+                  <div className="px-5 py-3">
+                    <div className="text-[8px] font-black text-blue-500 uppercase tracking-[0.25em] mb-2">Pré-Stacking</div>
+                    <div className="space-y-0">
                       {valorPSNum > 0 && <DotRow label="Pré-staking" value={fmtBRL(valorPSNum)} />}
                       {diasEstadia > 0 && valorDiaria && (
                         <DotRow label="Diárias excedentes" sub={diariasLabel} value={fmtBRL(valorTotalEstadia)} />
@@ -700,43 +728,42 @@ const ValoresPreStackingTab: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="px-8 py-10 text-center">
-                    <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
-                      <svg className="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="px-5 py-8 text-center">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-2">
+                      <svg className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                       </svg>
                     </div>
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Preencha os campos ao lado</p>
-                    <p className="text-[10px] text-slate-300 mt-1">A prévia aparecerá aqui automaticamente</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Preencha os campos ao lado</p>
                   </div>
                 )}
 
                 {/* Estadia rows */}
                 {showEstadia && valorTotalHoras > 0 && (
-                  <div className="px-8 py-5 border-t border-slate-100">
-                    <div className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.25em] mb-3">Estadia</div>
+                  <div className="px-5 py-3 border-t border-slate-100">
+                    <div className="text-[8px] font-black text-emerald-600 uppercase tracking-[0.25em] mb-2">Estadia</div>
                     <DotRow label="Estadia excedente" sub={horasLabel} value={fmtBRL(valorTotalHoras)} />
                   </div>
                 )}
 
                 {/* Entre Margem rows */}
                 {showEntreMargem && emTotal > 0 && (
-                  <div className="px-8 py-5 border-t border-slate-100">
-                    <div className="text-[9px] font-black text-violet-600 uppercase tracking-[0.25em] mb-3">Entre Margem</div>
+                  <div className="px-5 py-3 border-t border-slate-100">
+                    <div className="text-[8px] font-black text-violet-600 uppercase tracking-[0.25em] mb-2">Entre Margem</div>
                     <DotRow label="Entre Margem" sub={emLabel} value={fmtBRL(emTotal)} />
                   </div>
                 )}
 
                 {/* Total */}
                 {grandTotal > 0 && (
-                  <div className="px-8 py-4 bg-gradient-to-r from-slate-900 to-slate-800">
+                  <div className="px-5 py-3 bg-gradient-to-r from-slate-900 to-slate-800">
                     <TotalRow value={fmtBRL(grandTotal)} />
                   </div>
                 )}
 
                 {/* Footer */}
-                <div className="px-8 py-3 bg-slate-50 border-t border-slate-100 text-center">
-                  <span className="text-[9px] font-bold text-slate-300 uppercase tracking-[0.2em]">ALS Logística · Pré-Stacking</span>
+                <div className="px-5 py-2 bg-slate-50 border-t border-slate-100 text-center">
+                  <span className="text-[8px] font-bold text-slate-300 uppercase tracking-[0.2em]">ALS Logística · Pré-Stacking</span>
                 </div>
               </div>
             </div>

@@ -211,12 +211,27 @@ export const tripRepository = {
     const { error } = await doSave(payloadWithoutId);
 
     if (error) {
-      // Se o erro for de coluna inexistente (PGRST204) e envolver 'agencia'
-      if (error.code === 'PGRST204' || error.message.includes('agencia')) {
-        console.warn('Coluna "agencia" não encontrada na tabela "trips". Tentando salvar sem este campo...');
+      // Coluna inexistente no banco (migration ainda não aplicada) — remove o campo e tenta de novo
+      const missingColumnMatch = error.message?.match(/column ["']?(\w+)["']? (of relation|does not exist)/i)
+        || error.details?.match(/column ["']?(\w+)["']? (of relation|does not exist)/i);
+      const isUnknownColumn = error.code === 'PGRST204' || !!missingColumnMatch
+        || error.message.includes('agencia')
+        || error.message.includes('coleta_order_index');
+
+      if (isUnknownColumn) {
+        // Detecta quais colunas remover
+        const columnsToRemove: string[] = [];
+        if (error.message.includes('agencia')) columnsToRemove.push('agencia');
+        if (error.message.includes('coleta_order_index')) columnsToRemove.push('coleta_order_index');
+        if (missingColumnMatch) columnsToRemove.push(missingColumnMatch[1]);
+
+        // Fallback genérico: tenta também sem coleta_order_index sempre que o erro for de coluna
+        if (!columnsToRemove.includes('coleta_order_index')) columnsToRemove.push('coleta_order_index');
 
         const retryPayload = { ...payloadWithoutId };
-        delete (retryPayload as any).agencia;
+        columnsToRemove.forEach(col => delete (retryPayload as any)[col]);
+
+        console.warn(`Colunas ausentes no banco [${columnsToRemove.join(', ')}] — tentando salvar sem elas...`);
 
         const { error: retryError } = await doSave(retryPayload);
 
