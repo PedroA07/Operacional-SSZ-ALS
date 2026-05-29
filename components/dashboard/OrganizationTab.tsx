@@ -457,9 +457,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           setTerminalVessels(data.map((r: any) => ({
             terminal: r.terminal, navio: r.navio, situacao: r.situacao,
             viagem: r.viagem,
-            gateDry:      r.terminal === 'EMBRAPORT' ? r.dead_line_str : r.gate_dry,
-            gateReefer:   r.terminal === 'EMBRAPORT' ? undefined        : r.gate_reefer,
-            deadLineStr:  r.terminal === 'EMBRAPORT' ? r.gate_dry       : r.dead_line_str,
+            gateDry:      r.gate_dry         ?? undefined,
+            gateReefer:   r.gate_reefer      ?? undefined,
+            deadLineStr:  r.dead_line_str    ?? undefined,
             dtPrevChegada:  r.dt_prev_chegada,
             dtChegada:      r.dt_chegada,
             dtPrevAtrac:    r.dt_prev_atrac,
@@ -647,8 +647,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
 
     if (effectiveStatus === 'GATE FECHADO') {
-      // Usa abertura efetiva se disponível, senão usa previsão (azul) como indicador
-      const aberturaRef = (gateDt && gateDt > now) ? gateDt : (prevGateDt && prevGateDt > now ? prevGateDt : null);
+      // Usa abertura efetiva (futuro) se disponível; senão mostra previsão (azul) mesmo que passada
+      const aberturaRef = (gateDt && gateDt > now) ? gateDt : prevGateDt;
       const isPreview   = !gateDt && !!prevGateDt;
       return (
         <span className="inline-flex items-center gap-1 font-black uppercase rounded-full border text-[7px] px-1.5 py-0.5 bg-red-500/10 text-red-600 border-red-500/30">
