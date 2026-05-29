@@ -584,6 +584,7 @@ export interface Trip {
   coletaEmissaoSolicitada?: boolean;
   isRemovedFromColeta?: boolean;
   isRemovedFromOrg?: boolean;
+  coletaOrderIndex?: number;
   emissaoCteNumber?: string;
   emissaoObservacoes?: string;
 }

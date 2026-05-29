@@ -340,8 +340,8 @@ function buildCardHtml(params: {
     <div style="width:44px;height:44px;background:#2563eb;border-radius:12px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;">
       <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBzdHJva2VXaWR0aD0iMiIgc3Ryb2tlTGluZWNhcD0icm91bmQiIHN0cm9rZUxpbmVqb2luPSJyb3VuZCIgZD0iTTIwIDdsLTgtNC04IDRtMTYgMGwtOCA0bTgtNHYxMGwtOCA0bTAtMTBMNCA3bTggNHYxMCIvPjwvc3ZnPg==" width="22" height="22" alt="" style="display:block;"/>
     </div>
-    <div style="font-size:15px;font-weight:900;color:#1e293b;text-transform:uppercase;letter-spacing:3px;">${container || 'Pré-Stacking In/Out'}</div>
-    ${container ? `<div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:2px;margin-top:3px;">Pré-Stacking In/Out</div>` : ''}
+    <div style="font-size:15px;font-weight:900;color:#1e293b;text-transform:uppercase;letter-spacing:3px;">${container || 'DESCRIÇÃO'}</div>
+    ${container ? `<div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:2px;margin-top:3px;">DESCRIÇÃO</div>` : ''}
   </td></tr>
   <!-- rows -->
   ${rows}
@@ -678,10 +678,10 @@ const ValoresPreStackingTab: React.FC = () => {
                     </svg>
                   </div>
                   <h2 className="text-base font-black text-slate-800 uppercase tracking-widest">
-                    {container || 'Pré-Stacking In/Out'}
+                    {container || 'DESCRIÇÃO'}
                   </h2>
                   {container && (
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Pré-Stacking In/Out</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">DESCRIÇÃO</p>
                   )}
                 </div>
 
