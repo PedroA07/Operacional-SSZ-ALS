@@ -40,6 +40,7 @@ const ExternalPortal     = lazy(() => import('./components/dashboard/third-party
 const NaviosTab          = lazy(() => import('./components/dashboard/ships/NaviosTab'));
 const FreightTableTab    = lazy(() => import('./components/dashboard/FreightTableTab'));
 const EmissoesTab        = lazy(() => import('./components/dashboard/EmissoesTab'));
+const ValoresPreStackingTab = lazy(() => import('./components/dashboard/ValoresPreStackingTab'));
 
 const TabFallback = () => (
   <div className="flex-1 flex items-center justify-center py-24">
@@ -434,6 +435,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 setFeedback({ show: true, title: 'Erro', message: 'Falha ao salvar unidade. Verifique o console.', type: 'error' });
               }
             }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(false); } }} />}
+           {activeTab === DashboardTab.VALORES_PRE_STACKING && <ValoresPreStackingTab />}
            {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={() => loadAllData(false)} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
            {activeTab === DashboardTab.AUTOMACOES && <AutomationsTab />}
            {activeTab === DashboardTab.NAVIOS && <NaviosTab user={user} trips={trips} />}
