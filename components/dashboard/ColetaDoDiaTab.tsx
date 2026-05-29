@@ -14,7 +14,7 @@ interface ColetaDoDiaTabProps {
   onRefresh: () => Promise<void>;
 }
 
-const CopyBtn: React.FC<{ text: string; title?: string }> = ({ text, title }) => {
+const CopyBtn: React.FC<{ text: string | undefined | null; title?: string }> = ({ text, title }) => {
   const [copied, setCopied] = React.useState(false);
   if (!text || text === '---') return null;
   return (
