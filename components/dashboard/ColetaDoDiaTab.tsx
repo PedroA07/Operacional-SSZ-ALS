@@ -252,6 +252,10 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
 
   const STABILITY_DURATION = 30000;
 
+  // Drag-and-drop state
+  const [dragFromIdx, setDragFromIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
   useEffect(() => {
     setEmailTemplates(propTemplates);
   }, [propTemplates]);
@@ -334,6 +338,13 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         return normalized >= '2026-04-01';
       })
       .sort((a, b) => {
+        // Ordem manual tem prioridade quando definida
+        const aIdx = a.coletaOrderIndex;
+        const bIdx = b.coletaOrderIndex;
+        if (aIdx != null && bIdx != null) return aIdx - bIdx;
+        if (aIdx != null) return -1;
+        if (bIdx != null) return 1;
+        // Fallback: NF enviada → data → motorista
         const aNF = !!a.sentNF;
         const bNF = !!b.sentNF;
         if (aNF !== bNF) return aNF ? -1 : 1;
@@ -438,6 +449,31 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       }));
     }
   }, [defaultTipoViagemId]);
+
+  // Salva a nova ordem de todas as viagens visíveis após drag-and-drop
+  const handleDropReorder = useCallback(async (_e: React.DragEvent, dropIdx: number) => {
+    setDragOverIdx(null);
+    if (dragFromIdx === null || dragFromIdx === dropIdx) { setDragFromIdx(null); return; }
+
+    // trips é a lista visível na aba atual, já ordenada
+    const reordered = [...trips];
+    const [moved] = reordered.splice(dragFromIdx, 1);
+    reordered.splice(dropIdx, 0, moved);
+
+    setDragFromIdx(null);
+
+    // Salva coletaOrderIndex = posição para cada trip reordenada
+    const saves = reordered.map((trip, idx) =>
+      db.saveTrip({ ...trip, coletaOrderIndex: idx })
+    );
+    try {
+      await Promise.all(saves);
+    } catch {
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Erro ao salvar ordem', type: 'error' }
+      }));
+    }
+  }, [dragFromIdx, trips]);
 
   const removePunctuation = (str?: string) => str ? str.replace(/[^\w\s]/gi, '') : '---';
 
@@ -1009,6 +1045,11 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
             hideInternalSearch={false}
             getRowClassName={getRowClassName}
             getRowStyle={getRowStyle}
+            draggableRows
+            dragOverIndex={dragOverIdx}
+            onRowDragStart={(_row, idx) => setDragFromIdx(idx)}
+            onRowDragOver={(_e, idx) => setDragOverIdx(idx)}
+            onRowDrop={handleDropReorder}
           />
         </div>
       </div>

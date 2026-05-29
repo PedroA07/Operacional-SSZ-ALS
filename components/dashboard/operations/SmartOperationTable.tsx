@@ -24,12 +24,22 @@ interface SmartOperationTableProps {
   getRowClassName?: (row: any) => string;
   getRowStyle?: (row: any) => React.CSSProperties;
   noMaxHeight?: boolean;
-  stickyHeaderTop?: number; // offset em px para o header sticky (quando noMaxHeight=true)
+  stickyHeaderTop?: number;
+  draggableRows?: boolean;
+  onRowDragStart?: (row: any, index: number) => void;
+  onRowDragOver?: (e: React.DragEvent, index: number) => void;
+  onRowDrop?: (e: React.DragEvent, index: number) => void;
+  dragOverIndex?: number | null;
 }
 
 const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
   userId,
   componentId,
+  draggableRows,
+  onRowDragStart,
+  onRowDragOver,
+  onRowDrop,
+  dragOverIndex,
   columns,
   data,
   title,
@@ -348,10 +358,14 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
           </thead>
           <tbody className="divide-y divide-slate-200 bg-white">
             {paginatedData.map((row, idx) => (
-              <tr 
-                key={row.id || idx} 
+              <tr
+                key={row.id || idx}
                 onClick={() => onRowClick?.(row)}
-                className={`group transition-all ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'} ${onRowClick ? 'cursor-pointer hover:bg-blue-50/40' : 'hover:bg-slate-50/50'} ${getRowClassName ? getRowClassName(row) : ''}`}
+                draggable={draggableRows}
+                onDragStart={draggableRows ? (e) => { e.dataTransfer.effectAllowed = 'move'; onRowDragStart?.(row, idx); } : undefined}
+                onDragOver={draggableRows ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onRowDragOver?.(e, idx); } : undefined}
+                onDrop={draggableRows ? (e) => { e.preventDefault(); onRowDrop?.(e, idx); } : undefined}
+                className={`group transition-all ${draggableRows ? 'cursor-grab active:cursor-grabbing' : ''} ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'} ${dragOverIndex === idx ? 'bg-blue-50 border-t-2 border-t-blue-400' : ''} ${onRowClick ? 'hover:bg-blue-50/40' : 'hover:bg-slate-50/50'} ${getRowClassName ? getRowClassName(row) : ''}`}
                 style={getRowStyle ? getRowStyle(row) : {}}
               >
                 {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
