@@ -10,6 +10,7 @@ import { db } from '../../../utils/storage';
 import { maskCNPJ, maskCEP } from '../../../utils/masks';
 import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
 import DateTimePicker from '../../shared/DateTimePicker';
+import CustomSelect from '../../shared/CustomSelect';
 import { tripSyncService } from '../../../utils/tripSyncService';
 import { osCategoryService } from '../../../utils/osCategoryService';
 
@@ -437,33 +438,31 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
           </div>
           <div className="space-y-1">
             <label className={labelClass}>Motorista <span className="text-red-500">*</span></label>
-            <select
-              className={inputClass}
+            <CustomSelect
               value={formData.driverId}
-              onChange={e => {
-                const drv = drivers.find(d => d.id === e.target.value) || null;
-                setFormData({...formData, driverId: e.target.value});
+              onChange={v => {
+                const drv = drivers.find(d => d.id === v) || null;
+                setFormData({...formData, driverId: v});
                 setSelectedDriver(drv);
                 if (drv) { setPlateHorse(primaryHorse(drv)); setPlateTrailer(primaryTrailer(drv)); }
               }}
-            >
-              <option value="">SELECIONAR MOTORISTA...</option>
-              {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
+              options={drivers.map(d => ({ value: d.id, label: d.name }))}
+              placeholder="SELECIONAR MOTORISTA..."
+              inputClassName={inputClass}
+            />
           </div>
           <div className="space-y-1">
             <label className={labelClass}>Cliente / Remetente <span className="text-red-500">*</span></label>
-            <select
-              className={inputClass}
+            <CustomSelect
               value={formData.remetenteId}
-              onChange={e => {
-                setFormData({...formData, remetenteId: e.target.value});
-                setSelectedRemetente(customers.find(c => c.id === e.target.value) || null);
+              onChange={v => {
+                setFormData({...formData, remetenteId: v});
+                setSelectedRemetente(customers.find(c => c.id === v) || null);
               }}
-            >
-              <option value="">SELECIONAR CLIENTE...</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+              options={customers.map(c => ({ value: c.id, label: c.name }))}
+              placeholder="SELECIONAR CLIENTE..."
+              inputClassName={inputClass}
+            />
           </div>
         </div>
         )}
