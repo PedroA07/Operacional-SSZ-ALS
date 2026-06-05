@@ -30,9 +30,10 @@ interface LocationSearchableSelectProps {
   locations: any[];
   onLocationChange: (trip: Trip, locationId: string) => void;
   isScheduled?: boolean;
+  isFreteMorto?: boolean;
 }
 
-const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ trip, locations, onLocationChange, isScheduled }) => {
+const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ trip, locations, onLocationChange, isScheduled, isFreteMorto }) => {
   const selectedLoc = locations.find(l => l.id === trip.scheduledLocationId);
   const [isSearching, setIsSearching] = useState(false);
   const [search, setSearch] = useState('');
@@ -54,10 +55,18 @@ const LocationSearchableSelect: React.FC<LocationSearchableSelectProps> = ({ tri
     return locations.find(l => l.id === id);
   }, [trip, locations]);
 
+  if (isFreteMorto) {
+    return (
+      <div className="min-w-[180px] border rounded-lg px-2 py-2 bg-slate-100 border-slate-400 flex items-center justify-center">
+        <span className="text-[9px] font-black text-slate-600 uppercase tracking-wider">Frete Morto</span>
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-w-[180px]">
       {!isSearching ? (
-        <div 
+        <div
           onClick={() => setIsSearching(true)}
           className={`w-full border rounded-lg px-2 py-1.5 cursor-pointer transition-all group ${isScheduled ? 'bg-emerald-100/50 border-emerald-300 shadow-sm hover:border-emerald-500' : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-sm'}`}
         >
@@ -992,6 +1001,40 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, []);
 
+  const handleToggleFreteMorto = useCallback(async (trip: Trip, activate: boolean) => {
+    const newStatus: TripStatus = activate
+      ? 'Frete Morto'
+      : (trip.statusHistory?.slice().reverse().find(h => h.status !== 'Frete Morto')?.status || 'Pendente');
+    const now = Date.now();
+    setPendingUpdates(prev => ({
+      ...prev,
+      [trip.id]: { data: { ...(prev[trip.id]?.data || {}), status: newStatus }, timestamp: now }
+    }));
+    try {
+      await db.saveTrip({ ...trip, status: newStatus });
+    } catch {
+      setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar Frete Morto', type: 'error' } }));
+    }
+  }, []);
+
+  const handleToggleReutilizacao = useCallback(async (trip: Trip, activate: boolean) => {
+    const newStatus: TripStatus = activate
+      ? 'Reutilização'
+      : (trip.statusHistory?.slice().reverse().find(h => h.status !== 'Reutilização')?.status || 'Pendente');
+    const now = Date.now();
+    setPendingUpdates(prev => ({
+      ...prev,
+      [trip.id]: { data: { ...(prev[trip.id]?.data || {}), status: newStatus }, timestamp: now }
+    }));
+    try {
+      await db.saveTrip({ ...trip, status: newStatus });
+    } catch {
+      setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar Reutilização', type: 'error' } }));
+    }
+  }, []);
+
   const handleToggleScheduled = useCallback(async (trip: Trip, checked: boolean) => {
     if (checked) {
       setSelectedTripForScheduling(trip);
@@ -1710,15 +1753,16 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         );
       }
     },
-    { 
-      key: 'scheduledLocationId', 
-      label: 'Local Agendamento', 
+    {
+      key: 'scheduledLocationId',
+      label: 'Local Agendamento',
       render: (t: Trip) => (
-        <LocationSearchableSelect 
-          trip={t} 
-          locations={locations} 
-          onLocationChange={handleLocationChange} 
+        <LocationSearchableSelect
+          trip={t}
+          locations={locations}
+          onLocationChange={handleLocationChange}
           isScheduled={isTripScheduled(t)}
+          isFreteMorto={t.status === 'Frete Morto'}
         />
       )
     },
@@ -1777,6 +1821,40 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       )
     },
     {
+      key: 'freteMortoReut',
+      label: activeView === 'COLETA' ? 'Frete Morto' : 'Reutilização',
+      sortable: false,
+      render: (t: Trip) => {
+        if (activeView === 'COLETA') {
+          const isFreteMorto = t.status === 'Frete Morto';
+          return (
+            <div className="flex items-center justify-center">
+              <button
+                onClick={(e) => { e.stopPropagation(); handleToggleFreteMorto(t, !isFreteMorto); }}
+                className={`px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${isFreteMorto ? 'bg-slate-100 border-slate-500 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                title={isFreteMorto ? 'Frete Morto — clique para reverter' : 'Marcar como Frete Morto'}
+              >
+                Frete Morto
+              </button>
+            </div>
+          );
+        } else {
+          const isReutilizacao = t.status === 'Reutilização';
+          return (
+            <div className="flex items-center justify-center">
+              <button
+                onClick={(e) => { e.stopPropagation(); handleToggleReutilizacao(t, !isReutilizacao); }}
+                className={`px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${isReutilizacao ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white border-slate-200 text-slate-400 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
+                title={isReutilizacao ? 'Reutilização — clique para reverter' : 'Marcar como Reutilização'}
+              >
+                Reutilização
+              </button>
+            </div>
+          );
+        }
+      }
+    },
+    {
       key: 'actions',
       label: 'Ações',
       sortable: false,
@@ -1794,7 +1872,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao]);
 
   const handleDeleteDevolucao = useCallback((d: Devolucao) => {
     setConfirmModal({
