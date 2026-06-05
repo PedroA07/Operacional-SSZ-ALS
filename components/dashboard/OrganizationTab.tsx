@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Trip, Port, PreStacking, TripStatus, TerminalVessel, Driver, Customer, Devolucao, Liberacao } from '../../types';
+import { Trip, Port, PreStacking, TripStatus, StatusHistoryEntry, TerminalVessel, Driver, Customer, Devolucao, Liberacao } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { organizationService } from '../../services/organizationService';
 import { advanceService } from '../../services/advanceService';
@@ -1001,39 +1001,45 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, []);
 
-  const handleToggleFreteMorto = useCallback(async (trip: Trip, activate: boolean) => {
-    const newStatus: TripStatus = activate
-      ? 'Frete Morto'
-      : (trip.statusHistory?.slice().reverse().find(h => h.status !== 'Frete Morto')?.status || 'Pendente');
+  const applyStatusToggle = useCallback(async (
+    trip: Trip,
+    activate: boolean,
+    targetStatus: TripStatus,
+    errMsg: string,
+  ) => {
+    const nowIso = new Date().toISOString();
+    const history = trip.statusHistory || [];
+    let newStatus: TripStatus;
+    let newHistory: StatusHistoryEntry[];
+
+    if (activate) {
+      newStatus = targetStatus;
+      newHistory = [...history, { status: targetStatus, dateTime: trip.dateTime || nowIso, createdAt: nowIso }];
+    } else {
+      // Remove as entradas desse status e volta ao último status anterior
+      newHistory = history.filter(h => h.status !== targetStatus);
+      newStatus = newHistory.length ? newHistory[newHistory.length - 1].status : 'Pendente';
+    }
+
+    const updated = { ...trip, status: newStatus, statusHistory: newHistory };
     const now = Date.now();
     setPendingUpdates(prev => ({
       ...prev,
-      [trip.id]: { data: { ...(prev[trip.id]?.data || {}), status: newStatus }, timestamp: now }
+      [trip.id]: { data: { ...(prev[trip.id]?.data || {}), status: newStatus, statusHistory: newHistory }, timestamp: now }
     }));
     try {
-      await db.saveTrip({ ...trip, status: newStatus });
+      await db.saveTrip(updated);
     } catch {
       setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
-      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar Frete Morto', type: 'error' } }));
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: errMsg, type: 'error' } }));
     }
   }, []);
 
-  const handleToggleReutilizacao = useCallback(async (trip: Trip, activate: boolean) => {
-    const newStatus: TripStatus = activate
-      ? 'Reutilização'
-      : (trip.statusHistory?.slice().reverse().find(h => h.status !== 'Reutilização')?.status || 'Pendente');
-    const now = Date.now();
-    setPendingUpdates(prev => ({
-      ...prev,
-      [trip.id]: { data: { ...(prev[trip.id]?.data || {}), status: newStatus }, timestamp: now }
-    }));
-    try {
-      await db.saveTrip({ ...trip, status: newStatus });
-    } catch {
-      setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
-      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar Reutilização', type: 'error' } }));
-    }
-  }, []);
+  const handleToggleFreteMorto = useCallback((trip: Trip, activate: boolean) =>
+    applyStatusToggle(trip, activate, 'Frete Morto', 'Erro ao salvar Frete Morto'), [applyStatusToggle]);
+
+  const handleToggleReutilizacao = useCallback((trip: Trip, activate: boolean) =>
+    applyStatusToggle(trip, activate, 'Reutilização', 'Erro ao salvar Reutilização'), [applyStatusToggle]);
 
   const handleToggleScheduled = useCallback(async (trip: Trip, checked: boolean) => {
     if (checked) {
@@ -1756,15 +1762,44 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     {
       key: 'scheduledLocationId',
       label: 'Local Agendamento',
-      render: (t: Trip) => (
-        <LocationSearchableSelect
-          trip={t}
-          locations={locations}
-          onLocationChange={handleLocationChange}
-          isScheduled={isTripScheduled(t)}
-          isFreteMorto={t.status === 'Frete Morto'}
-        />
-      )
+      render: (t: Trip) => {
+        const isFreteMorto = t.status === 'Frete Morto';
+        const isReutilizacao = t.status === 'Reutilização';
+        return (
+          <div className="flex flex-col gap-1.5">
+            <LocationSearchableSelect
+              trip={t}
+              locations={locations}
+              onLocationChange={handleLocationChange}
+              isScheduled={isTripScheduled(t)}
+              isFreteMorto={isFreteMorto}
+            />
+            {activeView === 'COLETA' ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleToggleFreteMorto(t, !isFreteMorto); }}
+                className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${isFreteMorto ? 'bg-slate-200 border-slate-500 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                title={isFreteMorto ? 'Frete Morto — clique para reverter' : 'Marcar como Frete Morto'}
+              >
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                </svg>
+                {isFreteMorto ? 'Frete Morto ✓' : 'Frete Morto'}
+              </button>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleToggleReutilizacao(t, !isReutilizacao); }}
+                className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${isReutilizacao ? 'bg-emerald-100 border-emerald-500 text-emerald-700' : 'bg-white border-slate-200 text-slate-400 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
+                title={isReutilizacao ? 'Reutilização — clique para reverter' : 'Marcar como Reutilização'}
+              >
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                {isReutilizacao ? 'Reutilização ✓' : 'Reutilização'}
+              </button>
+            )}
+          </div>
+        );
+      }
     },
     {
       key: 'scheduledDateTime',
@@ -1819,40 +1854,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           )}
         </div>
       )
-    },
-    {
-      key: 'freteMortoReut',
-      label: activeView === 'COLETA' ? 'Frete Morto' : 'Reutilização',
-      sortable: false,
-      render: (t: Trip) => {
-        if (activeView === 'COLETA') {
-          const isFreteMorto = t.status === 'Frete Morto';
-          return (
-            <div className="flex items-center justify-center">
-              <button
-                onClick={(e) => { e.stopPropagation(); handleToggleFreteMorto(t, !isFreteMorto); }}
-                className={`px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${isFreteMorto ? 'bg-slate-100 border-slate-500 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
-                title={isFreteMorto ? 'Frete Morto — clique para reverter' : 'Marcar como Frete Morto'}
-              >
-                Frete Morto
-              </button>
-            </div>
-          );
-        } else {
-          const isReutilizacao = t.status === 'Reutilização';
-          return (
-            <div className="flex items-center justify-center">
-              <button
-                onClick={(e) => { e.stopPropagation(); handleToggleReutilizacao(t, !isReutilizacao); }}
-                className={`px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${isReutilizacao ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white border-slate-200 text-slate-400 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
-                title={isReutilizacao ? 'Reutilização — clique para reverter' : 'Marcar como Reutilização'}
-              >
-                Reutilização
-              </button>
-            </div>
-          );
-        }
-      }
     },
     {
       key: 'actions',
@@ -2400,6 +2401,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               data={trips}
               hideInternalSearch={false}
               getRowStyle={(t: Trip) => {
+                if (t.status === 'Frete Morto') return { backgroundColor: '#f1f5f9', boxShadow: 'inset 4px 0 0 #64748b' };
                 if (isTripReadyToFinalize(t)) return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #10b981' };
                 if (isTripScheduled(t))       return { backgroundColor: '#fffbeb', boxShadow: 'inset 4px 0 0 #f59e0b' };
                 return {};
@@ -2419,6 +2421,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               data={trips}
               hideInternalSearch={false}
               getRowStyle={(t: Trip) => {
+                if (t.status === 'Reutilização') return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #059669' };
                 if (isTripReadyToFinalize(t)) return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #10b981' };
                 if (isTripScheduled(t))       return { backgroundColor: '#fffbeb', boxShadow: 'inset 4px 0 0 #f59e0b' };
                 return {};

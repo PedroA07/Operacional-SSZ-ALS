@@ -723,12 +723,24 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips, devolucoes
         key: 'status', label: 'Status',
         sortValue: (t: Trip) => t.status || '',
         render: (t: Trip) => {
-          const history = t.statusHistory;
-          if (!history?.length) return <span className="text-[9px] font-bold text-slate-400 uppercase italic">—</span>;
+          const history = t.statusHistory || [];
           const sorted = [...history].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          const isCompleted = t.isCompleted || sorted[0]?.status === 'Viagem concluída';
+          // Frete Morto / Reutilização são gravados em t.status (não no histórico).
+          // Exibe-os como status atual no topo para o usuário externo.
+          const isFreteMorto = t.status === 'Frete Morto';
+          const isReutilizacao = t.status === 'Reutilização';
+          const entries: string[] = sorted.map(e => e.status);
+          if ((isFreteMorto || isReutilizacao) && entries[0] !== t.status) {
+            entries.unshift(t.status);
+          }
+          if (!entries.length) return <span className="text-[9px] font-bold text-slate-400 uppercase italic">—</span>;
+          const isCompleted = t.isCompleted || entries[0] === 'Viagem concluída';
           const getStyle = (status: string, isLatest: boolean) => {
-            if (status === 'Viagem concluída' || isCompleted)
+            if (status === 'Frete Morto')
+              return isLatest ? 'bg-slate-500 text-white shadow-sm shadow-slate-200 border-slate-400 scale-[1.03]' : 'bg-slate-100 text-slate-500 border-slate-200';
+            if (status === 'Reutilização')
+              return isLatest ? 'bg-teal-500 text-white shadow-sm shadow-teal-200 border-teal-400 scale-[1.03]' : 'bg-teal-50 text-teal-600 border-teal-100';
+            if (status === 'Viagem concluída' || (isCompleted && status !== 'Frete Morto' && status !== 'Reutilização'))
               return isLatest ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200 border-emerald-400 scale-[1.03]' : 'bg-emerald-50 text-emerald-600 border-emerald-100';
             if (status === 'Viagem cancelada')
               return isLatest ? 'bg-red-500 text-white shadow-sm shadow-red-200 border-red-400' : 'bg-red-50 text-red-500 border-red-100';
@@ -736,9 +748,9 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips, devolucoes
           };
           return (
             <div className="flex flex-col gap-1 py-0.5">
-              {sorted.map((entry, idx) => (
-                <div key={idx} className={`px-2 py-1 rounded-lg border text-[8px] font-black uppercase tracking-wide transition-all ${getStyle(entry.status, idx === 0)}`}>
-                  {entry.status}
+              {entries.map((status, idx) => (
+                <div key={idx} className={`px-2 py-1 rounded-lg border text-[8px] font-black uppercase tracking-wide transition-all ${getStyle(status, idx === 0)}`}>
+                  {status}
                 </div>
               ))}
             </div>
