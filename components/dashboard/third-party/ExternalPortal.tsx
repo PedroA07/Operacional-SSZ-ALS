@@ -777,6 +777,15 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips, devolucoes
         key: 'scheduling', label: 'Agendamento',
         sortValue: (t: Trip) => t.scheduling?.dateTime || '',
         render: (t: Trip) => {
+          if (t.status === 'Frete Morto') {
+            return (
+              <div className="flex flex-col gap-0.5">
+                <span className="px-2 py-1 bg-slate-100 border border-slate-400 rounded-lg text-[9px] font-black text-slate-600 uppercase tracking-wide">
+                  Frete Morto
+                </span>
+              </div>
+            );
+          }
           const s = t.scheduling;
           if (!s) return <span className="text-[9px] text-slate-300 italic">—</span>;
           let fDate = '', fTime = '';
