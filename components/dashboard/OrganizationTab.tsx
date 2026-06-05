@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Trip, Port, PreStacking, TripStatus, TerminalVessel, Driver, Customer, Devolucao, Liberacao } from '../../types';
+import { Trip, Port, PreStacking, TripStatus, StatusHistoryEntry, TerminalVessel, Driver, Customer, Devolucao, Liberacao } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { organizationService } from '../../services/organizationService';
 import { advanceService } from '../../services/advanceService';
@@ -1001,39 +1001,45 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, []);
 
-  const handleToggleFreteMorto = useCallback(async (trip: Trip, activate: boolean) => {
-    const newStatus: TripStatus = activate
-      ? 'Frete Morto'
-      : (trip.statusHistory?.slice().reverse().find(h => h.status !== 'Frete Morto')?.status || 'Pendente');
+  const applyStatusToggle = useCallback(async (
+    trip: Trip,
+    activate: boolean,
+    targetStatus: TripStatus,
+    errMsg: string,
+  ) => {
+    const nowIso = new Date().toISOString();
+    const history = trip.statusHistory || [];
+    let newStatus: TripStatus;
+    let newHistory: StatusHistoryEntry[];
+
+    if (activate) {
+      newStatus = targetStatus;
+      newHistory = [...history, { status: targetStatus, dateTime: trip.dateTime || nowIso, createdAt: nowIso }];
+    } else {
+      // Remove as entradas desse status e volta ao último status anterior
+      newHistory = history.filter(h => h.status !== targetStatus);
+      newStatus = newHistory.length ? newHistory[newHistory.length - 1].status : 'Pendente';
+    }
+
+    const updated = { ...trip, status: newStatus, statusHistory: newHistory };
     const now = Date.now();
     setPendingUpdates(prev => ({
       ...prev,
-      [trip.id]: { data: { ...(prev[trip.id]?.data || {}), status: newStatus }, timestamp: now }
+      [trip.id]: { data: { ...(prev[trip.id]?.data || {}), status: newStatus, statusHistory: newHistory }, timestamp: now }
     }));
     try {
-      await db.saveTrip({ ...trip, status: newStatus });
+      await db.saveTrip(updated);
     } catch {
       setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
-      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar Frete Morto', type: 'error' } }));
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: errMsg, type: 'error' } }));
     }
   }, []);
 
-  const handleToggleReutilizacao = useCallback(async (trip: Trip, activate: boolean) => {
-    const newStatus: TripStatus = activate
-      ? 'Reutilização'
-      : (trip.statusHistory?.slice().reverse().find(h => h.status !== 'Reutilização')?.status || 'Pendente');
-    const now = Date.now();
-    setPendingUpdates(prev => ({
-      ...prev,
-      [trip.id]: { data: { ...(prev[trip.id]?.data || {}), status: newStatus }, timestamp: now }
-    }));
-    try {
-      await db.saveTrip({ ...trip, status: newStatus });
-    } catch {
-      setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
-      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar Reutilização', type: 'error' } }));
-    }
-  }, []);
+  const handleToggleFreteMorto = useCallback((trip: Trip, activate: boolean) =>
+    applyStatusToggle(trip, activate, 'Frete Morto', 'Erro ao salvar Frete Morto'), [applyStatusToggle]);
+
+  const handleToggleReutilizacao = useCallback((trip: Trip, activate: boolean) =>
+    applyStatusToggle(trip, activate, 'Reutilização', 'Erro ao salvar Reutilização'), [applyStatusToggle]);
 
   const handleToggleScheduled = useCallback(async (trip: Trip, checked: boolean) => {
     if (checked) {
