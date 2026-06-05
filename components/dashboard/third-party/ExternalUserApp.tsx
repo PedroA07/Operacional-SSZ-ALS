@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Trip, Devolucao, Customer } from '../../../types';
-import { db } from '../../../utils/storage';
+import { db, supabase } from '../../../utils/storage';
 import ExternalPortal from './ExternalPortal';
 
 interface ExternalUserAppProps {
@@ -27,10 +27,36 @@ const ExternalUserApp: React.FC<ExternalUserAppProps> = ({ user, onLogout }) => 
     }
   }, []);
 
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 30000); // Atualiza a cada 30 segundos
-    return () => clearInterval(interval);
+
+    // Atualização em tempo real via Supabase Realtime.
+    // Faz debounce para agrupar múltiplas mudanças em um único reload.
+    let channel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null;
+    if (supabase) {
+      const scheduleReload = () => {
+        if (reloadTimer.current) clearTimeout(reloadTimer.current);
+        reloadTimer.current = setTimeout(loadData, 500);
+      };
+
+      channel = supabase
+        .channel('external-portal-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, scheduleReload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'devolucoes' }, scheduleReload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, scheduleReload)
+        .subscribe();
+    }
+
+    // Fallback de polling (caso o realtime esteja indisponível na conexão)
+    const interval = setInterval(loadData, 30000);
+
+    return () => {
+      clearInterval(interval);
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
+      if (channel && supabase) supabase.removeChannel(channel);
+    };
   }, [loadData]);
 
   if (isLoading) {
