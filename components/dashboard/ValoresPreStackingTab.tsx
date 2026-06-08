@@ -293,11 +293,14 @@ function buildCardHtml(params: {
   diasEstadia: number; valorDiaria: string; valorTotalEstadia: number; diariasLabel: string;
   adValorTotal: number; adValLabel: string;
   showEstadia: boolean; valorTotalHoras: number; horasLabel: string;
+  estInicio: string; estFim: string; horasFreeNum: number;
+  totalHoras: number; horasExcedentes: number; diasExc: number; horasResiduo: number; valorHoraNum: number;
   showEntreMargem: boolean; emTotal: number; emLabel: string;
   grandTotal: number;
 }): string {
   const { container, valorPS, valorPSFmt, diasEstadia, valorDiaria, valorTotalEstadia, diariasLabel,
     adValorTotal, adValLabel, showEstadia, valorTotalHoras, horasLabel,
+    estInicio, estFim, horasFreeNum, totalHoras, horasExcedentes, diasExc, horasResiduo, valorHoraNum,
     showEntreMargem, emTotal, emLabel, grandTotal } = params;
 
   const dotRow = (label: string, sub: string, val: string) => `
@@ -323,7 +326,13 @@ function buildCardHtml(params: {
 
   if (showEstadia && valorTotalHoras > 0) {
     rows += sectionLabel('Estadia', '#10b981');
-    rows += dotRow('Estadia excedente', horasLabel, fmtBRL(valorTotalHoras));
+    if (estInicio) rows += dotRow('Data/Hora de Início', '', estInicio);
+    if (estFim) rows += dotRow('Data/Hora de Término', '', estFim);
+    rows += dotRow('Horas FREE', '', `${horasFreeNum}h`);
+    if (totalHoras > 0) rows += dotRow('Total do Período', '', `${Math.floor(totalHoras)}h ${Math.round((totalHoras % 1) * 60)}min`);
+    rows += dotRow('Horas de Estadia', '', `${diasExc > 0 ? `${diasExc}d ` : ''}${horasResiduo}h`);
+    rows += dotRow('Valor por Hora', '', fmtBRL(valorHoraNum) + '/h');
+    rows += dotRow('Total Estadia', '', fmtBRL(valorTotalHoras));
   }
 
   if (showEntreMargem && emTotal > 0) {
@@ -434,6 +443,7 @@ const ValoresPreStackingTab: React.FC = () => {
       diasEstadia, valorDiaria, valorTotalEstadia, diariasLabel,
       adValorTotal, adValLabel,
       showEstadia, valorTotalHoras, horasLabel,
+      estInicio, estFim, horasFreeNum, totalHoras, horasExcedentes, diasExc, horasResiduo, valorHoraNum,
       showEntreMargem, emTotal, emLabel,
       grandTotal,
     });
@@ -466,7 +476,17 @@ const ValoresPreStackingTab: React.FC = () => {
     if (valorPSNum > 0) lines.push(`Pré-staking: ${fmtBRL(valorPSNum)}`);
     if (diasEstadia > 0 && valorDiaria) lines.push(`Diárias excedentes (${diariasLabel}): ${fmtBRL(valorTotalEstadia)}`);
     if (adValorTotal > 0) lines.push(`Ad-Valorem (${adValLabel}): ${fmtBRL(adValorTotal)}`);
-    if (showEstadia && valorTotalHoras > 0) lines.push(`Estadia (${horasLabel}): ${fmtBRL(valorTotalHoras)}`);
+    if (showEstadia && valorTotalHoras > 0) {
+      lines.push('');
+      lines.push('ESTADIA');
+      if (estInicio) lines.push(`Data/Hora de Início: ${estInicio}`);
+      if (estFim) lines.push(`Data/Hora de Término: ${estFim}`);
+      lines.push(`Horas FREE: ${horasFreeNum}h`);
+      if (totalHoras > 0) lines.push(`Total do Período: ${Math.floor(totalHoras)}h ${Math.round((totalHoras % 1) * 60)}min`);
+      lines.push(`Horas de Estadia: ${diasExc > 0 ? `${diasExc}d ` : ''}${horasResiduo}h`);
+      lines.push(`Valor por Hora: ${fmtBRL(valorHoraNum)}/h`);
+      lines.push(`Total Estadia: ${fmtBRL(valorTotalHoras)}`);
+    }
     if (showEntreMargem && emTotal > 0) lines.push(`Entre Margem (${emLabel}): ${fmtBRL(emTotal)}`);
     lines.push('', `Total Geral: ${fmtBRL(grandTotal)}`);
     return lines.join('\n');
