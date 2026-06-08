@@ -112,13 +112,13 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
             />
           </div>
 
-          {/* Row 1: Category / Subcategory */}
+          {/* Row 1: Vínculo / Sub-vínculo */}
           <div className="grid grid-cols-2 gap-6">
             <div className="relative">
               <label className={labelClass}>
-                Categoria
+                Vínculo Operacional
                 {form.category && getCategoryForType(form.type || '', operationTypes) === form.category && (
-                  <span className="ml-2 text-[8px] text-blue-400 normal-case font-bold animate-pulse">✓ automática</span>
+                  <span className="ml-2 text-[8px] text-blue-400 normal-case font-bold animate-pulse">✓ automático</span>
                 )}
               </label>
               <CustomSelect
@@ -131,7 +131,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
               />
             </div>
             <div className="relative">
-              <label className={labelClass}>Subcategoria</label>
+              <label className={labelClass}>Sub-vínculo</label>
               <CustomSelect
                 value={form.subCategory || ''}
                 onChange={v => setForm({...form, subCategory: v})}
