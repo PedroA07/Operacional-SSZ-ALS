@@ -1035,8 +1035,36 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, []);
 
-  const handleToggleFreteMorto = useCallback((trip: Trip, activate: boolean) =>
-    applyStatusToggle(trip, activate, 'Frete Morto', 'Erro ao salvar Frete Morto'), [applyStatusToggle]);
+  const handleToggleFreteMorto = useCallback(async (trip: Trip, activate: boolean) => {
+    const nowIso = new Date().toISOString();
+    const history = trip.statusHistory || [];
+    let newStatus: TripStatus;
+    let newHistory: typeof history;
+
+    if (activate) {
+      newStatus = 'Frete Morto';
+      newHistory = [...history, { status: 'Frete Morto' as TripStatus, dateTime: trip.dateTime || nowIso, createdAt: nowIso }];
+    } else {
+      newHistory = history.filter(h => h.status !== 'Frete Morto');
+      newStatus = newHistory.length ? newHistory[newHistory.length - 1].status : 'Pendente';
+    }
+
+    const updated = { ...trip, status: newStatus, statusHistory: newHistory, isRemovedFromColeta: activate };
+    const now = Date.now();
+    setPendingUpdates(prev => ({
+      ...prev,
+      [trip.id]: {
+        data: { ...(prev[trip.id]?.data || {}), status: newStatus, statusHistory: newHistory, isRemovedFromColeta: activate },
+        timestamp: now,
+      }
+    }));
+    try {
+      await db.saveTrip(updated);
+    } catch {
+      setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar Frete Morto', type: 'error' } }));
+    }
+  }, []);
 
   const handleToggleReutilizacao = useCallback((trip: Trip, activate: boolean) =>
     applyStatusToggle(trip, activate, 'Reutilização', 'Erro ao salvar Reutilização'), [applyStatusToggle]);
@@ -1777,16 +1805,31 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               isFreteMorto={isFreteMorto}
             />
             {activeView === 'COLETA' ? (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleToggleFreteMorto(t, !isFreteMorto); }}
-                className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${isFreteMorto ? 'bg-slate-200 border-slate-500 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
-                title={isFreteMorto ? 'Frete Morto — clique para reverter' : 'Marcar como Frete Morto'}
-              >
-                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-                </svg>
-                {isFreteMorto ? 'Frete Morto ✓' : 'Frete Morto'}
-              </button>
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); if (!isFreteMorto) handleToggleFreteMorto(t, true); }}
+                  disabled={isFreteMorto}
+                  className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${isFreteMorto ? 'bg-slate-200 border-slate-500 text-slate-700 cursor-default' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                  title={isFreteMorto ? (t.hasAdvance ? 'Frete Morto — use Limpar para reverter' : 'Frete Morto — libere o adiantamento para limpar') : 'Marcar como Frete Morto'}
+                >
+                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                  </svg>
+                  {isFreteMorto ? 'Frete Morto ✓' : 'Frete Morto'}
+                </button>
+                {isFreteMorto && t.hasAdvance && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleToggleFreteMorto(t, false); }}
+                    className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border bg-red-50 border-red-300 text-red-600 hover:bg-red-100 hover:border-red-400"
+                    title="Limpar Frete Morto — adiantamento liberado"
+                  >
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    Limpar
+                  </button>
+                )}
+              </>
             ) : (
               <button
                 onClick={(e) => { e.stopPropagation(); handleToggleReutilizacao(t, !isReutilizacao); }}
