@@ -10,13 +10,15 @@ interface LoginFormProps {
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [dbOnline, setDbOnline] = useState<boolean | null>(null);
   const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('als_remember_pref') === 'true');
+  const [username, setUsername] = useState(() => {
+    if (localStorage.getItem('als_remember_pref') === 'true') return localStorage.getItem('als_saved_username') || '';
+    return '';
+  });
+  const [password, setPassword] = useState(() => {
+    if (localStorage.getItem('als_remember_pref') === 'true') return localStorage.getItem('als_saved_password') || '';
+    return '';
+  });
 
   useEffect(() => {
     const check = async () => {
@@ -38,6 +40,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       
       if (result.success && result.user) {
         localStorage.setItem('als_remember_pref', rememberMe ? 'true' : 'false');
+        if (rememberMe) {
+          localStorage.setItem('als_saved_username', username);
+          localStorage.setItem('als_saved_password', password);
+        } else {
+          localStorage.removeItem('als_saved_username');
+          localStorage.removeItem('als_saved_password');
+        }
         onLoginSuccess(result.user, rememberMe);
       } else {
         setError(result.error || 'Credenciais Inválidas.');
@@ -125,7 +134,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
             {/* Lembrar login */}
             <button
               type="button"
-              onClick={() => setRememberMe(v => !v)}
+              onClick={() => setRememberMe(v => {
+                const next = !v;
+                localStorage.setItem('als_remember_pref', next ? 'true' : 'false');
+                if (!next) {
+                  localStorage.removeItem('als_saved_username');
+                  localStorage.removeItem('als_saved_password');
+                }
+                return next;
+              })}
               className="flex items-center gap-3 w-full group"
             >
               <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${rememberMe ? 'bg-blue-600 border-blue-500 shadow-[0_0_10px_rgba(37,99,235,0.4)]' : 'bg-black/40 border-blue-500/20 group-hover:border-blue-500/40'}`}>
