@@ -196,7 +196,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
       return;
     }
     if (!formData.category) {
-      alert("Por favor, selecione um vínculo (categoria) para a operação.");
+      alert("Por favor, selecione um vínculo operacional para a operação.");
       return;
     }
     setPendingAction(mode);
@@ -334,7 +334,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
                    inputClassName={`${selectClasses} ${formData.category ? 'text-blue-600 border-blue-400 ring-2 ring-blue-500/5' : ''}`}
                  />
                  {formData.category && !userHasChosenCategory && (
-                    <p className="text-[8px] font-black text-blue-500 uppercase mt-2 ml-1 animate-pulse">✓ Sugestão Automática: {formData.category}</p>
+                    <p className="text-[8px] font-black text-blue-500 uppercase mt-2 ml-1 animate-pulse">✓ Vínculo detectado: {formData.category}</p>
                  )}
               </div>
            </div>
