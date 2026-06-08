@@ -19,6 +19,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
     if (localStorage.getItem('als_remember_pref') === 'true') return localStorage.getItem('als_saved_password') || '';
     return '';
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [dbOnline, setDbOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
     const check = async () => {
