@@ -6,7 +6,7 @@ import { User } from '../types';
 import { APP_CONFIG } from '../constants';
 
 interface LoginFormProps {
-  onLoginSuccess: (user: User) => void;
+  onLoginSuccess: (user: User, rememberMe: boolean) => void;
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
@@ -16,6 +16,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [dbOnline, setDbOnline] = useState<boolean | null>(null);
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('als_remember_pref') === 'true');
 
   useEffect(() => {
     const check = async () => {
@@ -36,7 +37,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
       const result = await authService.login(username, password);
       
       if (result.success && result.user) {
-        onLoginSuccess(result.user);
+        localStorage.setItem('als_remember_pref', rememberMe ? 'true' : 'false');
+        onLoginSuccess(result.user, rememberMe);
       } else {
         setError(result.error || 'Credenciais Inválidas.');
         setIsLoading(false);
@@ -119,6 +121,24 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 </button>
               </div>
             </div>
+
+            {/* Lembrar login */}
+            <button
+              type="button"
+              onClick={() => setRememberMe(v => !v)}
+              className="flex items-center gap-3 w-full group"
+            >
+              <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${rememberMe ? 'bg-blue-600 border-blue-500 shadow-[0_0_10px_rgba(37,99,235,0.4)]' : 'bg-black/40 border-blue-500/20 group-hover:border-blue-500/40'}`}>
+                {rememberMe && (
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                  </svg>
+                )}
+              </div>
+              <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${rememberMe ? 'text-blue-400' : 'text-blue-900/50 group-hover:text-blue-700/60'}`}>
+                Lembrar login
+              </span>
+            </button>
 
             {error && (
               <div className="p-4 text-[10px] font-black uppercase text-red-400 bg-red-500/10 rounded-2xl border border-red-500/20 text-center animate-shake">
