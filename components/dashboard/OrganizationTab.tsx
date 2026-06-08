@@ -387,6 +387,7 @@ const DEV_PRIORITY: Record<DevScheduleStatus, number> = { critico: 3, pendente: 
 const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, drivers, customers, onRefresh }) => {
   const [locations, setLocations] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [selectedCategoryFilters, setSelectedCategoryFilters] = useState<string[]>([]);
   const [settingsModal, setSettingsModal] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<Trip | null>(null);
   const [terminalVessels, setTerminalVessels] = useState<TerminalVessel[]>([]);
@@ -838,6 +839,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
         if (finalizingIds.has(trip.id)) return false;
 
+        if (selectedCategoryFilters.length > 0) {
+          const tripCat = (trip.category || '').toUpperCase();
+          if (!selectedCategoryFilters.includes(tripCat)) return false;
+        }
+
         if (!trip.isRemovedFromOrg) {
           // Viagem agendada ou com data de agendamento definida: permanece visível
           if (trip.isScheduled) return true;
@@ -858,7 +864,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         if (dateA !== dateB) return dateA - dateB;
         return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
-  }, [propTrips, pendingUpdates, finalizingIds, activeView, hiddenTripTypesColeta, hiddenTripTypesEntrega]);
+  }, [propTrips, pendingUpdates, finalizingIds, activeView, hiddenTripTypesColeta, hiddenTripTypesEntrega, selectedCategoryFilters]);
 
   // Limpeza periódica de atualizações expiradas para liberar memória
   useEffect(() => {
@@ -1035,8 +1041,36 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, []);
 
-  const handleToggleFreteMorto = useCallback((trip: Trip, activate: boolean) =>
-    applyStatusToggle(trip, activate, 'Frete Morto', 'Erro ao salvar Frete Morto'), [applyStatusToggle]);
+  const handleToggleFreteMorto = useCallback(async (trip: Trip, activate: boolean) => {
+    const nowIso = new Date().toISOString();
+    const history = trip.statusHistory || [];
+    let newStatus: TripStatus;
+    let newHistory: typeof history;
+
+    if (activate) {
+      newStatus = 'Frete Morto';
+      newHistory = [...history, { status: 'Frete Morto' as TripStatus, dateTime: trip.dateTime || nowIso, createdAt: nowIso }];
+    } else {
+      newHistory = history.filter(h => h.status !== 'Frete Morto');
+      newStatus = newHistory.length ? newHistory[newHistory.length - 1].status : 'Pendente';
+    }
+
+    const updated = { ...trip, status: newStatus, statusHistory: newHistory, isRemovedFromColeta: activate };
+    const now = Date.now();
+    setPendingUpdates(prev => ({
+      ...prev,
+      [trip.id]: {
+        data: { ...(prev[trip.id]?.data || {}), status: newStatus, statusHistory: newHistory, isRemovedFromColeta: activate },
+        timestamp: now,
+      }
+    }));
+    try {
+      await db.saveTrip(updated);
+    } catch {
+      setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar Frete Morto', type: 'error' } }));
+    }
+  }, []);
 
   const handleToggleReutilizacao = useCallback((trip: Trip, activate: boolean) =>
     applyStatusToggle(trip, activate, 'Reutilização', 'Erro ao salvar Reutilização'), [applyStatusToggle]);
@@ -1777,16 +1811,31 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               isFreteMorto={isFreteMorto}
             />
             {activeView === 'COLETA' ? (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleToggleFreteMorto(t, !isFreteMorto); }}
-                className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${isFreteMorto ? 'bg-slate-200 border-slate-500 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
-                title={isFreteMorto ? 'Frete Morto — clique para reverter' : 'Marcar como Frete Morto'}
-              >
-                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-                </svg>
-                {isFreteMorto ? 'Frete Morto ✓' : 'Frete Morto'}
-              </button>
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); if (!isFreteMorto) handleToggleFreteMorto(t, true); }}
+                  disabled={isFreteMorto}
+                  className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${isFreteMorto ? 'bg-slate-200 border-slate-500 text-slate-700 cursor-default' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                  title={isFreteMorto ? (t.hasAdvance ? 'Frete Morto — use Limpar para reverter' : 'Frete Morto — libere o adiantamento para limpar') : 'Marcar como Frete Morto'}
+                >
+                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                  </svg>
+                  {isFreteMorto ? 'Frete Morto ✓' : 'Frete Morto'}
+                </button>
+                {isFreteMorto && t.hasAdvance && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleToggleFreteMorto(t, false); }}
+                    className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border bg-red-50 border-red-300 text-red-600 hover:bg-red-100 hover:border-red-400"
+                    title="Limpar Frete Morto — adiantamento liberado"
+                  >
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    Limpar
+                  </button>
+                )}
+              </>
             ) : (
               <button
                 onClick={(e) => { e.stopPropagation(); handleToggleReutilizacao(t, !isReutilizacao); }}
@@ -2241,67 +2290,96 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         defaultLocationId={selectedTripForScheduling?.destination?.id || selectedTripForScheduling?.customer?.id}
       />
 
-      <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-6 flex-wrap">
-          <div>
-            <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Organização Operacional</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de Agendamentos e NF • Dados desde 06/03/2026</p>
+      <div className="flex flex-col gap-4 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-6 flex-wrap">
+            <div>
+              <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Organização Operacional</h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de Agendamentos e NF • Dados desde 06/03/2026</p>
+            </div>
+
+            <button
+              onClick={() => setSettingsModal(true)}
+              className="p-4 bg-white text-slate-600 rounded-2xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-95"
+              title="Configurações de tipos visíveis"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+              <button
+                onClick={() => setActiveView('COLETA')}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'COLETA' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                Coleta/Export
+              </button>
+              <button
+                onClick={() => setActiveView('ENTREGA')}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'ENTREGA' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                Entrega/Import
+              </button>
+              <button
+                onClick={() => setActiveView('DEVOLUÇÕES')}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'DEVOLUÇÕES' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                Devoluções
+              </button>
+              <button
+                onClick={() => setActiveView('LIBERAÇÕES')}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'LIBERAÇÕES' ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                Liberações
+              </button>
+            </div>
           </div>
 
           <button
-            onClick={() => setSettingsModal(true)}
-            className="p-4 bg-white text-slate-600 rounded-2xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-all active:scale-95"
-            title="Configurações de tipos visíveis"
+            onClick={handleFinalizeTrips}
+            disabled={isFinalizing || trips.filter(t => isTripReadyToFinalize(t)).length === 0}
+            className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+            {isFinalizing ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Limpando...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
+                Limpar ({trips.filter(t => isTripReadyToFinalize(t)).length})
+              </>
+            )}
           </button>
-
-          <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
-            <button 
-              onClick={() => setActiveView('COLETA')}
-              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'COLETA' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Coleta/Export
-            </button>
-            <button
-              onClick={() => setActiveView('ENTREGA')}
-              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'ENTREGA' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Entrega/Import
-            </button>
-            <button
-              onClick={() => setActiveView('DEVOLUÇÕES')}
-              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'DEVOLUÇÕES' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Devoluções
-            </button>
-            <button
-              onClick={() => setActiveView('LIBERAÇÕES')}
-              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'LIBERAÇÕES' ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Liberações
-            </button>
-          </div>
-
         </div>
-        
-        <button 
-          onClick={handleFinalizeTrips}
-          disabled={isFinalizing || trips.filter(t => isTripReadyToFinalize(t)).length === 0}
-          className="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
-        >
-          {isFinalizing ? (
-            <>
-              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              Limpando...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
-              Limpar ({trips.filter(t => isTripReadyToFinalize(t)).length})
-            </>
-          )}
-        </button>
+
+        {categories.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">Categoria:</span>
+            <button
+              onClick={() => setSelectedCategoryFilters([])}
+              className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${selectedCategoryFilters.length === 0 ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400 hover:text-slate-600'}`}
+            >
+              Todas
+            </button>
+            {categories.map((cat: any) => {
+              const nameUp = (cat.name || '').toUpperCase();
+              const active = selectedCategoryFilters.includes(nameUp);
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategoryFilters(prev =>
+                    prev.includes(nameUp) ? prev.filter(c => c !== nameUp) : [...prev, nameUp]
+                  )}
+                  style={active && cat.color ? { backgroundColor: `${cat.color}20`, color: cat.color, borderColor: `${cat.color}60` } : {}}
+                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${active ? '' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600'}`}
+                >
+                  {cat.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {settingsModal && (
