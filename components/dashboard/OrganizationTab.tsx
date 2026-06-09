@@ -1115,24 +1115,32 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const handleConfirmScheduling = useCallback(async (locationId: string, dateTime: string) => {
     if (!selectedTripForScheduling) return;
 
+    const existing = selectedTripForScheduling;
     const selectedLoc = locations.find(l => l.id === locationId);
+
+    // Usa o local já existente na viagem quando nenhum novo local foi selecionado
+    const resolvedLocationId = locationId || existing.scheduledLocationId || existing.scheduling?.locationId || '';
+    const resolvedLoc = selectedLoc || locations.find(l => l.id === resolvedLocationId);
+    const resolvedLocationName = resolvedLoc?.name || existing.scheduling?.location || '';
+    const resolvedDestination = resolvedLoc ? {
+      id: resolvedLoc.id,
+      name: resolvedLoc.name,
+      legalName: resolvedLoc.legalName,
+      cnpj: resolvedLoc.cnpj,
+      city: resolvedLoc.city,
+      state: resolvedLoc.state
+    } : existing.destination;
+
     const schedulingData = {
       isScheduled: true,
-      scheduledLocationId: locationId,
+      scheduledLocationId: resolvedLocationId,
       scheduledDateTime: dateTime,
-      destination: selectedLoc ? {
-        id: selectedLoc.id,
-        name: selectedLoc.name,
-        legalName: selectedLoc.legalName,
-        cnpj: selectedLoc.cnpj,
-        city: selectedLoc.city,
-        state: selectedLoc.state
-      } : selectedTripForScheduling.destination,
+      destination: resolvedDestination,
       scheduling: {
-        locationId: locationId,
-        location: selectedLoc?.name || '',
+        locationId: resolvedLocationId,
+        location: resolvedLocationName,
         dateTime: dateTime ? new Date(dateTime).toISOString() : '',
-        obs: selectedTripForScheduling.scheduling?.obs || ''
+        obs: existing.scheduling?.obs || ''
       }
     };
 
