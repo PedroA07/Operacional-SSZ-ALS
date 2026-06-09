@@ -106,8 +106,8 @@ const SchedulingEditModal: React.FC<SchedulingEditModalProps> = ({
             <h3 className="text-sm font-black uppercase tracking-widest leading-none">Agendamento de Terminal</h3>
             <p className="text-[10px] font-bold opacity-80 mt-2">OS: {trip.os} • {trip.driver.name}</p>
           </div>
-          <button onClick={onClose} className="p-3 hover:bg-white/20 rounded-full transition-colors">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white/15 hover:bg-white/30 rounded-full transition-all active:scale-90">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
         </div>
 
@@ -188,11 +188,11 @@ const SchedulingEditModal: React.FC<SchedulingEditModalProps> = ({
           </div>
 
           <div className="grid grid-cols-2 gap-4 pt-2">
-            <button type="button" onClick={onClose} className="py-5 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">Cancelar</button>
-            <button 
-              type="submit" 
+            <button type="button" onClick={onClose} className="py-5 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95">Cancelar</button>
+            <button
+              type="submit"
               disabled={isSaving || !formData.locationId}
-              className="py-5 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all"
+              className="py-5 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {isSaving ? 'Salvando...' : 'Salvar Agendamento'}
             </button>

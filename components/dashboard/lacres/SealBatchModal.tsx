@@ -85,19 +85,19 @@ const SealBatchModal: React.FC<SealBatchModalProps> = ({ isOpen, onClose, onSucc
 
   if (!isOpen) return null;
 
-  const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1 block";
-  const inputClass = "w-full px-5 py-4 rounded-2xl border-2 border-slate-50 bg-slate-50 text-slate-700 font-bold uppercase focus:border-blue-500 focus:bg-white outline-none transition-all shadow-sm";
+  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1 block";
+  const inputClass = "w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold uppercase focus:border-blue-500 focus:bg-white outline-none transition-all placeholder:text-slate-300";
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-      <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-        <header className="p-8 border-b bg-slate-50 flex justify-between items-center">
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+        <header className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
           <div>
             <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Novo Lote de Lacres</h3>
-            <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Geração Automática de Sequência</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Geração Automática de Sequência</p>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
         </header>
 

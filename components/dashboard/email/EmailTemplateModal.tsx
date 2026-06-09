@@ -420,15 +420,15 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
   return (
     <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
       <div className="bg-white w-full max-w-[85vw] max-h-[90vh] rounded-[2.5rem] shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-        <header className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
+        <header className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
           <div>
-            <h3 className="text-xl font-black uppercase tracking-tight">
+            <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">
               {template ? 'Editar Modelo de E-mail' : 'Novo Modelo de E-mail'}
             </h3>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Configuração de Template e Layout</p>
+            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Configuração de Template e Layout</p>
           </div>
-          <button onClick={onClose} className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3.5"/></svg>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
         </header>
 

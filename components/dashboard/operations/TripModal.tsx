@@ -113,25 +113,25 @@ const TripModal: React.FC<TripModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-      <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 h-[92vh] flex flex-col border border-white/20">
-        
-        <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+    <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[92vh] flex flex-col">
+
+        <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-4">
              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
                 <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
              </div>
              <div>
-                <h3 className="font-black text-slate-800 text-sm uppercase tracking-[0.2em]">{editTrip ? 'Edição de Viagem' : 'Nova Programação Operacional'}</h3>
+                <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editTrip ? 'Edição de Viagem' : 'Nova Programação Operacional'}</h3>
                 <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 tracking-widest">Painel de Gerenciamento de Cargas</p>
              </div>
           </div>
-          <button onClick={onClose} className="w-12 h-12 flex items-center justify-center bg-slate-50 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
         </div>
-        
-        <div className="p-12 overflow-y-auto custom-scrollbar flex-1 bg-[#fcfdfe]">
+
+        <div className="p-10 overflow-y-auto custom-scrollbar flex-1 bg-white">
           <TripForm 
             editTrip={editTrip}
             initialCategory={initialCategory}
