@@ -43,12 +43,12 @@ const generateCredentials = (b: Partial<Beneficiary>) => {
 
 const Field: React.FC<{ label: string; children: React.ReactNode; className?: string }> = ({ label, children, className = '' }) => (
   <div className={`space-y-1 ${className}`}>
-    <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 ml-1">{label}</label>
+    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 block">{label}</label>
     {children}
   </div>
 );
 
-const inputCls = 'w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white placeholder:text-white/20 outline-none focus:bg-white/15 focus:border-blue-400/50 transition-all';
+const inputCls = 'w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-800 text-sm font-bold focus:border-blue-500 focus:bg-white outline-none transition-all placeholder:text-slate-300';
 
 const BeneficiaryModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing }) => {
   const [saving, setSaving] = useState(false);
@@ -153,20 +153,20 @@ const BeneficiaryModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-8 px-4 bg-black/70 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="w-full max-w-2xl bg-slate-900 rounded-[2rem] shadow-2xl border border-white/5 overflow-hidden">
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-2xl bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[92vh]">
 
         {/* Header */}
-        <div className="px-8 py-6 border-b border-white/10 flex items-center justify-between">
+        <div className="p-8 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div>
-            <h2 className="text-lg font-black text-white uppercase tracking-wider">
+            <h2 className="font-black text-slate-800 text-sm uppercase tracking-widest">
               {editing ? 'Editar Beneficiário' : 'Novo Beneficiário'}
             </h2>
-            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
               {editing ? `ID: ${editing.id}` : 'Cadastro de beneficiário independente'}
             </p>
           </div>
-          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all">
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
             </svg>
@@ -175,16 +175,16 @@ const BeneficiaryModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing })
 
         {/* Toast */}
         {toast && (
-          <div className={`mx-8 mt-5 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border ${toast.type === 'ok' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+          <div className={`mx-8 mt-5 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border shrink-0 ${toast.type === 'ok' ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-red-50 border-red-200 text-red-500'}`}>
             {toast.msg}
           </div>
         )}
 
-        <div className="px-8 py-6 space-y-8">
+        <div className="px-8 py-6 space-y-8 overflow-y-auto custom-scrollbar flex-1">
 
           {/* I. Identificação */}
           <section className="space-y-4">
-            <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-widest border-b border-white/10 pb-2">
+            <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-widest border-b border-slate-100 pb-2">
               I. Identificação
             </h3>
             <div className="grid grid-cols-2 gap-4">
@@ -207,10 +207,10 @@ const BeneficiaryModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing })
                 <div className="flex gap-3">
                   {(['Ativo', 'Inativo'] as const).map(s => (
                     <button key={s} type="button" onClick={() => setForm(f => ({ ...f, status: s }))}
-                      className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all
+                      className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider border-2 transition-all
                         ${form.status === s
-                          ? s === 'Ativo' ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-red-500/20 border-red-500/40 text-red-400'
-                          : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'}`}>
+                          ? s === 'Ativo' ? 'bg-emerald-50 border-emerald-300 text-emerald-600' : 'bg-red-50 border-red-300 text-red-500'
+                          : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-300'}`}>
                       {s}
                     </button>
                   ))}
@@ -221,7 +221,7 @@ const BeneficiaryModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing })
 
           {/* II. Financeiro */}
           <section className="space-y-4">
-            <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-widest border-b border-white/10 pb-2">
+            <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-widest border-b border-slate-100 pb-2">
               II. Dados de Pagamento
             </h3>
             <div className="grid grid-cols-2 gap-4">
@@ -229,8 +229,8 @@ const BeneficiaryModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing })
                 <div className="flex gap-3">
                   {(['PIX', 'TED'] as const).map(t => (
                     <button key={t} type="button" onClick={() => setForm(f => ({ ...f, paymentPreference: t }))}
-                      className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all
-                        ${form.paymentPreference === t ? 'bg-blue-500/20 border-blue-500/40 text-blue-400' : 'bg-white/5 border-white/10 text-slate-500 hover:border-white/20'}`}>
+                      className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider border-2 transition-all
+                        ${form.paymentPreference === t ? 'bg-blue-50 border-blue-300 text-blue-600' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-300'}`}>
                       {t === 'PIX' ? 'PIX' : 'TED Bancário'}
                     </button>
                   ))}
@@ -253,38 +253,38 @@ const BeneficiaryModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing })
 
           {/* III. Acesso ao Portal */}
           <section className="space-y-4">
-            <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-widest border-b border-white/10 pb-2">
+            <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-widest border-b border-slate-100 pb-2">
               III. Acesso ao Portal
             </h3>
             {form.userId ? (
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-5 space-y-3">
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-wide">Acesso ativo</p>
-                    <p className="text-[9px] text-slate-400 mt-0.5">Este beneficiário possui login próprio no portal.</p>
+                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-wide">Acesso ativo</p>
+                    <p className="text-[9px] text-slate-500 mt-0.5">Este beneficiário possui login próprio no portal.</p>
                   </div>
-                  <button type="button" onClick={handleRevokeLogin} className="px-3 py-1.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[9px] font-black uppercase hover:bg-red-500/30 transition-all">
+                  <button type="button" onClick={handleRevokeLogin} className="px-3 py-1.5 rounded-xl bg-red-50 border border-red-200 text-red-500 text-[9px] font-black uppercase hover:bg-red-100 transition-all">
                     Revogar
                   </button>
                 </div>
                 {generatedCreds && (
-                  <div className="bg-white/5 rounded-xl p-4 space-y-2 border border-white/10">
+                  <div className="bg-white rounded-xl p-4 space-y-2 border border-blue-100">
                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Credenciais geradas — anote agora</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <p className="text-[8px] text-slate-500 uppercase font-black">Usuário</p>
-                        <p className="text-[11px] font-mono font-black text-white">{generatedCreds.username}</p>
+                        <p className="text-[8px] text-slate-400 uppercase font-black">Usuário</p>
+                        <p className="text-[11px] font-mono font-black text-slate-800">{generatedCreds.username}</p>
                       </div>
                       <div>
-                        <p className="text-[8px] text-slate-500 uppercase font-black">Senha</p>
-                        <p className="text-[11px] font-mono font-black text-white">{generatedCreds.password}</p>
+                        <p className="text-[8px] text-slate-400 uppercase font-black">Senha</p>
+                        <p className="text-[11px] font-mono font-black text-slate-800">{generatedCreds.password}</p>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-5 flex items-center justify-between gap-4">
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 flex items-center justify-between gap-4">
                 <p className="text-[9px] text-slate-500 leading-relaxed">Sem acesso ao portal. Clique para gerar um login exclusivo para este beneficiário.</p>
                 <button type="button" onClick={handleCreateLogin} disabled={creatingLogin}
                   className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-50 whitespace-nowrap">
@@ -299,7 +299,7 @@ const BeneficiaryModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing })
 
           {/* IV. Observações */}
           <section className="space-y-4">
-            <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-widest border-b border-white/10 pb-2">
+            <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-widest border-b border-slate-100 pb-2">
               IV. Observações
             </h3>
             <Field label="Anotações internas">
@@ -309,12 +309,12 @@ const BeneficiaryModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing })
         </div>
 
         {/* Footer */}
-        <div className="px-8 py-5 border-t border-white/10 flex items-center justify-between gap-4">
-          <button type="button" onClick={onClose} className="px-6 py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all">
+        <div className="px-8 py-5 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-4 shrink-0">
+          <button type="button" onClick={onClose} className="px-6 py-3.5 rounded-2xl bg-white border border-slate-200 text-slate-500 text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all active:scale-95">
             Cancelar
           </button>
           <button type="button" onClick={handleSave} disabled={saving}
-            className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95 disabled:opacity-50">
+            className="flex items-center gap-2 px-8 py-3.5 bg-slate-900 hover:bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50">
             {saving
               ? <><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Salvando...</>
               : <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>Salvar Beneficiário</>}
