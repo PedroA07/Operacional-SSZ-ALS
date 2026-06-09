@@ -127,7 +127,7 @@ const ShipModal: React.FC<Props> = ({ isOpen, onClose, onSave, editing, terminal
                 value={form.status || 'EM TRÂNSITO'}
                 onChange={v => setForm(f => ({ ...f, status: v as ShipStatus }))}
                 options={STATUSES.map(s => ({ value: s, label: s }))}
-                inputClassName="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-[11px] font-bold text-white outline-none"
+                inputClassName="w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-800 text-[11px] font-bold uppercase outline-none"
               />
             </Field>
           </div>
