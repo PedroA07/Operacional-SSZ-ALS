@@ -275,9 +275,9 @@ const PreStackingTab: React.FC<PreStackingTabProps> = ({ userId, preStacking, on
     },
   ];
 
-  const inputClasses = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50 placeholder:text-slate-300";
-  const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
-  const labelBlueClass = "text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 ml-1 block";
+  const inputClasses = "w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold uppercase focus:border-blue-500 focus:bg-white outline-none transition-all placeholder:text-slate-300 disabled:bg-slate-100 disabled:text-slate-400";
+  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1 block";
+  const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 ml-1 block";
 
   return (
     <div className="max-w-full mx-auto space-y-6 animate-in fade-in duration-500">

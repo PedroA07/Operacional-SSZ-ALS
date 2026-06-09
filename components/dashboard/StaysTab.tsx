@@ -578,9 +578,9 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       {isSettingsOpen && selectedSession && (
         <div className="fixed inset-0 z-[3500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-             <div className="p-8 bg-slate-900 text-white text-center">
-                <h3 className="text-xl font-black uppercase tracking-tight">Parametrização</h3>
-                <p className="text-[10px] font-bold text-blue-400 uppercase mt-1">{selectedSession.category.replace(/\|/g, ' ')}</p>
+             <div className="p-8 bg-slate-50 border-b border-slate-100 text-center">
+                <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Parametrização</h3>
+                <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest mt-1">{selectedSession.category.replace(/\|/g, ' ')}</p>
              </div>
              <form onSubmit={handleSaveSettings} className="p-10 space-y-8">
                 <div className="space-y-2">
@@ -665,9 +665,9 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       {isAddingManualRecord && selectedSession && (
         <div className="fixed inset-0 z-[4000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-            <div className="p-8 bg-slate-900 text-white text-center">
-              <h3 className="text-xl font-black uppercase tracking-tight">Inserção Manual</h3>
-              <p className="text-[10px] font-bold text-blue-400 uppercase mt-1">Adicionar registro à pasta</p>
+            <div className="p-8 bg-slate-50 border-b border-slate-100 text-center">
+              <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Inserção Manual</h3>
+              <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest mt-1">Adicionar registro à pasta</p>
             </div>
             <div className="p-10 max-h-[70vh] overflow-y-auto custom-scrollbar space-y-6">
               <div className="grid grid-cols-2 gap-4">
@@ -750,8 +750,9 @@ const StaysTab: React.FC<StaysTabProps> = ({ userId, categories: globalCategorie
       {isCreatingSession && (
         <div className="fixed inset-0 z-[3200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-10 bg-slate-900 text-white text-center">
-                 <h3 className="text-xl font-black uppercase tracking-tight">Configurar Pasta</h3>
+              <div className="p-8 bg-slate-50 border-b border-slate-100 text-center">
+                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Configurar Pasta</h3>
+                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Nova pasta de estadias</p>
               </div>
               <form onSubmit={handleCreateSession} className="p-10 space-y-6">
                 <div className="space-y-1">
