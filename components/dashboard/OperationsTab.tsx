@@ -792,13 +792,13 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       {isOCFormOpen && selectedTrip && createPortal(
         <div className="fixed inset-0 z-[9000] animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-400">
-            <div className="px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div className="px-8 py-5 bg-blue-600 flex items-center justify-between shrink-0 shadow-lg">
               <div>
-                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Operações</p>
-                <h2 className="font-black text-slate-800 text-sm uppercase tracking-widest">Ordem de Coleta</h2>
-                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">OS: {selectedTrip.os}</p>
+                <p className="text-[8px] font-black text-white/60 uppercase tracking-widest mb-0.5">Operações</p>
+                <h2 className="font-black text-white text-sm uppercase tracking-widest">Ordem de Coleta</h2>
+                <p className="text-[9px] text-white/60 font-bold uppercase tracking-widest mt-0.5">OS: {selectedTrip.os}</p>
               </div>
-              <button onClick={() => { setIsOCFormOpen(false); onRefresh(); }} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+              <button onClick={() => { setIsOCFormOpen(false); onRefresh(); }} className="w-10 h-10 flex items-center justify-center bg-white/15 border border-white/20 text-white/80 hover:text-white hover:bg-white/30 rounded-full transition-all active:scale-90">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
             </div>
@@ -813,13 +813,13 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       {isMinutaFormOpen && selectedTrip && createPortal(
         <div className="fixed inset-0 z-[9000] animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-400">
-            <div className="px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div className="px-8 py-5 bg-emerald-600 flex items-center justify-between shrink-0 shadow-lg">
               <div>
-                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Operações</p>
-                <h2 className="font-black text-slate-800 text-sm uppercase tracking-widest">Minuta / Pré-Stacking</h2>
-                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">OS: {selectedTrip.os}</p>
+                <p className="text-[8px] font-black text-white/60 uppercase tracking-widest mb-0.5">Operações</p>
+                <h2 className="font-black text-white text-sm uppercase tracking-widest">Minuta / Pré-Stacking</h2>
+                <p className="text-[9px] text-white/60 font-bold uppercase tracking-widest mt-0.5">OS: {selectedTrip.os}</p>
               </div>
-              <button onClick={() => { setIsMinutaFormOpen(false); onRefresh(); }} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+              <button onClick={() => { setIsMinutaFormOpen(false); onRefresh(); }} className="w-10 h-10 flex items-center justify-center bg-white/15 border border-white/20 text-white/80 hover:text-white hover:bg-white/30 rounded-full transition-all active:scale-90">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
             </div>

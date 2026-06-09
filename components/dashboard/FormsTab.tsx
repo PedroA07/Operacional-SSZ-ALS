@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { User, Driver, Customer, Port, PreStacking, FormHistoryEntry } from '../../types';
 import OrdemColetaForm from './forms/OrdemColetaForm';
 import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
@@ -520,15 +521,15 @@ const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, pr
       )}
 
       {/* Form modal */}
-      {isFormModalOpen && selectedFormType && (
-        <div className="fixed inset-0 z-[200] animate-in fade-in duration-200">
+      {isFormModalOpen && selectedFormType && createPortal(
+        <div className="fixed inset-0 z-[9000] animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-400">
-            <div className="px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div className={`px-8 py-5 ${formConfigs[selectedFormType].color} flex items-center justify-between shrink-0 shadow-lg`}>
               <div>
-                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Formulários</p>
-                <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{formConfigs[selectedFormType].title}</h3>
+                <p className="text-[8px] font-black text-white/60 uppercase tracking-widest mb-0.5">Formulários</p>
+                <h3 className="font-black text-white text-sm uppercase tracking-widest">{formConfigs[selectedFormType].title}</h3>
               </div>
-              <button onClick={handleClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+              <button onClick={handleClose} className="w-10 h-10 flex items-center justify-center bg-white/15 border border-white/20 text-white/80 hover:text-white hover:bg-white/30 rounded-full transition-all active:scale-90">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
             </div>
@@ -546,7 +547,8 @@ const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, pr
               ) : null}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <FeedbackModal
