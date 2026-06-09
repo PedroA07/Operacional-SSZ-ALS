@@ -187,7 +187,7 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
                     <DataItem label="Armador" value={trip.agencia || '---'} color="text-slate-500" copyable />
                     <DataItem label="Data Programada" value={new Date(trip.dateTime).toLocaleString('pt-BR')} />
                     <div className="flex flex-col">
-                      <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Categoria</span>
+                      <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Vínculo</span>
                       {trip.category ? (
                         <span
                           className="px-2 py-0.5 rounded text-[8px] font-black uppercase border w-fit"

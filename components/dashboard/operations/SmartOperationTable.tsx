@@ -249,7 +249,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
-              <svg className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <svg className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             </div>
           )}
 
@@ -302,13 +302,13 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
                 <th
                   key={col.key}
                   style={col.width ? { width: typeof col.width === 'number' ? `${col.width}px` : col.width, minWidth: typeof col.width === 'number' ? `${col.width}px` : col.width, maxWidth: typeof col.width === 'number' ? `${col.width}px` : col.width } : undefined}
-                  className={`px-2 py-1.5 whitespace-nowrap border border-slate-200 bg-slate-100 text-left relative group/th ${col.sortable !== false ? 'cursor-pointer hover:bg-slate-200 transition-colors' : ''}`}
+                  className={`px-2 py-2 whitespace-nowrap border-b-2 border-slate-200 bg-slate-50 text-left relative group/th transition-colors ${col.sortable !== false ? 'cursor-pointer hover:bg-slate-100' : ''}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1 flex-1" onClick={() => col.sortable !== false && handleSort(col.key)}>
                       {col.label}
                       {col.sortable !== false && (
-                        <div className="flex flex-col opacity-30 group-hover/th:opacity-100">
+                        <div className="flex flex-col opacity-40 group-hover/th:opacity-100 transition-all duration-150">
                           <svg className={`w-2 h-2 ${sortConfig?.key === col.key && sortConfig.direction === 'asc' ? 'text-blue-600 opacity-100' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7"/></svg>
                           <svg className={`w-2 h-2 -mt-0.5 ${sortConfig?.key === col.key && sortConfig.direction === 'desc' ? 'text-blue-600 opacity-100' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
                         </div>
@@ -369,7 +369,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
                 style={getRowStyle ? getRowStyle(row) : {}}
               >
                 {columns.filter(c => visibleColumns.includes(c.key)).map(col => (
-                  <td key={col.key} style={col.width ? { width: typeof col.width === 'number' ? `${col.width}px` : col.width, maxWidth: typeof col.width === 'number' ? `${col.width}px` : col.width, overflow: 'hidden' } : undefined} className="px-2 py-1 text-slate-600 border border-slate-200 align-middle">
+                  <td key={col.key} style={col.width ? { width: typeof col.width === 'number' ? `${col.width}px` : col.width, maxWidth: typeof col.width === 'number' ? `${col.width}px` : col.width, overflow: 'hidden' } : undefined} className="px-2 py-1.5 text-slate-600 border-b border-slate-100 align-middle">
                     {col.render ? col.render(row) : row[col.key]}
                   </td>
                 ))}
@@ -377,8 +377,23 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
             ))}
             {filteredData.length === 0 && (
               <tr>
-                <td colSpan={visibleColumns.length} className="px-3 py-10 text-center text-slate-400 font-bold uppercase italic bg-white border border-slate-200">
-                  Nenhum registro localizado para os critérios atuais.
+                <td colSpan={visibleColumns.length} className="py-16 text-center bg-white">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                      </svg>
+                    </div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nenhum registro encontrado</p>
+                    {(debouncedSearch || Object.keys(columnFilters).length > 0) && (
+                      <button
+                        onClick={() => { setSearchQuery(''); setColumnFilters({}); }}
+                        className="text-[9px] font-black text-blue-500 uppercase hover:text-blue-700 transition-colors underline underline-offset-2"
+                      >
+                        Limpar filtros
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             )}
@@ -387,47 +402,74 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
       </div>
 
       {/* RODAPÉ COM CONTROLES DE PÁGINA */}
-      <div className="p-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between rounded-b-[2.5rem]">
-         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-           Exibindo {paginatedData.length} de {filteredData.length} registros
-         </p>
-         
-         <div className="flex items-center gap-2">
-            <button 
+      <div className="px-6 py-4 bg-slate-50/40 border-t border-slate-100 flex items-center justify-between rounded-b-[2.5rem] gap-4 flex-wrap">
+        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">
+          {filteredData.length === 0 ? '0 registros' : `${(currentPage - 1) * itemsPerPage + 1}–${Math.min(currentPage * itemsPerPage, filteredData.length)} de ${filteredData.length}`}
+        </p>
+
+        {totalPages > 1 && (
+          <div className="flex items-center gap-1.5">
+            <button
               disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-blue-600 disabled:opacity-30 transition-all active:scale-90"
+              onClick={() => setCurrentPage(1)}
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-blue-600 disabled:opacity-25 transition-all active:scale-90"
+              title="Primeira página"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 19l-7-7 7-7M18 19l-7-7 7-7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>
-            
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-blue-600 disabled:opacity-25 transition-all active:scale-90"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+
             <div className="flex gap-1">
-               {/* Lógica simples de páginas */}
-               {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                 // Mostra páginas ao redor da atual
-                 let pageNum = currentPage > 3 ? currentPage - 2 + i : i + 1;
-                 if (pageNum > totalPages) return null;
-                 
-                 return (
-                   <button 
-                     key={pageNum}
-                     onClick={() => setCurrentPage(pageNum)}
-                     className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}`}
-                   >
-                     {pageNum}
-                   </button>
-                 );
-               })}
+              {(() => {
+                const pages: (number | '...')[] = [];
+                if (totalPages <= 7) {
+                  for (let i = 1; i <= totalPages; i++) pages.push(i);
+                } else {
+                  pages.push(1);
+                  if (currentPage > 3) pages.push('...');
+                  for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) pages.push(i);
+                  if (currentPage < totalPages - 2) pages.push('...');
+                  pages.push(totalPages);
+                }
+                return pages.map((p, i) =>
+                  p === '...' ? (
+                    <span key={`e-${i}`} className="w-8 h-8 flex items-center justify-center text-[10px] text-slate-300">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setCurrentPage(p as number)}
+                      className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all ${currentPage === p ? 'bg-blue-600 text-white shadow-md shadow-blue-200' : 'bg-white border border-slate-200 text-slate-500 hover:border-blue-300 hover:text-blue-600'}`}
+                    >
+                      {p}
+                    </button>
+                  )
+                );
+              })()}
             </div>
 
-            <button 
+            <button
               disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-blue-600 disabled:opacity-30 transition-all active:scale-90"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-blue-600 disabled:opacity-25 transition-all active:scale-90"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>
-         </div>
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-blue-600 disabled:opacity-25 transition-all active:scale-90"
+              title="Última página"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 5l7 7-7 7M6 5l7 7-7 7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

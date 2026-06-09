@@ -49,7 +49,7 @@ function SmartCategorySelect({ categories, value, onChange }: {
             <span className="text-sm font-bold text-slate-700 uppercase flex-1">{selected.name}</span>
           </>
         ) : (
-          <span className="text-sm text-slate-400 flex-1">Selecionar categoria...</span>
+          <span className="text-sm text-slate-400 flex-1">Selecionar vínculo...</span>
         )}
         <svg className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/>
@@ -61,7 +61,7 @@ function SmartCategorySelect({ categories, value, onChange }: {
             <input
               value={q}
               onChange={e => setQ(e.target.value)}
-              placeholder="Buscar categoria..."
+              placeholder="Buscar vínculo..."
               className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-400"
               autoFocus
               onClick={e => e.stopPropagation()}
@@ -69,7 +69,7 @@ function SmartCategorySelect({ categories, value, onChange }: {
           </div>
           <div className="max-h-44 overflow-y-auto">
             {filtered.length === 0 && (
-              <p className="text-[10px] text-slate-400 text-center py-4">Nenhuma categoria encontrada</p>
+              <p className="text-[10px] text-slate-400 text-center py-4">Nenhum vínculo encontrado</p>
             )}
             {filtered.map(c => (
               <button
@@ -496,13 +496,13 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/>
               </svg>
-              Categorias{selectedCategories.length > 0 ? ` (${selectedCategories.length})` : ''}
+              Vínculos{selectedCategories.length > 0 ? ` (${selectedCategories.length})` : ''}
             </button>
 
             {categoryFilterOpen && (
               <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-3 w-60">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Filtrar por Categoria</span>
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Filtrar por Vínculo</span>
                   {selectedCategories.length > 0 && (
                     <button
                       onClick={() => setSelectedCategories([])}
@@ -536,7 +536,7 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
                     );
                   })}
                   {categories.length === 0 && (
-                    <p className="text-[9px] text-slate-400 text-center py-3">Nenhuma categoria disponível</p>
+                    <p className="text-[9px] text-slate-400 text-center py-3">Nenhum vínculo disponível</p>
                   )}
                 </div>
               </div>
@@ -638,7 +638,7 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
               </div>
               <div>
                 <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">
-                  Categoria <span className="text-red-400">*</span>
+                  Vínculo Operacional <span className="text-red-400">*</span>
                 </label>
                 {insertCategoryDetected && !userChoseCategory ? (
                   <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
