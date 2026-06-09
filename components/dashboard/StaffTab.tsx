@@ -182,7 +182,7 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                 <div className="mt-6 flex gap-2">
                    <button onClick={() => handleEdit(s)} className="flex-1 py-3.5 bg-slate-900 text-white rounded-[1.4rem] text-[9px] font-black uppercase hover:bg-blue-600 transition-all shadow-md active:scale-95">Editar Cadastro</button>
                    {isAdmin && (
-                     <button onClick={() => confirmDelete(s)} className="px-4.5 py-3.5 bg-red-50 text-red-500 rounded-[1.4rem] border border-red-100 hover:bg-red-500 hover:text-white transition-all shadow-sm active:scale-95">
+                     <button onClick={() => confirmDelete(s)} className="px-4 py-3.5 bg-red-50 text-red-500 rounded-[1.4rem] border border-red-100 hover:bg-red-500 hover:text-white transition-all shadow-sm active:scale-95">
                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
                      </button>
                    )}
@@ -227,8 +227,8 @@ const StaffTab = forwardRef<HTMLDivElement, StaffTabProps>(({
                     </div>
                  </div>
                  <div className="grid grid-cols-2 gap-3 pt-4">
-                    <button onClick={() => setIsDeleteModalOpen(false)} className="py-4.5 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all active:scale-95">Cancelar</button>
-                    <button onClick={executeDelete} className="py-4.5 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-red-700 transition-all active:scale-95">Sim, Excluir</button>
+                    <button onClick={() => setIsDeleteModalOpen(false)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all active:scale-95">Cancelar</button>
+                    <button onClick={executeDelete} className="py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-red-700 transition-all active:scale-95">Sim, Excluir</button>
                  </div>
               </div>
            </div>

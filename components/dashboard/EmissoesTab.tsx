@@ -608,7 +608,7 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
 
       {/* Insert OS modal */}
       {showInsertModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={e => { if (e.target === e.currentTarget) closeInsertModal(); }}>
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[500] p-4 animate-in fade-in duration-200" onClick={e => { if (e.target === e.currentTarget) closeInsertModal(); }}>
           <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">Inserir OS</h3>

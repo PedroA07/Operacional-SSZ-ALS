@@ -44,14 +44,14 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
           <div className={`grid ${type === 'confirm' ? 'grid-cols-2' : 'grid-cols-1'} gap-3 pt-2`}>
             <button 
               onClick={onClose} 
-              className="py-4.5 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all active:scale-95"
+              className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all active:scale-95"
             >
               {type === 'confirm' ? 'Cancelar' : 'Fechar'}
             </button>
             {type === 'confirm' && (
               <button 
                 onClick={() => { onConfirm?.(); onClose(); }} 
-                className="py-4.5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95"
+                className="py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-blue-700 transition-all active:scale-95"
               >
                 {confirmLabel}
               </button>
