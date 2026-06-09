@@ -54,7 +54,7 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({ availableOps, o
 
       {availableOps.length === 0 && (
         <div className="col-span-full py-16 text-center bg-slate-50 border-2 border-dashed border-slate-100 rounded-[2rem]">
-          <p className="text-slate-400 font-black uppercase text-[10px] tracking-[0.2em]">Nenhuma Categoria Habilitada</p>
+          <p className="text-slate-400 font-black uppercase text-[10px] tracking-[0.2em]">Nenhum Vínculo Habilitado</p>
         </div>
       )}
     </div>

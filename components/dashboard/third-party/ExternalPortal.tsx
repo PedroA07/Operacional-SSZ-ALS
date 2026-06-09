@@ -68,17 +68,17 @@ function SmartCategorySelect({ categories, value, onChange }: { categories: Cate
         className="w-full flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-left hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
         {selected ? (
           <><div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: selected.color || '#94a3b8' }} /><span className="text-sm font-bold text-slate-700 uppercase flex-1">{selected.name}</span></>
-        ) : <span className="text-sm text-slate-400 flex-1">Selecionar categoria...</span>}
+        ) : <span className="text-sm text-slate-400 flex-1">Selecionar vínculo...</span>}
         <svg className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>
       </button>
       {open && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
           <div className="p-2 border-b border-slate-100">
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar categoria..."
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar vínculo..."
               className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-400" autoFocus onClick={e => e.stopPropagation()} />
           </div>
           <div className="max-h-44 overflow-y-auto">
-            {filtered.length === 0 && <p className="text-[10px] text-slate-400 text-center py-4">Nenhuma categoria encontrada</p>}
+            {filtered.length === 0 && <p className="text-[10px] text-slate-400 text-center py-4">Nenhum vínculo encontrado</p>}
             {filtered.map(c => (
               <button key={c.id} type="button" onClick={() => { onChange(c.name); setOpen(false); setQ(''); }}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 transition-colors ${value === c.name ? 'bg-blue-50' : ''}`}>
@@ -917,12 +917,12 @@ const ExternalPortal: React.FC<ExternalPortalProps> = ({ user, trips, devolucoes
                   <button onClick={() => setEmissCatOpen(v => !v)}
                     className={`flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase rounded-xl border transition-all ${emissCatOpen || emissCatFilter.length > 0 ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-slate-600 border-slate-200 hover:border-purple-300'}`}>
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/></svg>
-                    Categorias{emissCatFilter.length > 0 ? ` (${emissCatFilter.length})` : ''}
+                    Vínculos{emissCatFilter.length > 0 ? ` (${emissCatFilter.length})` : ''}
                   </button>
                   {emissCatOpen && (
                     <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-3 w-60">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Filtrar por Categoria</span>
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Filtrar por Vínculo</span>
                         {emissCatFilter.length > 0 && (
                           <button onClick={() => setEmissCatFilter([])} className="text-[8px] text-red-500 hover:text-red-700 font-black uppercase transition-colors">Limpar</button>
                         )}
