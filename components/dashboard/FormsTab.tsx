@@ -521,9 +521,9 @@ const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, pr
 
       {/* Form modal */}
       {isFormModalOpen && selectedFormType && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[95vh]">
-            <div className="p-8 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+        <div className="fixed inset-0 z-[200] animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-400">
+            <div className="px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Formulários</p>
                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{formConfigs[selectedFormType].title}</h3>
@@ -532,18 +532,19 @@ const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, pr
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
             </div>
-
-            {selectedFormType === 'ORDEM_COLETA' ? (
-              <OrdemColetaForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialData={initialFormData} />
-            ) : selectedFormType === 'PRE_STACKING' ? (
-              <PreStackingForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
-            ) : selectedFormType === 'LIBERACAO_VAZIO' ? (
-              <LiberacaoVazioForm user={user} drivers={drivers} customers={customers} ports={ports} preStackings={preStacking} onClose={handleClose} initialFormData={initialFormData} />
-            ) : selectedFormType === 'DEVOLUCAO_VAZIO' ? (
-              <DevolucaoVazioForm user={user} drivers={drivers} customers={customers} ports={ports} preStackings={preStacking} onClose={handleClose} initialFormData={initialFormData} />
-            ) : selectedFormType === 'RETIRADA_CHEIO' ? (
-              <RetiradaCheioForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
-            ) : null}
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              {selectedFormType === 'ORDEM_COLETA' ? (
+                <OrdemColetaForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialData={initialFormData} />
+              ) : selectedFormType === 'PRE_STACKING' ? (
+                <PreStackingForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
+              ) : selectedFormType === 'LIBERACAO_VAZIO' ? (
+                <LiberacaoVazioForm user={user} drivers={drivers} customers={customers} ports={ports} preStackings={preStacking} onClose={handleClose} initialFormData={initialFormData} />
+              ) : selectedFormType === 'DEVOLUCAO_VAZIO' ? (
+                <DevolucaoVazioForm user={user} drivers={drivers} customers={customers} ports={ports} preStackings={preStacking} onClose={handleClose} initialFormData={initialFormData} />
+              ) : selectedFormType === 'RETIRADA_CHEIO' ? (
+                <RetiradaCheioForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={handleClose} initialFormData={initialFormData} />
+              ) : null}
+            </div>
           </div>
         </div>
       )}

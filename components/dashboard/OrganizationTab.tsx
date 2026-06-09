@@ -2248,15 +2248,29 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       )}
 
       {minutaTrip && (
-        <div className="fixed inset-0 z-[300] bg-slate-950/80 backdrop-blur-md flex flex-col overflow-y-auto animate-in fade-in duration-300">
-          <PreStackingForm
-            user={undefined}
-            drivers={drivers}
-            customers={customers}
-            ports={ports}
-            onClose={() => { setMinutaTrip(null); onRefresh(); }}
-            initialFormData={minutaTrip.preStackingFormData || mapTripToMinuta(minutaTrip)}
-          />
+        <div className="fixed inset-0 z-[300] animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-400">
+            <div className="px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Organização Operacional</p>
+                <h2 className="font-black text-slate-800 text-sm uppercase tracking-widest">Minuta / Pré-Stacking</h2>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">OS: {minutaTrip.os}</p>
+              </div>
+              <button onClick={() => { setMinutaTrip(null); onRefresh(); }} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <PreStackingForm
+                user={undefined}
+                drivers={drivers}
+                customers={customers}
+                ports={ports}
+                onClose={() => { setMinutaTrip(null); onRefresh(); }}
+                initialFormData={minutaTrip.preStackingFormData || mapTripToMinuta(minutaTrip)}
+              />
+            </div>
+          </div>
         </div>
       )}
 
@@ -2579,9 +2593,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       </div>
 
       {devMinutaDev && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[200] flex items-stretch justify-center p-4 overflow-auto">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-6xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden my-auto">
-            <div className="flex justify-between items-center p-8 border-b border-slate-100 bg-slate-50 shrink-0">
+        <div className="fixed inset-0 z-[200] animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-400">
+            <div className="px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Organização Operacional</p>
                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Minuta de Devolução</h3>
@@ -2591,7 +2605,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
               <DevolucaoVazioForm
                 drivers={drivers}
                 customers={customers}
@@ -2607,9 +2621,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       )}
 
       {libMinuta && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[200] flex items-stretch justify-center p-4 overflow-auto">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-6xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden my-auto">
-            <div className="flex justify-between items-center p-8 border-b border-slate-100 bg-slate-50 shrink-0">
+        <div className="fixed inset-0 z-[200] animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-400">
+            <div className="px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div>
                 <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Organização Operacional</p>
                 <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Liberação de Vazio</h3>
@@ -2619,7 +2633,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
               <LiberacaoVazioForm
                 drivers={drivers}
                 customers={customers}

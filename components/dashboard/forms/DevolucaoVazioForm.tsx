@@ -247,14 +247,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
         </div>
       </div>
 
-      <div className="w-full lg:min-w-[560px] lg:w-[560px] p-10 overflow-y-auto space-y-8 bg-slate-50 border-r border-slate-100 custom-scrollbar relative">
-        <button
-          onClick={onClose}
-          className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 bg-white rounded-full shadow-sm border border-slate-200 transition-colors z-10"
-          title="Fechar"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
+      <div className="w-full lg:min-w-[560px] lg:w-[560px] p-8 overflow-y-auto space-y-6 bg-slate-50 border-r border-slate-100 custom-scrollbar">
 
         <AutocompleteSearch
           label="1. Local de Devolução (Depot / Terminal)"
@@ -417,7 +410,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
               {isSaving ? 'Processando...' : 'Salvar Dados'}
             </button>
           )}
-          <button disabled={isExporting} onClick={downloadPDF} className={`py-6 bg-slate-900 text-white rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-amber-600 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${devolucao && onSave ? '' : 'col-span-2'}`}>
+          <button disabled={isExporting} onClick={downloadPDF} className={`py-6 bg-slate-900 text-white rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${devolucao && onSave ? '' : 'col-span-2'}`}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth="2.5"/></svg>
             {isExporting ? 'Gerando PDF...' : 'Baixar Minuta'}
           </button>

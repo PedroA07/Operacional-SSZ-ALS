@@ -262,8 +262,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
   };
 
   const selectClasses = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm cursor-pointer";
-  const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block";
-  const labelBlueClass = "text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 block";
+  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
+  const labelBlueClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
   const inputClasses = "w-full px-5 py-4 rounded-[1.5rem] border-2 border-slate-50 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
 
   // Preparação consistente das opções
@@ -287,22 +287,15 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
       </div>
 
 
-      <div className="w-full lg:min-w-[560px] lg:w-[560px] p-10 overflow-y-auto space-y-8 bg-slate-50 border-r border-slate-100 custom-scrollbar relative">
-        <button 
-          onClick={onClose}
-          className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 bg-white rounded-full shadow-sm border border-slate-200 transition-colors z-10"
-          title="Fechar"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
+      <div className="w-full lg:min-w-[560px] lg:w-[560px] p-8 overflow-y-auto space-y-6 bg-slate-50 border-r border-slate-100 custom-scrollbar">
 
-        <div className="bg-blue-50 p-8 rounded-[2.5rem] border border-blue-100 shadow-sm space-y-6 mt-4">
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6 mt-4">
            <div className="space-y-1">
               <label className={labelBlueClass}>Identificação da Viagem (OS)</label>
               <input 
                 required 
                 placeholder="EX: 123ALC1234567A"
-                className={`${inputClasses} text-xl border-blue-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10`} 
+                className={`${inputClasses} text-xl`}
                 value={formData.os} 
                 onChange={e => handleInputChange('os', e.target.value)} 
               />
@@ -391,7 +384,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
           </div>
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1"><label className={labelClass}>Genset (Opcional)</label><input className={inputClasses} value={formData.genset} onChange={e => handleInputChange('genset', e.target.value)} placeholder="Nº GENSET" /></div>
-            <div className="space-y-1"><label className={labelClass}>Armador / Agência</label><input className={`${inputClasses} bg-blue-50/30 border-blue-100`} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
+            <div className="space-y-1"><label className={labelClass}>Armador / Agência</label><input className={inputClasses} value={formData.agencia} onChange={e => handleInputChange('agencia', e.target.value)} /></div>
           </div>
           <div className="space-y-1">
             <label className={labelClass}>Padrão de Carga</label>

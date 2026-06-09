@@ -135,9 +135,9 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
   };
 
   const inputClasses =
-    'w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold uppercase focus:border-indigo-500 outline-none transition-all shadow-sm placeholder:text-slate-300';
+    'w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-800 text-[11px] font-bold uppercase focus:border-blue-500 focus:bg-white outline-none transition-all placeholder:text-slate-300';
   const labelClass = 'text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block';
-  const labelIndigoClass = 'text-[9px] font-black text-indigo-700 uppercase tracking-widest mb-1.5 block';
+  const labelIndigoClass = 'text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block';
 
   const filteredPODs = commonPODs.filter(p => p.toUpperCase().includes(podSearch.toUpperCase()));
 
@@ -155,7 +155,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
       </div>
 
       {/* PAINEL ESQUERDO */}
-      <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50/50 border-r border-slate-100 custom-scrollbar">
+      <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50 border-r border-slate-100 custom-scrollbar">
 
         <div className="space-y-1">
           <label className={labelIndigoClass}>1. Terminal de Retirada (Manual)</label>
@@ -232,7 +232,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
           <div className="space-y-1">
             <label className={labelClass}>Armador (auto-detectado pelo container)</label>
             <input
-              className={`${inputClasses} bg-indigo-50/40 border-indigo-100`}
+              className={inputClasses}
               value={formData.agencia}
               onChange={e => handleInputChange('agencia', e.target.value)}
               placeholder="MAERSK, MSC, CMA CGM..."
@@ -272,7 +272,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
                   <button
                     key={pod}
                     type="button"
-                    className="w-full text-left px-4 py-3 text-xs font-black text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 uppercase tracking-wider transition-colors"
+                    className="w-full text-left px-4 py-3 text-xs font-black text-slate-700 hover:bg-blue-50 hover:text-blue-700 uppercase tracking-wider transition-colors"
                     onClick={() => {
                       handleInputChange('pod', pod);
                       setPodSearch('');
@@ -353,7 +353,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
         <button
           disabled={isExporting}
           onClick={downloadPDF}
-          className="w-full py-6 bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-800 shadow-xl transition-all active:scale-95 disabled:opacity-60"
+          className="w-full py-6 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95 disabled:opacity-60"
         >
           {isExporting ? 'GERANDO PDF...' : 'BAIXAR MINUTA DE RETIRADA CHEIO'}
         </button>
