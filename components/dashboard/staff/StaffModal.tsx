@@ -165,20 +165,20 @@ const StaffModal: React.FC<StaffModalProps> = ({
 
   if (!isOpen) return null;
 
-  const inputClasses = "w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-white font-bold outline-none focus:border-blue-500 text-slate-900 shadow-sm transition-all placeholder:text-slate-300 disabled:bg-slate-50 disabled:text-slate-400";
+  const inputClasses = "w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50 font-bold outline-none focus:border-blue-500 focus:bg-white text-slate-800 transition-all placeholder:text-slate-300 disabled:bg-slate-100 disabled:text-slate-400";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1 block";
 
   return (
     <>
-      <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-        <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95 duration-500 flex flex-col h-[90vh]">
-          <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+      <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[92vh]">
+          <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
             <div>
               <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editingStaff ? 'Editar Colaborador' : 'Novo Colaborador ALS'}</h3>
-              <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Ficha de Identificação Individual</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Ficha de Identificação Individual</p>
             </div>
-            <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 rounded-full transition-all shadow-sm">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+            <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>
           </div>
 

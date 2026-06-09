@@ -41,13 +41,13 @@ const CustomColumnsManager: React.FC<CustomColumnsManagerProps> = ({ session, on
   return (
     <div className="fixed inset-0 z-[4000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
       <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-        <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+        <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
           <div>
-            <h3 className="text-xl font-black uppercase tracking-tight">Colunas Personalizadas</h3>
-            <p className="text-[10px] font-bold text-blue-400 uppercase mt-1">Gerencie campos extras e fórmulas</p>
+            <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Colunas Personalizadas</h3>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Gerencie campos extras e fórmulas</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-all">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
 

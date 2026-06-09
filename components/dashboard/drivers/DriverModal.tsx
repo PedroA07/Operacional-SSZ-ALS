@@ -306,28 +306,30 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
 
   if (!isOpen) return null;
 
-  const inputClasses = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm disabled:bg-slate-50";
+  const inputClasses = "w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold uppercase focus:border-blue-500 focus:bg-white outline-none transition-all placeholder:text-slate-300 disabled:bg-slate-100 disabled:text-slate-400";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1 block";
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-      <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[95vh] animate-in zoom-in-95">
-        <div className="p-8 border-b bg-slate-50 flex justify-between items-center shrink-0">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[95vh] animate-in zoom-in-95 duration-300">
+        <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
               <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
             </div>
             <div>
-              <h3 className="font-black text-slate-800 text-lg uppercase leading-none">
+              <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest leading-none">
                 {editingDriver ? 'Editar Motorista' : 'Novo Registro de Motorista'}
               </h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-widest">Controle de Frota e Vínculos</p>
+              <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 tracking-widest">Controle de Frota e Vínculos</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Icons.Excluir /></button>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-10 space-y-10 overflow-y-auto custom-scrollbar flex-1 bg-[#fcfdfe]">
+        <form onSubmit={handleSubmit} className="p-10 space-y-10 overflow-y-auto custom-scrollbar flex-1 bg-white">
           <div className="grid grid-cols-12 gap-10">
             <div className="col-span-3 space-y-6">
               {/* Foto */}
@@ -590,9 +592,9 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
             </div>
           </div>
 
-          <div className="flex gap-4 pt-10 border-t">
-            <button type="button" onClick={onClose} className="px-10 py-5 bg-slate-100 text-slate-500 rounded-[2rem] text-[10px] font-black uppercase">Descartar</button>
-            <button type="submit" disabled={isSaving} className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] text-xs font-black uppercase tracking-widest shadow-2xl hover:bg-blue-700 transition-all flex items-center justify-center gap-3">
+          <div className="flex gap-4 pt-10 border-t border-slate-100">
+            <button type="button" onClick={onClose} className="px-10 py-5 bg-slate-100 text-slate-500 rounded-[2rem] text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95">Descartar</button>
+            <button type="submit" disabled={isSaving} className="flex-1 py-5 bg-slate-900 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-widest shadow-2xl hover:bg-blue-600 transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-3">
               {isSaving ? 'Gravando Dados...' : 'Salvar Ficha do Motorista'}
             </button>
           </div>

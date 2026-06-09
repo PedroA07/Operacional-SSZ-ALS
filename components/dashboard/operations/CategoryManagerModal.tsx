@@ -55,7 +55,7 @@ const CategoryManagerModal: React.FC<Props> = ({ isOpen, onClose, categories, on
 
     const success = await db.saveCategory(categoryData, actingUser);
     if (!success) {
-      alert('Erro ao salvar categoria. Verifique as permissões ou se a coluna "color" existe na tabela.');
+      alert('Erro ao salvar vínculo. Verifique as permissões ou se a coluna "color" existe na tabela.');
       return;
     }
     resetForm();
@@ -65,32 +65,37 @@ const CategoryManagerModal: React.FC<Props> = ({ isOpen, onClose, categories, on
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-      <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4">
-        <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
-          <h3 className="text-xs font-black uppercase tracking-widest">Configurações de Categorias</h3>
-          <button onClick={onClose}><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></button>
-        </div>
-        
-        <form onSubmit={handleSave} className="p-8 space-y-6">
-          <div className="space-y-1">
-            <label className="text-[9px] font-black text-slate-400 uppercase">{editingId ? 'Editar Categoria' : 'Nova Categoria/Subcategoria'}</label>
-            <input required className="w-full px-4 py-3 rounded-xl border border-slate-200 font-bold uppercase" placeholder="NOME DA CATEGORIA" value={name} onChange={e => setName(e.target.value.toUpperCase())} />
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[92vh]">
+        <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
+          <div>
+            <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Vínculos Operacionais</h3>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Cadastro de vínculos e sub-vínculos</p>
           </div>
-          
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSave} className="p-8 space-y-6 shrink-0">
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">{editingId ? 'Editar Vínculo' : 'Novo Vínculo/Sub-vínculo'}</label>
+            <input required className="w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold uppercase focus:border-blue-500 focus:bg-white outline-none transition-all placeholder:text-slate-300" placeholder="NOME DO VÍNCULO" value={name} onChange={e => setName(e.target.value.toUpperCase())} />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 uppercase">Vincular à Categoria Pai</label>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Vincular ao Vínculo Pai</label>
               <CustomSelect
                 value={parentId}
                 onChange={v => setParentId(v)}
-                placeholder="NENHUMA (PRINCIPAL)"
+                placeholder="NENHUM (PRINCIPAL)"
                 options={categories.filter(c => !c.parentId && c.id !== editingId).map(c => ({ value: c.id, label: c.name }))}
-                inputClassName="w-full px-4 py-3 rounded-xl border border-slate-200 font-bold text-xs"
+                inputClassName="w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50 font-bold text-xs outline-none"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 uppercase">Cor da Categoria</label>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Cor do Vínculo</label>
               <div className="flex items-center gap-2">
                 <input type="color" className="w-12 h-12 rounded-xl border-none cursor-pointer" value={color} onChange={e => setColor(e.target.value)} />
                 <span className="text-xs font-mono font-bold text-slate-600 uppercase">{color}</span>
@@ -116,15 +121,15 @@ const CategoryManagerModal: React.FC<Props> = ({ isOpen, onClose, categories, on
           
           <div className="flex gap-2">
             {editingId && (
-              <button type="button" onClick={resetForm} className="flex-1 py-4 bg-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-300 transition-all">Cancelar</button>
+              <button type="button" onClick={resetForm} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95">Cancelar</button>
             )}
-            <button type="submit" className="flex-[2] py-4 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-emerald-600 transition-all">
-              {editingId ? 'Salvar Alterações' : 'Cadastrar Categoria'}
+            <button type="submit" className="flex-[2] py-4 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-[0.98]">
+              {editingId ? 'Salvar Alterações' : 'Cadastrar Vínculo'}
             </button>
           </div>
         </form>
 
-        <div className="p-8 pt-0 border-t border-slate-100 max-h-60 overflow-y-auto">
+        <div className="p-8 pt-0 border-t border-slate-100 overflow-y-auto custom-scrollbar flex-1">
           <p className="text-[9px] font-black text-slate-300 uppercase mb-4 mt-4 tracking-widest">Existentes no Sistema</p>
           <div className="space-y-2">
             {categories.filter(c => !c.parentId).map(parent => (

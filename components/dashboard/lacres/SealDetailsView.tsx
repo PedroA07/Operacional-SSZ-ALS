@@ -364,7 +364,7 @@ const SealDetailsView: React.FC<SealDetailsViewProps> = ({ batch, onBack, userId
            </div>
         </div>
 
-        <div className="flex-1 w-full max-md relative group">
+        <div className="flex-1 w-full max-w-md relative group">
            <input 
              type="text" 
              placeholder="BUSCAR LACRE, CONTAINER OU MOTORISTA..."

@@ -69,23 +69,26 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
 
   if (!isOpen) return null;
 
-  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block";
-  const labelBlueClass = "text-[9px] font-black text-blue-500 uppercase tracking-widest mb-1.5 block";
-  const inputClass = "w-full px-4 py-3.5 rounded-xl border-none bg-[#333333] text-white font-bold uppercase focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-500";
-  const selectClass = "w-full px-4 py-3.5 rounded-xl border-none bg-[#333333] text-white font-bold uppercase focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none cursor-pointer";
+  const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1 block";
+  const labelBlueClass = "text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1.5 ml-1 block";
+  const inputClass = "w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold uppercase focus:border-blue-500 focus:bg-white outline-none transition-all placeholder:text-slate-300";
+  const selectClass = "w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold uppercase focus:border-blue-500 focus:bg-white outline-none transition-all appearance-none cursor-pointer";
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-      <div className="bg-[#f8fafc] w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-white">
-          <h3 className="font-black text-slate-800 text-sm uppercase tracking-[0.2em]">Nova Programação</h3>
-          <button onClick={onClose} className="text-slate-300 hover:text-red-500 transition-colors">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+        <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
+          <div>
+            <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Nova Programação</h3>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Registro de viagem operacional</p>
+          </div>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-12 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+        <form onSubmit={handleSubmit} className="p-10 space-y-6 overflow-y-auto custom-scrollbar flex-1">
           {/* Row 0: Tipo de Programação */}
           <div>
             <label className={labelClass}>Tipo de Programação</label>
@@ -155,7 +158,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
                 value={form.dateTime || ''}
                 onChange={v => setForm({...form, dateTime: v})}
                 placeholder="Data/Hora Programação..."
-                inputClassName="w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                inputClassName="w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold focus:border-blue-500 focus:bg-white outline-none transition-all"
               />
             </div>
           </div>
@@ -184,7 +187,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
             </div>
             <div>
               <label className={labelClass}>CVA (Certificado)</label>
-              <input className={`${inputClass} border-2 border-slate-700`} value={form.cva} onChange={e => setForm({...form, cva: e.target.value.toUpperCase()})} />
+              <input className={inputClass} value={form.cva} onChange={e => setForm({...form, cva: e.target.value.toUpperCase()})} />
             </div>
           </div>
 
@@ -229,7 +232,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
           </div>
 
           {/* Submit Button */}
-          <button type="submit" className="w-full py-6 bg-[#2563eb] text-white rounded-2xl text-[12px] font-black uppercase tracking-[0.3em] shadow-xl shadow-blue-500/20 hover:bg-blue-700 hover:-translate-y-1 active:translate-y-0 transition-all duration-300">
+          <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl hover:bg-blue-600 transition-all active:scale-[0.98]">
             Salvar Programação
           </button>
         </form>
