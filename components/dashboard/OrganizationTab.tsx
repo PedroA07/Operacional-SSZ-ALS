@@ -2219,21 +2219,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       {ocTrip && createPortal(
         <div className="fixed inset-0 z-[400] animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
-            <div className="h-14 bg-indigo-700 flex items-center justify-between px-6 shrink-0 shadow-lg">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                </div>
-                <div>
-                  <p className="text-white font-black text-sm uppercase tracking-tight leading-none">Editar Ordem de Coleta</p>
-                  <p className="text-white/60 text-[9px] font-bold uppercase mt-0.5">OS: {ocTrip.os}</p>
-                </div>
+            <div className="px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Organização Operacional</p>
+                <h2 className="font-black text-slate-800 text-sm uppercase tracking-widest">Ordem de Coleta</h2>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">OS: {ocTrip.os}</p>
               </div>
               <button
                 onClick={() => { setOcTrip(null); onRefresh(); }}
-                className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center hover:bg-white/40 text-white transition-all"
+                className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
             </div>
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -2583,15 +2579,16 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       </div>
 
       {devMinutaDev && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-stretch justify-center p-4 overflow-auto">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[200] flex items-stretch justify-center p-4 overflow-auto">
           <div className="bg-white rounded-[2.5rem] w-full max-w-6xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden my-auto">
-            <div className="flex justify-between items-center px-8 py-5 border-b border-slate-100 bg-slate-50/50 shrink-0">
+            <div className="flex justify-between items-center p-8 border-b border-slate-100 bg-slate-50 shrink-0">
               <div>
-                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Minuta de Devolução</h3>
+                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Organização Operacional</p>
+                <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Minuta de Devolução</h3>
                 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{devMinutaDev.container || devMinutaDev.os}</p>
               </div>
-              <button onClick={() => setDevMinutaDev(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-                <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              <button onClick={() => setDevMinutaDev(null)} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
             </div>
             <div className="flex-1 overflow-auto">
@@ -2610,15 +2607,16 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       )}
 
       {libMinuta && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-stretch justify-center p-4 overflow-auto">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[200] flex items-stretch justify-center p-4 overflow-auto">
           <div className="bg-white rounded-[2.5rem] w-full max-w-6xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden my-auto">
-            <div className="flex justify-between items-center px-8 py-5 border-b border-slate-100 bg-slate-50/50 shrink-0">
+            <div className="flex justify-between items-center p-8 border-b border-slate-100 bg-slate-50 shrink-0">
               <div>
-                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Liberação de Vazio</h3>
+                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Organização Operacional</p>
+                <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Liberação de Vazio</h3>
                 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{libMinuta.os}</p>
               </div>
-              <button onClick={() => setLibMinuta(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-                <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              <button onClick={() => setLibMinuta(null)} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
             </div>
             <div className="flex-1 overflow-auto">

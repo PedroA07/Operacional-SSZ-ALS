@@ -521,12 +521,15 @@ const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, pr
 
       {/* Form modal */}
       {isFormModalOpen && selectedFormType && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
-          <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[95vh]">
-            <div className="p-6 text-white flex justify-between items-center" style={{ backgroundColor: formConfigs[selectedFormType].hex }}>
-              <h3 className="font-black text-sm uppercase tracking-widest">{formConfigs[selectedFormType].title}</h3>
-              <button onClick={handleClose} className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-all">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-white w-full max-w-[1700px] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col h-[95vh]">
+            <div className="p-8 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Formulários</p>
+                <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{formConfigs[selectedFormType].title}</h3>
+              </div>
+              <button onClick={handleClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
             </div>
 
