@@ -36,38 +36,45 @@ const Sidebar: React.FC<SidebarProps> = ({
     if (thirdPartyOnly && user.role !== 'third_party') return null;
     const isActive = forceActive || (tab ? activeTab === tab : false);
     const isExpanded = expandedMenus[label];
-    
+
     return (
       <div className="w-full">
         <div className="flex items-center group">
-          <button 
-            onClick={() => { 
-              if (tab) { 
-                setActiveTab(tab); 
-                if (tab === DashboardTab.OPERACOES) setOpsView({ type: 'list' }); 
-              } 
-            }} 
-            className={`flex-1 flex items-center gap-3 px-5 py-3 rounded-xl transition-all font-bold text-[10px] uppercase tracking-widest ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-slate-800/60 text-slate-400'}`}
+          <button
+            title={sidebarState !== 'open' ? label : undefined}
+            onClick={() => {
+              if (tab) {
+                setActiveTab(tab);
+                if (tab === DashboardTab.OPERACOES) setOpsView({ type: 'list' });
+              }
+            }}
+            className={`flex-1 flex items-center gap-3 rounded-xl transition-all duration-200 font-bold text-[10px] uppercase tracking-widest relative overflow-hidden
+              ${sidebarState === 'open' ? 'px-4 py-3' : 'px-0 py-3 justify-center'}
+              ${isActive
+                ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-600/25'
+                : 'hover:bg-white/5 text-slate-400 hover:text-slate-200'
+              }`}
           >
-            <div className={`${isActive ? 'text-white' : 'text-slate-50 group-hover:text-white'}`}>{icon}</div>
+            {isActive && <span className="absolute left-0 inset-y-1.5 w-0.5 bg-white/50 rounded-full" />}
+            <div className={`shrink-0 transition-transform duration-200 ${isActive ? 'text-white scale-105' : 'text-slate-400 group-hover:text-slate-200'}`}>{icon}</div>
             {sidebarState === 'open' && <span className="truncate">{label}</span>}
           </button>
           {children && sidebarState === 'open' && (
-            <button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                setExpandedMenus(p => ({ ...p, [label]: !p[label] })); 
-              }} 
-              className={`p-3 text-slate-500 transition-all ${isExpanded ? 'rotate-180' : ''}`}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpandedMenus(p => ({ ...p, [label]: !p[label] }));
+              }}
+              className={`p-2.5 rounded-lg text-slate-600 hover:text-slate-300 transition-all duration-300 ${isExpanded ? 'rotate-180' : ''}`}
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M19 9l-7 7-7-7" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M19 9l-7 7-7-7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
           )}
         </div>
         {children && isExpanded && sidebarState === 'open' && (
-          <div className="ml-8 mt-1 space-y-1 border-l border-slate-800/50 pl-4 animate-in slide-in-from-top-2 duration-300">
+          <div className="ml-7 mt-1 space-y-0.5 border-l border-slate-700/40 pl-3 animate-in slide-in-from-top-2 duration-200">
             {children}
           </div>
         )}
@@ -78,33 +85,38 @@ const Sidebar: React.FC<SidebarProps> = ({
   if (sidebarState === 'hidden') return null;
 
   return (
-    <aside className={`${sidebarState === 'open' ? 'w-80' : 'w-20'} bg-[#0f172a] text-slate-400 flex flex-col shadow-[10px_0_50px_rgba(0,0,0,0.3)] z-50 transition-all duration-500 shrink-0 overflow-hidden`}>
-      <div className="p-6 border-b border-slate-800/50 space-y-4">
-        <div className="flex items-center gap-4 mb-2">
-          <div className="bg-white w-10 h-10 min-w-[40px] rounded-xl flex items-center justify-center shadow-xl shadow-blue-600/10 overflow-hidden">
-            <img src="/logo.jpg" alt="ALS" className="w-full h-full object-cover rounded-xl" />
+    <aside className={`${sidebarState === 'open' ? 'w-72' : 'w-[72px]'} bg-[#0b1120] text-slate-400 flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.35)] z-50 transition-all duration-300 shrink-0 overflow-hidden`}>
+      <div className={`border-b border-white/5 ${sidebarState === 'open' ? 'p-5' : 'p-3.5'} space-y-3`}>
+        <div className={`flex items-center ${sidebarState === 'open' ? 'gap-3' : 'justify-center'}`}>
+          <div className="bg-white min-w-[38px] w-[38px] h-[38px] rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20 overflow-hidden ring-2 ring-white/10">
+            <img src="/logo.jpg" alt="ALS" className="w-full h-full object-cover" />
           </div>
-          {sidebarState === 'open' && <span className="block font-black text-slate-100 tracking-[0.2em] text-xs uppercase whitespace-nowrap animate-in fade-in slide-in-from-left-4">ALS LOGÍSTICA</span>}
+          {sidebarState === 'open' && (
+            <div className="animate-in fade-in slide-in-from-left-3 duration-200 overflow-hidden">
+              <p className="font-black text-white tracking-[0.15em] text-xs uppercase leading-tight">ALS</p>
+              <p className="font-bold text-slate-500 text-[9px] uppercase tracking-widest">Logística SSZ</p>
+            </div>
+          )}
         </div>
         {sidebarState === 'open' && <WeatherWidget />}
       </div>
-      
-      <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto overflow-x-hidden custom-scrollbar">
+
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto overflow-x-hidden custom-scrollbar">
         <MenuItem tab={DashboardTab.INICIO} label="Início" icon={<Icons.Inicio />} />
         <MenuItem tab={DashboardTab.HANDOVER} label="Passagem de Serviço" icon={
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
         } />
         <MenuItem tab={DashboardTab.OPERACOES} label="Operações" icon={<Icons.Operacoes />} forceActive={activeTab === DashboardTab.OPERACOES}>
           {availableOps.map(op => (
-            <button 
-              key={op.id} 
-              onClick={() => { 
-                setActiveTab(DashboardTab.OPERACOES); 
-                setOpsView({ type: 'category', id: op.id, categoryName: op.category }); 
-              }} 
-              className="w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase text-slate-500 hover:text-white transition-colors"
+            <button
+              key={op.id}
+              onClick={() => {
+                setActiveTab(DashboardTab.OPERACOES);
+                setOpsView({ type: 'category', id: op.id, categoryName: op.category });
+              }}
+              className="w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase text-slate-500 hover:text-slate-200 hover:bg-white/5 rounded-lg transition-all"
             >
-              • {op.category}
+              {op.category}
             </button>
           ))}
         </MenuItem>
@@ -131,33 +143,48 @@ const Sidebar: React.FC<SidebarProps> = ({
         <MenuItem tab={DashboardTab.VALORES_PRE_STACKING} label="Valores Pré-Stacking" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>} />
         
         <MenuItem label="Outros" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>}>
-            <button onClick={() => setActiveTab(DashboardTab.LOGINS)} className={`w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase transition-colors ${activeTab === DashboardTab.LOGINS ? 'text-blue-400' : 'text-slate-500 hover:text-white'}`}>
-              • Cofre de Logins
+          {([
+            { tab: DashboardTab.LOGINS, label: 'Cofre de Logins' },
+            { tab: DashboardTab.LACRES, label: 'Controle de Lacres' },
+            { tab: DashboardTab.AVANTIDA, label: 'Avantida' },
+          ] as const).map(item => (
+            <button
+              key={item.tab}
+              onClick={() => setActiveTab(item.tab)}
+              className={`w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase rounded-lg transition-all ${activeTab === item.tab ? 'text-blue-400 bg-blue-500/10' : 'text-slate-500 hover:text-slate-200 hover:bg-white/5'}`}
+            >
+              {item.label}
             </button>
-            <button onClick={() => setActiveTab(DashboardTab.LACRES)} className={`w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase transition-colors ${activeTab === DashboardTab.LACRES ? 'text-blue-400' : 'text-slate-500 hover:text-white'}`}>
-              • Controle de Lacres
-            </button>
-            <button onClick={() => setActiveTab(DashboardTab.AVANTIDA)} className={`w-full text-left py-1.5 px-3 text-[9px] font-bold uppercase transition-colors ${activeTab === DashboardTab.AVANTIDA ? 'text-blue-400' : 'text-slate-500 hover:text-white'}`}>
-              • Avantida
-            </button>
+          ))}
         </MenuItem>
 
-        <div className="pt-6 pb-2">
-           {sidebarState === 'open' && <p className="px-5 text-[8px] font-black text-slate-600 uppercase mb-3 tracking-[0.3em]">Administração</p>}
+        <div className="pt-4 pb-2">
+          {sidebarState === 'open' && (
+            <div className="flex items-center gap-2 px-4 mb-2">
+              <div className="h-px flex-1 bg-slate-800/60" />
+              <p className="text-[7px] font-black text-slate-600 uppercase tracking-[0.3em] shrink-0">Admin</p>
+              <div className="h-px flex-1 bg-slate-800/60" />
+            </div>
+          )}
            <MenuItem tab={DashboardTab.COLABORADORES} label="Equipe ALS" icon={<Icons.Equipe />} />
            <MenuItem tab={DashboardTab.EXTERNAL_USERS} label="Usuários Externos" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>} adminOnly />
            <MenuItem tab={DashboardTab.SISTEMA} label="Configurações" icon={<Icons.Configuracoes />} adminOnly />
         </div>
       </nav>
       
-      <div className="p-5 border-t border-slate-800/50 bg-[#0f172a] space-y-4">
-         {sidebarState === 'open' && <OnlineStatus staffList={staffList} currentUser={user} />}
-         <button onClick={onLogout} className="w-full text-[9px] text-red-500 font-black uppercase hover:bg-red-500/10 py-4 rounded-2xl flex items-center justify-center gap-3 border border-red-900/20 active:scale-95 transition-all duration-300">
-           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-             <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="2.5"/>
-           </svg>
-           {sidebarState === 'open' && <span>Sair do Sistema</span>}
-         </button>
+      <div className={`border-t border-white/5 ${sidebarState === 'open' ? 'p-4' : 'p-3'} space-y-3`}>
+        {sidebarState === 'open' && <OnlineStatus staffList={staffList} currentUser={user} />}
+        <button
+          onClick={onLogout}
+          title={sidebarState !== 'open' ? 'Sair do sistema' : undefined}
+          className={`w-full text-[9px] text-red-400/80 font-black uppercase hover:bg-red-500/10 hover:text-red-400 rounded-xl flex items-center gap-3 border border-red-900/20 hover:border-red-800/40 active:scale-95 transition-all duration-200
+            ${sidebarState === 'open' ? 'px-4 py-3 justify-start' : 'py-3 justify-center'}`}
+        >
+          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="2.5"/>
+          </svg>
+          {sidebarState === 'open' && <span>Sair do Sistema</span>}
+        </button>
       </div>
     </aside>
   );

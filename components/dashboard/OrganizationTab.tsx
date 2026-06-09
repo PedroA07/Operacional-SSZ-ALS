@@ -2347,8 +2347,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
 
         {categories.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">Categoria:</span>
+          <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">Vínculo:</span>
             <button
               onClick={() => setSelectedCategoryFilters([])}
               className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${selectedCategoryFilters.length === 0 ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400 hover:text-slate-600'}`}
