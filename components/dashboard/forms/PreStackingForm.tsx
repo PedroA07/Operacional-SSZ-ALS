@@ -289,7 +289,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
   };
 
   const labelClass = "text-[10px] font-black text-emerald-600 uppercase tracking-widest block";
-  const inputClass = "w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-white font-bold uppercase focus:border-emerald-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
+  const inputClass = "w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-white font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
 
   const filteredUnits = preStackingList.filter(u => 
     (u.legalName || u.name || '').toUpperCase().includes(searchTerm.toUpperCase())
@@ -309,15 +309,8 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
       </div>
 
 
-      <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50 border-r border-slate-100 custom-scrollbar shrink-0 relative">
-        <button 
-          onClick={onClose}
-          className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 bg-white rounded-full shadow-sm border border-slate-200 transition-colors z-10"
-          title="Fechar"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-        
+      <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50 border-r border-slate-100 custom-scrollbar shrink-0">
+
         {selectedDriver && (
           <>
             <DriverPlateSelector
@@ -367,12 +360,12 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
         </div>
 
         {mode === 'viagem' ? (
-        <div className="bg-emerald-50 p-6 rounded-[2.2rem] border border-emerald-100 shadow-sm space-y-4">
+        <div className="bg-white p-6 rounded-[2.2rem] border border-slate-100 shadow-sm space-y-4">
            <div className="space-y-1">
               <label className={labelClass}>Busca por Ordem de Serviço</label>
               <div className="flex gap-2">
                 <input
-                  className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white font-bold uppercase focus:border-emerald-500 outline-none transition-all shadow-sm"
+                  className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm"
                   value={osInput}
                   onChange={e => setOsInput(e.target.value.toUpperCase())}
                   placeholder="EX: 123ALC..."
@@ -392,7 +385,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
            </div>
         </div>
         ) : (
-        <div className="bg-emerald-50 p-6 rounded-[2.2rem] border border-emerald-100 shadow-sm space-y-4">
+        <div className="bg-white p-6 rounded-[2.2rem] border border-slate-100 shadow-sm space-y-4">
           <div className="space-y-1">
             <label className={labelClass}>Ordem de Serviço <span className="text-red-500">*</span></label>
             <input
@@ -544,7 +537,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
            <button
              disabled={isExporting || !formData.os || (mode === 'personalizado' && (!formData.driverId || !formData.remetenteId))}
              onClick={() => startWorkflow('print')}
-             className="py-5 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase hover:bg-emerald-50 transition-all flex items-center justify-center gap-3 active:scale-95"
+             className="py-5 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-3 active:scale-95"
            >
              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
              Imprimir
@@ -552,7 +545,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
            <button
              disabled={isExporting || !formData.os || (mode === 'personalizado' && (!formData.driverId || !formData.remetenteId))}
              onClick={() => startWorkflow('download')}
-             className="py-5 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-emerald-700 shadow-xl transition-all flex items-center justify-center gap-3 active:scale-95"
+             className="py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-blue-600 shadow-xl transition-all flex items-center justify-center gap-3 active:scale-95"
            >
              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
              Baixar PDF
