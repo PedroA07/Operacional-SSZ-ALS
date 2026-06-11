@@ -140,6 +140,8 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
         plateTrailer: effectiveDriver.plateTrailer || undefined,
         cpf:          effectiveDriver.cpf          || undefined,
       } : liberacao.driver,
+      userName: (user || currentUser)?.displayName || liberacao.userName,
+      userId:   (user || currentUser)?.id           || liberacao.userId,
       updatedAt: new Date().toISOString(),
     };
   };
@@ -198,6 +200,8 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
             obs: formData.obs || undefined,
             status: 'Emitido',
             createdAt: new Date().toISOString(),
+            userName: activeUser?.displayName || undefined,
+            userId:   activeUser?.id           || undefined,
           }).catch(e => console.error('[saveLiberacao standalone]', e));
         } catch (e) { console.error('[saveLiberacao standalone]', e); }
       }

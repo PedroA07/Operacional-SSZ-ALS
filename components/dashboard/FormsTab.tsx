@@ -230,7 +230,20 @@ const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, pr
       label: 'Gerado por',
       sortable: true,
       render: (row: FormHistoryEntry) => (
-        <span className="text-[9px] font-bold text-slate-600">{row.userName || '—'}</span>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+              <svg className="w-2.5 h-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            </div>
+            <span className="text-[9px] font-bold text-slate-700 uppercase">{row.userName || '—'}</span>
+          </div>
+          {row.isEdited && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-[7px] font-black uppercase tracking-wider w-fit">
+              <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              Reemissão {row.editVersion && row.editVersion > 2 ? `v${row.editVersion}` : ''}
+            </span>
+          )}
+        </div>
       ),
     },
     {
@@ -441,10 +454,20 @@ const FormsTab: React.FC<FormsTabProps> = ({ user, drivers, customers, ports, pr
                                   {preview && entry.label && (
                                     <p className="text-[8px] text-slate-400 font-bold truncate mt-0.5 uppercase">{preview}</p>
                                   )}
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-[8px] font-bold text-slate-400 uppercase">{entry.userName}</span>
+                                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                    {entry.userName && (
+                                      <div className="flex items-center gap-1">
+                                        <svg className="w-2.5 h-2.5 text-slate-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                        <span className="text-[8px] font-bold text-slate-500 uppercase">{entry.userName}</span>
+                                      </div>
+                                    )}
                                     <span className="text-slate-200 text-[8px]">·</span>
                                     <span className="text-[8px] font-bold text-slate-400">{formatHistoryDate(entry.createdAt)}</span>
+                                    {entry.isEdited && (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-600 text-[7px] font-black uppercase">
+                                        Reemissão{entry.editVersion && entry.editVersion > 2 ? ` v${entry.editVersion}` : ''}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
 
