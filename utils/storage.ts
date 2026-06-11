@@ -889,6 +889,37 @@ export const db = {
     return !error;
   },
 
+  // ─── AUDITORIA DA ORGANIZAÇÃO ────────────────────────────────────────────
+  saveOrgAudit: async (entry: Omit<import('../types').OrgAuditEntry, 'id' | 'createdAt'>): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('org_audit_log').insert({
+      area:         entry.area,
+      action:       entry.action,
+      description:  entry.description,
+      entity_id:    entry.entityId    || null,
+      entity_label: entry.entityLabel || null,
+      changes:      entry.changes?.length ? entry.changes : null,
+      user_name:    entry.userName || 'Sistema',
+      user_id:      entry.userId   || null,
+    });
+    if (error) { console.error('[saveOrgAudit]', error.message); return false; }
+    return true;
+  },
+
+  getOrgAuditLog: async (limit = 500): Promise<import('../types').OrgAuditEntry[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('org_audit_log')
+      .select('*').order('created_at', { ascending: false }).limit(limit);
+    if (error) { console.error('[getOrgAuditLog]', error.message); return []; }
+    return (data || []).map((r: any) => ({
+      id: r.id, area: r.area, action: r.action, description: r.description || '',
+      entityId: r.entity_id || undefined, entityLabel: r.entity_label || undefined,
+      changes: r.changes || undefined,
+      userName: r.user_name || 'Sistema', userId: r.user_id || undefined,
+      createdAt: r.created_at,
+    }));
+  },
+
   getAvantidaRecords: async (): Promise<AvantidaRecord[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('avantida_records').select('*').order('date', { ascending: false });
