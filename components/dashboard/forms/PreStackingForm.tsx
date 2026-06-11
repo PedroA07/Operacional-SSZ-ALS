@@ -8,7 +8,7 @@ import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { db } from '../../../utils/storage';
 import { maskCNPJ, maskCEP } from '../../../utils/masks';
-import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
+import { localDateStr } from '../../../utils/dateHelpers';
 import DateTimePicker from '../../shared/DateTimePicker';
 import CustomSelect from '../../shared/CustomSelect';
 import { tripSyncService } from '../../../utils/tripSyncService';
@@ -226,10 +226,8 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
       if (activeUser) {
         await db.addNotification(activeUser, 'MINUTA_GENERATED', `Minuta Pre-Stacking: ${formData.os}`, `Minuta de carregado gerada para ${effectiveDriver?.name}.`, { os: formData.os, motorista: effectiveDriver?.name, placa: effectiveDriver?.plateHorse });
       }
-      const dataChanged = !initialFormData || formFingerprint(formData) !== formFingerprint(initialFormData);
-      if (dataChanged) {
-        db.savePreStackingEmissao(formData, activeUser);
-      }
+      // Toda emissão é registrada no histórico (rastreabilidade por usuário)
+      db.savePreStackingEmissao(formData, activeUser);
 
       if (mode !== 'personalizado' && effectiveDriver && selectedRemetente) {
          const schedulingDateTime = formData.schedulingDate && formData.schedulingTime

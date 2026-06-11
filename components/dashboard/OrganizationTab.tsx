@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Trip, Port, PreStacking, TripStatus, StatusHistoryEntry, TerminalVessel, Driver, Customer, Devolucao, Liberacao } from '../../types';
+import { Trip, Port, PreStacking, TripStatus, StatusHistoryEntry, TerminalVessel, Driver, Customer, Devolucao, Liberacao, OrgAuditEntry } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { organizationService } from '../../services/organizationService';
 import { advanceService } from '../../services/advanceService';
@@ -12,7 +12,7 @@ import PreStackingForm from './forms/PreStackingForm';
 import OrdemColetaForm from './forms/OrdemColetaForm';
 import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
 import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
-import { localDateStr, localDateTimeStr } from '../../utils/dateHelpers';
+import { localDateStr, localDateTimeStr, formatDateTimePtBR } from '../../utils/dateHelpers';
 import { r2Service } from '../../utils/r2Service';
 
 interface OrganizationTabProps {
@@ -384,6 +384,13 @@ function getDevScheduleStatus(d: Devolucao): DevScheduleStatus {
 
 const DEV_PRIORITY: Record<DevScheduleStatus, number> = { critico: 3, pendente: 2, agendado: 1, normal: 0 };
 
+// Compara pares de campos e retorna só os que mudaram (para a auditoria)
+function diffAuditFields(pairs: { field: string; from?: any; to?: any }[]): { field: string; from?: string; to?: string }[] {
+  return pairs
+    .filter(p => String(p.from ?? '').trim() !== String(p.to ?? '').trim())
+    .map(p => ({ field: p.field, from: String(p.from ?? '').trim(), to: String(p.to ?? '').trim() }));
+}
+
 const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, drivers, customers, onRefresh }) => {
   const [locations, setLocations] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -443,6 +450,47 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
   const [ocTrip, setOcTrip] = useState<Trip | null>(null);
+
+  // ─── Auditoria ───────────────────────────────────────────────────────────
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
+  const [auditEntries, setAuditEntries] = useState<OrgAuditEntry[]>([]);
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false);
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditAreaFilter, setAuditAreaFilter] = useState<string>('');
+
+  const getAuditUser = useCallback((): { name: string; id: string } => {
+    try {
+      const saved = sessionStorage.getItem('als_active_session');
+      if (saved) {
+        const u = JSON.parse(saved);
+        return { name: u.displayName || u.username || 'Sistema', id: u.id || '' };
+      }
+    } catch { /* sessão indisponível */ }
+    return { name: 'Sistema', id: userId || '' };
+  }, [userId]);
+
+  const logAudit = useCallback((
+    area: string,
+    action: string,
+    description: string,
+    entityLabel?: string,
+    changes?: { field: string; from?: string; to?: string }[],
+    entityId?: string,
+  ) => {
+    const u = getAuditUser();
+    db.saveOrgAudit({ area, action, description, entityLabel, entityId, changes, userName: u.name, userId: u.id })
+      .catch(e => console.error('[logAudit]', e));
+  }, [getAuditUser]);
+
+  const openAudit = useCallback(async () => {
+    setIsAuditOpen(true);
+    setIsLoadingAudit(true);
+    try {
+      setAuditEntries(await db.getOrgAuditLog(500));
+    } finally {
+      setIsLoadingAudit(false);
+    }
+  }, []);
 
   // Constantes de estabilidade
   const STABILITY_DURATION = 30000; // Aumentado para 30s pois agora temos auto-limpeza ao confirmar
@@ -993,6 +1041,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
     try {
       await db.saveTrip({ ...trip, sentNF: checked });
+      logAudit(activeView, 'NF', checked ? 'NF marcada como enviada' : 'NF desmarcada', trip.os, undefined, trip.id);
     } catch (error) {
       // Em caso de erro, remove a trava para permitir que o dado original volte
       setPendingUpdates(prev => {
@@ -1001,11 +1050,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         return next;
       });
       console.error("Erro ao salvar NF:", error);
-      window.dispatchEvent(new CustomEvent('als_show_toast', { 
-        detail: { message: 'Erro ao salvar NF no banco de dados', type: 'error' } 
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Erro ao salvar NF no banco de dados', type: 'error' }
       }));
     }
-  }, []);
+  }, [activeView, logAudit]);
 
   const applyStatusToggle = useCallback(async (
     trip: Trip,
@@ -1035,11 +1084,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }));
     try {
       await db.saveTrip(updated);
+      logAudit(activeView, 'STATUS', activate ? `Status alterado para ${targetStatus}` : `Status ${targetStatus} removido (voltou para ${newStatus})`, trip.os, [{ field: 'Status', from: trip.status, to: newStatus }], trip.id);
     } catch {
       setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
       window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: errMsg, type: 'error' } }));
     }
-  }, []);
+  }, [activeView, logAudit]);
 
   const handleToggleFreteMorto = useCallback(async (trip: Trip, activate: boolean) => {
     const nowIso = new Date().toISOString();
@@ -1066,11 +1116,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }));
     try {
       await db.saveTrip(updated);
+      logAudit(activeView, 'STATUS', activate ? 'Frete Morto ativado' : `Frete Morto removido (voltou para ${newStatus})`, trip.os, [{ field: 'Status', from: trip.status, to: newStatus }], trip.id);
     } catch {
       setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
       window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar Frete Morto', type: 'error' } }));
     }
-  }, []);
+  }, [activeView, logAudit]);
 
   const handleToggleReutilizacao = useCallback((trip: Trip, activate: boolean) =>
     applyStatusToggle(trip, activate, 'Reutilização', 'Erro ao salvar Reutilização'), [applyStatusToggle]);
@@ -1098,6 +1149,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
       try {
         await db.saveTrip({ ...trip, ...schedulingData });
+        logAudit(activeView, 'AGENDAMENTO', 'Agendamento removido', trip.os, [{ field: 'Agendamento', from: trip.scheduledDateTime || trip.scheduling?.dateTime || '', to: '' }], trip.id);
       } catch (error) {
         setPendingUpdates(prev => {
           const next = { ...prev };
@@ -1105,12 +1157,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           return next;
         });
         console.error("Erro ao remover agendamento:", error);
-        window.dispatchEvent(new CustomEvent('als_show_toast', { 
-          detail: { message: 'Erro ao remover agendamento', type: 'error' } 
+        window.dispatchEvent(new CustomEvent('als_show_toast', {
+          detail: { message: 'Erro ao remover agendamento', type: 'error' }
         }));
       }
     }
-  }, []);
+  }, [activeView, logAudit]);
 
   const handleConfirmScheduling = useCallback(async (locationId: string, dateTime: string) => {
     if (!selectedTripForScheduling) return;
@@ -1160,6 +1212,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
     try {
       await db.saveTrip({ ...selectedTripForScheduling, ...schedulingData });
+      logAudit(activeView, 'AGENDAMENTO', `Agendamento confirmado: ${resolvedLocationName || 'local não informado'}`, existing.os, [
+        { field: 'Local', from: existing.scheduling?.location || '', to: resolvedLocationName },
+        { field: 'Data/Hora', from: existing.scheduledDateTime || '', to: dateTime },
+      ], existing.id);
     } catch (error) {
       // Não reverte pendingUpdates para evitar que o trip desapareça do painel.
       console.error("Erro ao salvar agendamento:", error);
@@ -1167,7 +1223,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         detail: { message: 'Erro ao salvar agendamento', type: 'error' }
       }));
     }
-  }, [selectedTripForScheduling, locations]);
+  }, [selectedTripForScheduling, locations, activeView, logAudit]);
 
   const handleLocationChange = useCallback(async (trip: Trip, locationId: string) => {
     const selectedLoc = locations.find(l => l.id === locationId);
@@ -1200,6 +1256,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
     try {
       await db.saveTrip({ ...trip, ...locationData });
+      logAudit(activeView, 'LOCAL', `Local de agendamento alterado para ${selectedLoc?.name || '—'}`, trip.os, [{ field: 'Local', from: trip.scheduling?.location || trip.destination?.name || '', to: selectedLoc?.name || '' }], trip.id);
     } catch (error) {
       setPendingUpdates(prev => {
         const next = { ...prev };
@@ -1207,11 +1264,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         return next;
       });
       console.error("Erro ao salvar local de agendamento:", error);
-      window.dispatchEvent(new CustomEvent('als_show_toast', { 
-        detail: { message: 'Erro ao salvar local de agendamento', type: 'error' } 
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Erro ao salvar local de agendamento', type: 'error' }
       }));
     }
-  }, [locations]);
+  }, [locations, activeView, logAudit]);
 
   const handleDateTimeChange = useCallback(async (trip: Trip, dateTime: string) => {
     // Salva como ISO UTC para consistência com SchedulingEditModal
@@ -1239,6 +1296,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
     try {
       await db.saveTrip({ ...trip, ...dateTimeData });
+      logAudit(activeView, 'AGENDAMENTO', 'Data/hora de agendamento alterada', trip.os, [{ field: 'Data/Hora', from: trip.scheduledDateTime || '', to: dateTime }], trip.id);
     } catch (error) {
       // Não reverte pendingUpdates para evitar que o trip desapareça do painel.
       // O toast informa o erro e o timeout de 30s faz a limpeza quando necessário.
@@ -1247,18 +1305,20 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         detail: { message: 'Erro ao salvar data/hora de agendamento', type: 'error' }
       }));
     }
-  }, []);
+  }, [activeView, logAudit]);
 
   const handleSaveDevAgendamento = useCallback(async (devId: string, dateTime: string) => {
     const dev = devolucoes.find(d => d.id === devId);
     if (!dev) return;
     try {
-      await db.saveDevolucao({ ...dev, scheduledDateTime: dateTime, status: dateTime ? 'Agendado' : dev.status });
+      const u = getAuditUser();
+      await db.saveDevolucao({ ...dev, scheduledDateTime: dateTime, status: dateTime ? 'Agendado' : dev.status, userName: u.name, userId: u.id });
       await loadDevolucoes();
+      logAudit('DEVOLUCAO', 'AGENDAMENTO', dateTime ? 'Agendamento de devolução definido' : 'Agendamento de devolução removido', dev.container || dev.os, [{ field: 'Data/Hora', from: dev.scheduledDateTime || '', to: dateTime }], dev.id);
     } catch {
       window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar agendamento', type: 'error' } }));
     }
-  }, [devolucoes, loadDevolucoes]);
+  }, [devolucoes, loadDevolucoes, logAudit, getAuditUser]);
 
   const handleDevComprovanteUpload = useCallback(async (dev: Devolucao, file: File) => {
     setUploadingDevId(dev.id);
@@ -1267,29 +1327,60 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       const fileName = `comprovante-dev-${dev.os || dev.id}-${Date.now()}.${ext}`;
       const url = await r2Service.upload(file, fileName, `devolucoes/${dev.os || dev.id}`);
       const doc = { id: `agd-${Date.now()}`, type: 'AGENDAMENTO', url, fileName: file.name, uploadDate: new Date().toISOString() };
-      await db.saveDevolucao({ ...dev, agendamentoDoc: doc });
+      const u = getAuditUser();
+      await db.saveDevolucao({ ...dev, agendamentoDoc: doc, userName: u.name, userId: u.id });
       await loadDevolucoes();
+      logAudit('DEVOLUCAO', 'COMPROVANTE', `Comprovante de agendamento enviado (${file.name})`, dev.container || dev.os, undefined, dev.id);
       window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Comprovante enviado com sucesso', type: 'success' } }));
     } catch {
       window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao enviar comprovante', type: 'error' } }));
     } finally {
       setUploadingDevId(null);
     }
-  }, [loadDevolucoes]);
+  }, [loadDevolucoes, logAudit, getAuditUser]);
 
   const handleSaveDevolucaoFromForm = useCallback(async (updated: Devolucao) => {
+    const old = devMinutaDev;
     await db.saveDevolucao(updated);
     await loadDevolucoes();
     setDevMinutaDev(null);
+    const changes = old ? diffAuditFields([
+      { field: 'Container',  from: old.container,          to: updated.container },
+      { field: 'Booking',    from: old.booking,            to: updated.booking },
+      { field: 'Navio',      from: old.ship,               to: updated.ship },
+      { field: 'Armador',    from: old.agencia,            to: updated.agencia },
+      { field: 'POD',        from: old.pod,                to: updated.pod },
+      { field: 'Tipo',       from: old.containerType,      to: updated.containerType },
+      { field: 'Local',      from: old.local,              to: updated.local },
+      { field: 'Motorista',  from: old.driver?.name,       to: updated.driver?.name },
+      { field: 'Cliente',    from: old.customer?.name,     to: updated.customer?.name },
+      { field: 'Agendamento',from: old.scheduledDateTime,  to: updated.scheduledDateTime },
+      { field: 'Obs',        from: old.obs,                to: updated.obs },
+    ]) : [];
+    logAudit('DEVOLUCAO', 'EDICAO', changes.length ? 'Minuta de devolução editada' : 'Minuta de devolução salva (sem alterações)', updated.container || updated.os, changes, updated.id);
     window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Minuta salva com sucesso', type: 'success' } }));
-  }, [loadDevolucoes]);
+  }, [loadDevolucoes, devMinutaDev, logAudit]);
 
   const handleSaveLiberacaoFromForm = useCallback(async (updated: Liberacao) => {
+    const old = libMinuta;
     await db.saveLiberacao(updated);
     await loadLiberacoes();
     setLibMinuta(null);
+    const changes = old ? diffAuditFields([
+      { field: 'Booking',   from: old.booking,        to: updated.booking },
+      { field: 'Navio',     from: old.ship,           to: updated.ship },
+      { field: 'Armador',   from: old.agencia,        to: updated.agencia },
+      { field: 'POD',       from: old.pod,            to: updated.pod },
+      { field: 'Tipo',      from: old.containerType,  to: updated.containerType },
+      { field: 'Qtd',       from: old.qtdContainer,   to: updated.qtdContainer },
+      { field: 'Local',     from: old.local,          to: updated.local },
+      { field: 'Motorista', from: old.driver?.name,   to: updated.driver?.name },
+      { field: 'Cliente',   from: old.customer?.name, to: updated.customer?.name },
+      { field: 'Obs',       from: old.obs,            to: updated.obs },
+    ]) : [];
+    logAudit('LIBERACAO', 'EDICAO', changes.length ? 'Liberação de vazio editada' : 'Liberação salva (sem alterações)', updated.booking || updated.os, changes, updated.id);
     window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Liberação salva com sucesso', type: 'success' } }));
-  }, [loadLiberacoes]);
+  }, [loadLiberacoes, libMinuta, logAudit]);
 
   const handleAddDevEntry = useCallback(async () => {
     if (!devAddForm.container.trim()) return;
@@ -1313,8 +1404,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         status: 'Pendente',
         createdAt: now,
       };
-      await db.saveDevolucao(newDev);
+      const u = getAuditUser();
+      await db.saveDevolucao({ ...newDev, userName: u.name, userId: u.id });
       await loadDevolucoes();
+      logAudit('DEVOLUCAO', 'CRIACAO', 'Devolução criada manualmente', newDev.container, undefined, newDev.id);
       setDevAddForm({ container: '', local: '', dateTime: '', driverId: '' });
       setShowDevAddForm(false);
       window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Devolução adicionada com sucesso', type: 'success' } }));
@@ -1323,7 +1416,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     } finally {
       setSavingDevAdd(false);
     }
-  }, [devAddForm, drivers, loadDevolucoes]);
+  }, [devAddForm, drivers, loadDevolucoes, logAudit, getAuditUser]);
 
   const handleToggleAdvance = useCallback(async (trip: Trip, checked: boolean) => {
     const advanceData = { 
@@ -1341,18 +1434,20 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }));
 
     const success = await advanceService.toggleAdvance(trip, checked);
-    
+
     if (!success) {
       setPendingUpdates(prev => {
         const next = { ...prev };
         delete next[trip.id];
         return next;
       });
-      window.dispatchEvent(new CustomEvent('als_show_toast', { 
-        detail: { message: 'Erro ao processar adiantamento', type: 'error' } 
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Erro ao processar adiantamento', type: 'error' }
       }));
+    } else {
+      logAudit(activeView, 'ADIANTAMENTO', checked ? 'Adiantamento liberado' : 'Adiantamento bloqueado', trip.os, undefined, trip.id);
     }
-  }, []);
+  }, [activeView, logAudit]);
 
   const handleRemoveFromOrg = useCallback(async (trip: Trip) => {
     const now = Date.now();
@@ -1367,8 +1462,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
     try {
       await db.saveTrip({ ...trip, isRemovedFromOrg: true });
-      window.dispatchEvent(new CustomEvent('als_show_toast', { 
-        detail: { message: 'Viagem limpa do painel', type: 'success' } 
+      logAudit(activeView, 'LIMPEZA', 'Viagem limpa do painel', trip.os, undefined, trip.id);
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Viagem limpa do painel', type: 'success' }
       }));
     } catch (error) {
       setPendingUpdates(prev => {
@@ -1377,11 +1473,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         return next;
       });
       console.error("Erro ao remover do painel:", error);
-      window.dispatchEvent(new CustomEvent('als_show_toast', { 
-        detail: { message: 'Erro ao processar alteração', type: 'error' } 
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Erro ao processar alteração', type: 'error' }
       }));
     }
-  }, []);
+  }, [activeView, logAudit]);
 
   const toggleTripType = (type: string) => {
     if (activeView === 'COLETA') {
@@ -1432,6 +1528,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         try {
           const success = await organizationService.finalizeScheduledTrips(tripsToFinalize);
           if (success) {
+            logAudit(activeView, 'LIMPEZA', `${tripsToFinalize.length} viagens finalizadas e limpas do painel`, tripsToFinalize.map(t => t.os).join(', ').slice(0, 200));
             onRefresh();
           } else {
             // Reverte em caso de erro
@@ -1928,10 +2025,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         await db.deleteDevolucao(d.id);
         await loadDevolucoes();
+        logAudit('DEVOLUCAO', 'EXCLUSAO', 'Devolução excluída', d.container || d.os, undefined, d.id);
         window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Devolução excluída', type: 'success' } }));
       }
     });
-  }, [loadDevolucoes]);
+  }, [loadDevolucoes, logAudit]);
 
   const handleDeleteLiberacao = useCallback((l: Liberacao) => {
     setConfirmModal({
@@ -1942,10 +2040,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         await db.deleteLiberacao(l.id);
         await loadLiberacoes();
+        logAudit('LIBERACAO', 'EXCLUSAO', 'Liberação excluída', l.booking || l.os, undefined, l.id);
         window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Liberação excluída', type: 'success' } }));
       }
     });
-  }, [loadLiberacoes]);
+  }, [loadLiberacoes, logAudit]);
 
   const devolucoesColumns = useMemo(() => [
     {
@@ -2310,6 +2409,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
 
+            <button
+              onClick={openAudit}
+              className="flex items-center gap-2 p-4 bg-white text-slate-600 rounded-2xl border border-slate-200 shadow-sm hover:bg-slate-50 hover:text-blue-600 transition-all active:scale-95"
+              title="Auditoria de alterações"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+              <span className="text-[9px] font-black uppercase tracking-widest hidden xl:inline">Auditoria</span>
+            </button>
+
             <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
               <button
                 onClick={() => setActiveView('COLETA')}
@@ -2645,6 +2753,122 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 liberacao={libMinuta}
                 onSave={handleSaveLiberacaoFromForm}
               />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal de Auditoria */}
+      {isAuditOpen && createPortal(
+        <div className="fixed inset-0 z-[9100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[92vh]">
+            {/* Header */}
+            <div className="p-8 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div>
+                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Organização Operacional</p>
+                <h2 className="font-black text-slate-800 text-sm uppercase tracking-widest">Auditoria de Alterações</h2>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Registro de cada ação por usuário</p>
+              </div>
+              <button onClick={() => setIsAuditOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </div>
+
+            {/* Filtros */}
+            <div className="px-8 py-4 border-b border-slate-100 flex items-center gap-3 flex-wrap shrink-0">
+              <input
+                value={auditSearch}
+                onChange={e => setAuditSearch(e.target.value)}
+                placeholder="BUSCAR POR OS, CONTAINER, USUÁRIO..."
+                className="flex-1 min-w-[200px] px-4 py-3 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-800 text-[10px] font-bold uppercase focus:border-blue-500 focus:bg-white outline-none transition-all placeholder:text-slate-300"
+              />
+              <div className="flex gap-1.5 flex-wrap">
+                {['', 'COLETA', 'ENTREGA', 'DEVOLUCAO', 'LIBERACAO'].map(area => (
+                  <button
+                    key={area || 'todas'}
+                    onClick={() => setAuditAreaFilter(area)}
+                    className={`px-3 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all border ${auditAreaFilter === area ? 'bg-blue-600 border-blue-600 text-white shadow' : 'bg-white border-slate-200 text-slate-400 hover:border-blue-300 hover:text-blue-600'}`}
+                  >
+                    {area || 'Todas'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Lista */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              {isLoadingAudit ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : (() => {
+                const term = auditSearch.trim().toUpperCase();
+                const filtered = auditEntries.filter(e => {
+                  if (auditAreaFilter && e.area !== auditAreaFilter) return false;
+                  if (!term) return true;
+                  return [e.entityLabel, e.userName, e.description, e.action].some(v => (v || '').toUpperCase().includes(term));
+                });
+                if (filtered.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-20 gap-3">
+                      <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center">
+                        <svg className="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                      </div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nenhum registro encontrado</p>
+                    </div>
+                  );
+                }
+                const areaColors: Record<string, string> = {
+                  COLETA: 'bg-blue-50 text-blue-700 border-blue-200',
+                  ENTREGA: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                  DEVOLUCAO: 'bg-amber-50 text-amber-700 border-amber-200',
+                  LIBERACAO: 'bg-slate-100 text-slate-700 border-slate-300',
+                };
+                return (
+                  <div className="divide-y divide-slate-50">
+                    {filtered.map(entry => (
+                      <div key={entry.id} className="px-8 py-4 hover:bg-slate-50/60 transition-colors">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`px-2 py-0.5 rounded-md text-[7px] font-black uppercase tracking-wider border ${areaColors[entry.area] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                {entry.area}
+                              </span>
+                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{entry.action}</span>
+                              {entry.entityLabel && (
+                                <span className="text-[10px] font-black text-slate-800 uppercase">{entry.entityLabel}</span>
+                              )}
+                            </div>
+                            <p className="text-[11px] font-bold text-slate-600 mt-1">{entry.description}</p>
+                            {entry.changes && entry.changes.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                {entry.changes.map((c, i) => (
+                                  <div key={i} className="flex items-center gap-2 text-[9px] font-bold">
+                                    <span className="text-slate-400 uppercase tracking-wider shrink-0">{c.field}:</span>
+                                    <span className="text-red-400 line-through truncate max-w-[180px]">{c.from || '—'}</span>
+                                    <svg className="w-3 h-3 text-slate-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                                    <span className="text-emerald-600 truncate max-w-[180px]">{c.to || '—'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <div className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
+                                <svg className="w-2.5 h-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                              </div>
+                              <span className="text-[9px] font-black text-slate-700 uppercase">{entry.userName}</span>
+                            </div>
+                            <p className="text-[8px] font-bold text-slate-400 mt-1">{formatDateTimePtBR(entry.createdAt)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>,

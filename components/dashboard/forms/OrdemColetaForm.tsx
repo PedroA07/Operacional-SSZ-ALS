@@ -16,7 +16,7 @@ import { osCategoryService } from '../../../utils/osCategoryService';
 import { tripSyncService } from '../../../utils/tripSyncService';
 import { ocRules } from '../../../utils/ocRules';
 import { db } from '../../../utils/storage';
-import { localDateStr, localDateTimeStr, formFingerprint } from '../../../utils/dateHelpers';
+import { localDateStr, localDateTimeStr } from '../../../utils/dateHelpers';
 
 interface OrdemColetaFormProps {
   user?: User;
@@ -219,12 +219,9 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
       );
 
       window.dispatchEvent(new CustomEvent('als_force_global_refresh'));
-      // Salva histórico: sempre se for novo; só se editado se vier do histórico
+      // Toda emissão é registrada no histórico (rastreabilidade por usuário)
       const activeUser = user || currentUser;
-      const dataChanged = !initialData || formFingerprint(formData) !== formFingerprint(initialData);
-      if (dataChanged) {
-        db.saveOrdemColeta(formData, activeUser);
-      }
+      db.saveOrdemColeta(formData, activeUser);
 
       generateBarcodes();
       await new Promise(r => setTimeout(r, 800));

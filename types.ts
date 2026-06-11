@@ -279,6 +279,19 @@ export interface FormHistoryEntry {
   editVersion?: number;
 }
 
+export interface OrgAuditEntry {
+  id: string;
+  area: string;        // COLETA | ENTREGA | DEVOLUCAO | LIBERACAO
+  action: string;      // NF | STATUS | AGENDAMENTO | LOCAL | EDICAO | CRIACAO | EXCLUSAO | COMPROVANTE | ADIANTAMENTO | LIMPEZA
+  description: string;
+  entityId?: string;
+  entityLabel?: string;
+  changes?: { field: string; from?: string; to?: string }[];
+  userName: string;
+  userId?: string;
+  createdAt: string;
+}
+
 export interface HandoverMention {
   type: 'trip' | 'driver' | 'customer' | 'port' | 'user';
   id: string;
