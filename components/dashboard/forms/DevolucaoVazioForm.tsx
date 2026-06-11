@@ -152,6 +152,8 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
         plateTrailer: effectiveDriver.plateTrailer || undefined,
         cpf:          effectiveDriver.cpf          || undefined,
       } : devolucao.driver,
+      userName: (user || currentUser)?.displayName || devolucao.userName,
+      userId:   (user || currentUser)?.id           || devolucao.userId,
       updatedAt: new Date().toISOString(),
     };
   };
@@ -210,6 +212,8 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
             obs: formData.obs || undefined,
             status: 'Pendente',
             createdAt: new Date().toISOString(),
+            userName: activeUser?.displayName || undefined,
+            userId:   activeUser?.id           || undefined,
           }).catch(e => console.error('[saveDevolucao standalone]', e));
         } catch (e) { console.error('[saveDevolucao standalone]', e); }
       }

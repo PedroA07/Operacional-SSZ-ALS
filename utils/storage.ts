@@ -795,7 +795,7 @@ export const db = {
     if (!supabase) return [];
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase.from('devolucoes')
-      .select('id, container, booking, ship, agencia, pod, container_type, padrao, obs, local_name, local_id, driver_id, driver_name, customer_id, scheduled_date_time, created_at')
+      .select('id, container, booking, ship, agencia, pod, container_type, padrao, obs, local_name, local_id, driver_id, driver_name, customer_id, scheduled_date_time, created_at, user_name, user_id')
       .gte('created_at', cutoff).order('created_at', { ascending: false }).limit(limit);
     if (error) { console.error('[getDevolucaoHistory]', error.message); return []; }
     return (data || []).map((r: any) => ({
@@ -808,7 +808,7 @@ export const db = {
         agendamentoDateTime: r.scheduled_date_time,
       },
       label: r.container || r.booking || '',
-      userName: r.driver_name || '', userId: r.driver_id || '', createdAt: r.created_at,
+      userName: r.user_name || r.driver_name || '', userId: r.user_id || r.driver_id || '', createdAt: r.created_at,
     }));
   },
 
@@ -817,7 +817,7 @@ export const db = {
     if (!supabase) return [];
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase.from('liberacoes')
-      .select('id, booking, ship, agencia, pod, container_type, qtd_container, padrao, obs, local_name, local_id, driver_id, driver_name, customer_id, created_at')
+      .select('id, booking, ship, agencia, pod, container_type, qtd_container, padrao, obs, local_name, local_id, driver_id, driver_name, customer_id, created_at, user_name, user_id')
       .gte('created_at', cutoff).order('created_at', { ascending: false }).limit(limit);
     if (error) { console.error('[getLiberacaoHistory]', error.message); return []; }
     return (data || []).map((r: any) => ({
@@ -829,7 +829,7 @@ export const db = {
         destinatarioId: r.local_id, driverId: r.driver_id,
       },
       label: r.booking || '',
-      userName: r.driver_name || '', userId: r.driver_id || '', createdAt: r.created_at,
+      userName: r.user_name || r.driver_name || '', userId: r.user_id || r.driver_id || '', createdAt: r.created_at,
     }));
   },
 
@@ -844,22 +844,34 @@ export const db = {
       q('ordens_coleta'),
       q('pre_stacking_emissoes'),
       q('retiradas_cheio'),
-      q('devolucoes', 'id, container, booking, driver_name, driver_id, created_at, container_type, agencia, pod'),
-      q('liberacoes',  'id, booking, driver_name, driver_id, created_at, container_type, agencia, pod'),
+      q('devolucoes', 'id, container, booking, driver_name, driver_id, user_name, user_id, created_at, container_type, agencia, pod'),
+      q('liberacoes',  'id, booking, driver_name, driver_id, user_name, user_id, created_at, container_type, agencia, pod'),
     ]);
 
     const safe = (r: PromiseSettledResult<any>, map: (d: any) => any) =>
       r.status === 'fulfilled' && !r.value.error ? (r.value.data || []).map(map) : [];
 
-    const entries: import('../types').FormHistoryEntry[] = [
-      ...safe(ocR,  (r) => ({ id: r.id, formType: 'ORDEM_COLETA',   formData: r.form_data, label: r.os || r.container || r.booking || '', userName: r.user_name || '', userId: r.user_id || '', createdAt: r.created_at })),
-      ...safe(psR,  (r) => ({ id: r.id, formType: 'PRE_STACKING',   formData: r.form_data, label: r.container || r.os || r.booking || '',   userName: r.user_name || '', userId: r.user_id || '', createdAt: r.created_at })),
-      ...safe(rcR,  (r) => ({ id: r.id, formType: 'RETIRADA_CHEIO', formData: r.form_data, label: r.container || r.booking || '',            userName: r.user_name || '', userId: r.user_id || '', createdAt: r.created_at })),
-      ...safe(devR, (r) => ({ id: r.id, formType: 'DEVOLUCAO_VAZIO', formData: { container: r.container, booking: r.booking, tipo: r.container_type, agencia: r.agencia, pod: r.pod, driverId: r.driver_id }, label: r.container || r.booking || '', userName: r.driver_name || '', userId: r.driver_id || '', createdAt: r.created_at })),
-      ...safe(libR, (r) => ({ id: r.id, formType: 'LIBERACAO_VAZIO', formData: { booking: r.booking, tipo: r.container_type, agencia: r.agencia, pod: r.pod, driverId: r.driver_id },                              label: r.booking || '',            userName: r.driver_name || '', userId: r.driver_id || '', createdAt: r.created_at })),
+    const raw: import('../types').FormHistoryEntry[] = [
+      ...safe(ocR,  (r) => ({ id: r.id, formType: 'ORDEM_COLETA',    formData: r.form_data, label: r.os || r.container || r.booking || '',  userName: r.user_name || '',                       userId: r.user_id || '',       createdAt: r.created_at })),
+      ...safe(psR,  (r) => ({ id: r.id, formType: 'PRE_STACKING',    formData: r.form_data, label: r.container || r.os || r.booking || '',   userName: r.user_name || '',                       userId: r.user_id || '',       createdAt: r.created_at })),
+      ...safe(rcR,  (r) => ({ id: r.id, formType: 'RETIRADA_CHEIO',  formData: r.form_data, label: r.container || r.booking || '',           userName: r.user_name || '',                       userId: r.user_id || '',       createdAt: r.created_at })),
+      ...safe(devR, (r) => ({ id: r.id, formType: 'DEVOLUCAO_VAZIO', formData: { container: r.container, booking: r.booking, tipo: r.container_type, agencia: r.agencia, pod: r.pod, driverId: r.driver_id }, label: r.container || r.booking || '', userName: r.user_name || r.driver_name || '', userId: r.user_id || r.driver_id || '', createdAt: r.created_at })),
+      ...safe(libR, (r) => ({ id: r.id, formType: 'LIBERACAO_VAZIO', formData: { booking: r.booking, tipo: r.container_type, agencia: r.agencia, pod: r.pod, driverId: r.driver_id },           label: r.booking || '',        userName: r.user_name || r.driver_name || '', userId: r.user_id || r.driver_id || '', createdAt: r.created_at })),
     ];
 
-    return entries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, limit);
+    const sorted = raw.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, limit);
+
+    // Detecta reemissões: entradas com mesmo formType+label = edição, versões 2, 3…
+    const versionMap = new Map<string, number>();
+    for (const entry of sorted) {
+      if (!entry.label) continue;
+      const key = `${entry.formType}||${entry.label}`;
+      const v = (versionMap.get(key) ?? 0) + 1;
+      versionMap.set(key, v);
+      if (v > 1) { entry.isEdited = true; entry.editVersion = v; }
+    }
+
+    return sorted;
   },
 
   deleteEmissao: async (id: string, formType: string): Promise<boolean> => {
@@ -1907,7 +1919,9 @@ export const db = {
       status:      (r.status as DevolucaoStatus) ?? 'Pendente',
       isCompleted: r.is_completed ?? false,
       createdAt:   r.created_at,
-      updatedAt:   r.updated_at ?? undefined,
+      updatedAt:   r.updated_at  ?? undefined,
+      userName:    r.user_name   ?? undefined,
+      userId:      r.user_id     ?? undefined,
     }));
   },
 
@@ -1945,6 +1959,8 @@ export const db = {
       obs:                        d.obs                       ?? null,
       status:                     d.status,
       is_completed:               d.isCompleted               ?? false,
+      user_name:                  d.userName                  ?? null,
+      user_id:                    d.userId                    ?? null,
       created_at:                 d.createdAt || now,
       updated_at:                 now,
     };
@@ -1993,6 +2009,8 @@ export const db = {
       status: (r.status as LiberacaoStatus) || 'Pendente',
       createdAt: r.created_at,
       updatedAt: r.updated_at || undefined,
+      userName: r.user_name || undefined,
+      userId: r.user_id || undefined,
     }));
   },
 
@@ -2023,6 +2041,8 @@ export const db = {
       driver_cpf: l.driver?.cpf || null,
       obs: l.obs || null,
       status: l.status,
+      user_name: l.userName || null,
+      user_id: l.userId || null,
       created_at: l.createdAt,
       updated_at: l.updatedAt || new Date().toISOString(),
     });

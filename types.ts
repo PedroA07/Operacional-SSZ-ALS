@@ -275,6 +275,8 @@ export interface FormHistoryEntry {
   userName: string;
   userId: string;
   createdAt: string;
+  isEdited?: boolean;
+  editVersion?: number;
 }
 
 export interface HandoverMention {
@@ -967,6 +969,8 @@ export interface Devolucao {
   isCompleted?: boolean;
   createdAt: string;
   updatedAt?: string;
+  userName?: string;
+  userId?: string;
 }
 
 export interface Liberacao {
@@ -1000,4 +1004,6 @@ export interface Liberacao {
   status: LiberacaoStatus;
   createdAt: string;
   updatedAt?: string;
+  userName?: string;
+  userId?: string;
 }
