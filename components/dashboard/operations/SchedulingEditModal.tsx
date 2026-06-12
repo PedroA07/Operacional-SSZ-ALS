@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Trip, TripScheduling, PreStacking, Port } from '../../../types';
 import { db } from '../../../utils/storage';
 
@@ -98,9 +99,10 @@ const SchedulingEditModal: React.FC<SchedulingEditModalProps> = ({
 
   const selectedUnit = preStackingUnits.find(u => u.id === formData.locationId);
 
-  return (
-    <div className="fixed inset-0 z-[650] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+  return createPortal(
+    <div className="fixed inset-0 z-[9000] animate-in fade-in duration-200">
+    <div className="absolute inset-0 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+    <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[92vh]">
         <div className="p-8 bg-emerald-600 text-white flex justify-between items-center shrink-0">
           <div>
             <h3 className="text-sm font-black uppercase tracking-widest leading-none">Agendamento de Terminal</h3>
@@ -200,6 +202,8 @@ const SchedulingEditModal: React.FC<SchedulingEditModalProps> = ({
         </form>
       </div>
     </div>
+    </div>,
+    document.body
   );
 };
 

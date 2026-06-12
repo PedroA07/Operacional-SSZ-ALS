@@ -642,7 +642,9 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-6 animate-in fade-in duration-300">
+
+      {/* Banner SIL import */}
       {lastSilImport && (
         <div className="flex items-center gap-3 px-5 py-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl">
           <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -655,134 +657,130 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
         </div>
       )}
 
-      <>
-      <div className="flex flex-col lg:flex-row justify-between items-end gap-6">
-        <div className="flex-1 w-full"><CategoryNavigation availableOps={availableOps} onNavigate={setActiveView} /></div>
-        <div className="flex flex-col items-end gap-2 w-full lg:w-auto">
-          <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
+      {/* Topo: categorias + ações */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4">
+        <div className="flex-1 w-full min-w-0">
+          <CategoryNavigation availableOps={availableOps} onNavigate={setActiveView} />
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setIsSilImporterOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-[#001e50] transition-all shadow shrink-0"
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
           >
-            <span className="text-[7px] font-black italic bg-white text-[#001e50] px-1.5 py-0.5 rounded leading-none">SIL</span>
-            Importar Programações
+            <span className="text-[7px] font-black italic bg-slate-700 text-white px-1.5 py-0.5 rounded leading-none">SIL</span>
+            Importar
           </button>
+          <OperationRegisterAction user={user} drivers={drivers} customers={customers} categories={categories} onSuccess={onRefresh} variant="dark" />
         </div>
       </div>
 
-      <div className="pt-8 border-t border-slate-200 space-y-4">
-        <div className="bg-white px-6 py-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
+      {/* Painel de controle */}
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
 
-          {/* Linha 1: abas de status + botão nova guia */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="bg-slate-100 p-1 rounded-xl flex gap-1 overflow-x-auto shrink-0">
-              {['geral', 'ativas', 'concluida', 'cancelada'].map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveStatusTab(tab as any)}
-                  className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all whitespace-nowrap ${activeStatusTab === tab ? 'bg-slate-900 text-white shadow' : 'text-slate-400 hover:bg-white hover:text-slate-600'}`}
-                >
-                  {tab === 'ativas' ? 'Fila Ativa' : tab === 'concluida' ? 'Concluídas' : tab === 'cancelada' ? 'Canceladas' : 'Visão Geral'}
-                </button>
-              ))}
-            </div>
+        {/* Faixa de abas de status */}
+        <div className="px-5 py-3 bg-slate-900 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex gap-1">
+            {([
+              { key: 'geral',     label: 'Visão Geral',   dot: 'bg-slate-400' },
+              { key: 'ativas',    label: 'Fila Ativa',    dot: 'bg-blue-400' },
+              { key: 'concluida', label: 'Concluídas',    dot: 'bg-emerald-400' },
+              { key: 'cancelada', label: 'Canceladas',    dot: 'bg-red-400' },
+            ] as const).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveStatusTab(tab.key)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                  activeStatusTab === tab.key
+                    ? 'bg-white text-slate-900 shadow-lg'
+                    : 'text-slate-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeStatusTab === tab.key ? tab.dot : 'bg-current opacity-40'}`} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{filteredTrips.length} registros</span>
             <button
               onClick={() => {
                 const state = { activeStatusTab, searchQuery, startDate, endDate, density, filterTypes, filterClientNames, filterDriverNames, _ts: Date.now() };
                 localStorage.setItem('als_ops_newtab_state', JSON.stringify(state));
                 window.open(window.location.href.split('?')[0] + '?view=ops', '_blank');
               }}
-              className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[9px] font-black uppercase text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-all shrink-0"
-              title="Abrir tabela em nova aba do navegador"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 border border-white/15 rounded-xl text-[8px] font-black uppercase text-white/60 hover:text-white hover:bg-white/20 transition-all"
+              title="Abrir em nova guia"
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-              Nova Guia
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+              Nova guia
             </button>
           </div>
+        </div>
 
-          {/* Linha 2: busca + datas inline */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex-1 min-w-[180px] relative group">
+        {/* Controles de filtro */}
+        <div className="px-5 py-4 space-y-3 border-b border-slate-100">
+
+          {/* Busca + período */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex-1 min-w-[200px] relative group">
               <input
                 type="text"
-                placeholder="BUSCAR OS, CONTAINER, MOTORISTA..."
+                placeholder="Buscar OS, container, motorista..."
                 className="w-full pl-9 pr-3 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-[10px] font-black uppercase focus:border-blue-500 focus:bg-white transition-all outline-none"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
-              <svg className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <svg className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">De</span>
-              <DatePicker
-                value={startDate}
-                onChange={setStartDate}
-                placeholder="Data inicial..."
-                maxDate={endDate || undefined}
-                className="w-40"
-                inputClassName="py-2.5 text-[10px]"
-              />
+            <div className="flex items-center gap-1.5 shrink-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+              <svg className="w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              <DatePicker value={startDate} onChange={setStartDate} placeholder="De..." maxDate={endDate || undefined} className="w-28" inputClassName="py-0 bg-transparent border-0 text-[9px] font-black uppercase outline-none" />
+              <span className="text-slate-300 text-[9px]">→</span>
+              <DatePicker value={endDate} onChange={setEndDate} placeholder="Até..." minDate={startDate || undefined} className="w-28" inputClassName="py-0 bg-transparent border-0 text-[9px] font-black uppercase outline-none" />
+              {(startDate || endDate) && (
+                <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-slate-300 hover:text-red-500 transition-colors ml-1 text-xs leading-none">✕</button>
+              )}
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">Até</span>
-              <DatePicker
-                value={endDate}
-                onChange={setEndDate}
-                placeholder="Data final..."
-                minDate={startDate || undefined}
-                className="w-40"
-                inputClassName="py-2.5 text-[10px]"
-              />
-            </div>
-            {(startDate || endDate) && (
-              <button
-                onClick={() => { setStartDate(''); setEndDate(''); }}
-                className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-red-50 hover:text-red-500 text-slate-400 text-[9px] font-black uppercase transition-all shrink-0"
-                title="Limpar datas"
-              >✕</button>
-            )}
           </div>
 
-          {/* Linha 3: modalidades + filtros de cliente/motorista */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Tipos de operação + filtros avançados */}
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => setFilterTypes([])}
-              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${filterTypes.length === 0 ? 'bg-blue-600 border-blue-600 text-white shadow' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-400 hover:text-blue-600'}`}
+              className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase transition-all border ${filterTypes.length === 0 ? 'bg-blue-600 border-blue-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:border-blue-300 hover:text-blue-600'}`}
             >
-              Todas
+              Todos
             </button>
             {operationTypes.map(op => (
               <button
                 key={op.id}
                 onClick={() => setFilterTypes(prev => prev.includes(op.name) ? prev.filter(t => t !== op.name) : [...prev, op.name])}
-                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${filterTypes.includes(op.name) ? 'bg-slate-900 border-slate-900 text-white shadow' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-400 hover:text-blue-600'}`}
+                className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase transition-all border ${filterTypes.includes(op.name) ? 'bg-slate-800 border-slate-800 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-400 hover:text-slate-700'}`}
+                style={filterTypes.includes(op.name) && op.color ? { backgroundColor: op.color, borderColor: op.color } : undefined}
               >
                 {op.name}
               </button>
             ))}
-            <div className="w-px h-5 bg-slate-200 mx-0.5 hidden sm:block" />
+            <div className="w-px h-4 bg-slate-200 mx-0.5 hidden sm:block" />
             <OperationFilters selectedTypes={[]} onTypesChange={() => {}} selectedClients={filterClientNames} onClientsChange={setFilterClientNames} selectedDrivers={filterDriverNames} onDriversChange={setFilterDriverNames} customers={customers} drivers={drivers} hideModality />
           </div>
-
         </div>
 
+        {/* Tabela */}
         <div className={density === 'compact' ? 'table-compact' : ''}>
-           <SmartOperationTable
-             userId={user.id}
-             componentId="ops-global"
-             title={`Painel Operacional Sincronizado`}
-             columns={columns}
-             data={filteredTrips}
-             hideInternalSearch
-             noMaxHeight={noMaxHeight}
-             onRowClick={(t) => { setSelectedTrip(t); setIsTripDetailsOpen(true); }}
-             defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'destination_sch', 'finance', 'actions']}
-           />
+          <SmartOperationTable
+            userId={user.id}
+            componentId="ops-global"
+            title="Painel Operacional Sincronizado"
+            columns={columns}
+            data={filteredTrips}
+            hideInternalSearch
+            noMaxHeight={noMaxHeight}
+            onRowClick={(t) => { setSelectedTrip(t); setIsTripDetailsOpen(true); }}
+            defaultVisibleKeys={['dateTime', 'os_status', 'driver', 'equipment', 'ship_booking', 'customer', 'destination_sch', 'finance', 'actions']}
+          />
         </div>
       </div>
-      </>
 
       <DocumentViewerModal isOpen={isDocViewerOpen} onClose={() => setIsDocViewerOpen(false)} url={previewDocData.url} title={previewDocData.title} />
       <DriverLocationModal isOpen={isLocationModalOpen} onClose={() => { setIsLocationModalOpen(false); setLocationDriverId(null); }} driverId={locationDriverId} />
