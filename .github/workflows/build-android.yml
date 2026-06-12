@@ -1,0 +1,99 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Release APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      # ── 1. Código ────────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Node.js ──────────────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 3. Build web app ────────────────────────────────────────────────────
+      - name: Build web app
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_APP_VERSION: ${{ github.run_number }}
+        run: npm run build
+
+      # ── 4. Capacitor sync ───────────────────────────────────────────────────
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      # ── 5. Java & Android SDK ────────────────────────────────────────────────
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses 2>/dev/null || true
+
+      # ── 6. Build APK ────────────────────────────────────────────────────────
+      - name: Build Debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace
+
+      # ── 7. Renomear APK ─────────────────────────────────────────────────────
+      - name: Rename APK
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk ALS-Operacional.apk
+
+      # ── 8. Publicar release "latest" ─────────────────────────────────────────
+      - name: Create / Update "latest" release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: latest
+          name: "ALS Operacional — Versão Atual"
+          body: |
+            ## ALS Operacional APK
+
+            Build automático gerado em ${{ github.event.head_commit.timestamp || 'dispatch' }}.
+
+            **Commit:** ${{ github.sha }}
+
+            ### Como instalar
+            1. Baixe o arquivo `ALS-Operacional.apk` abaixo
+            2. No Android: Configurações → Segurança → "Fontes desconhecidas" → Ativar
+            3. Abra o APK e instale
+
+            > Este arquivo é atualizado automaticamente a cada push na branch `main`.
+          artifacts: "ALS-Operacional.apk"
+          allowUpdates: true
+          removeArtifacts: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 9. Atualizar versão no Supabase ──────────────────────────────────────
+      - name: Update app version in Supabase
+        if: ${{ secrets.VITE_SUPABASE_URL != '' }}
+        run: |
+          BUILD_NUM=${{ github.run_number }}
+          curl -s -X POST \
+            "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/app_config" \
+            -H "apikey: ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates" \
+            -d "{\"key\": \"mobile_app_version\", \"value\": \"${BUILD_NUM}\"}" || true
