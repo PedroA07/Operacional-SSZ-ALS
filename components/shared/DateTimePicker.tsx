@@ -160,20 +160,22 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     const rect  = containerRef.current.getBoundingClientRect();
     const vh    = window.innerHeight;
     const vw    = window.innerWidth;
-    const POP_W = 480;
-    const POP_H = 410;
-    const style: React.CSSProperties = { position: 'fixed', width: POP_W };
+    const POP_W = 380;
+    const POP_H = 350;
+    const style: React.CSSProperties = { position: 'fixed', width: POP_W, maxHeight: vh - 16, overflowY: 'auto' };
 
-    // Vertical: open below if room, else above
-    if (vh - rect.bottom - 8 >= POP_H || vh - rect.bottom >= rect.top) {
+    // Vertical: abaixo se couber; senão acima; senão prende dentro da tela
+    if (vh - rect.bottom - 8 >= POP_H) {
       style.top = rect.bottom + 8; style.bottom = 'auto';
-    } else {
+    } else if (rect.top - 8 >= POP_H) {
       style.bottom = vh - rect.top + 8; style.top = 'auto';
+    } else {
+      style.top = Math.max(8, vh - POP_H - 8); style.bottom = 'auto';
     }
 
-    // Horizontal
-    if (rect.left + POP_W <= vw) { style.left = rect.left; style.right = 'auto'; }
-    else                          { style.right = vw - rect.right; style.left = 'auto'; }
+    // Horizontal: nunca sai do viewport
+    if (rect.left + POP_W <= vw - 8) { style.left = rect.left; style.right = 'auto'; }
+    else                              { style.left = Math.max(8, vw - POP_W - 8); style.right = 'auto'; }
 
     setPopupStyle(style);
   }, [isOpen]);
@@ -304,7 +306,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     inputClassName ?? '',
   ].join(' ');
 
-  const arrowBtn = 'w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition-all';
+  const arrowBtn = 'w-6 h-5 flex items-center justify-center rounded-md bg-white border border-slate-200 text-slate-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition-all';
 
   return (
     <div ref={containerRef} className={`relative ${className ?? ''}`}>
@@ -337,10 +339,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
             <div className="flex-1 min-w-0 border-r border-slate-100">
 
               {/* Quick shortcuts */}
-              <div className="flex gap-1.5 p-3 border-b border-slate-100 bg-slate-50/60">
+              <div className="flex gap-1 p-2 border-b border-slate-100 bg-slate-50/60">
                 {([[-1,'Ontem'],[0,'Hoje'],[1,'Amanhã']] as [number,string][]).map(([offset, label]) => (
                   <button key={label} type="button" onClick={() => selectQuickDate(offset)}
-                    className={`flex-1 py-1.5 rounded-xl text-[8px] font-black uppercase transition-colors shadow-sm
+                    className={`flex-1 py-1 rounded-lg text-[8px] font-black uppercase transition-colors shadow-sm
                       ${offset === 0
                         ? 'bg-blue-600 text-white hover:bg-blue-700'
                         : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
@@ -352,32 +354,32 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
               {!showYearPicker ? (
                 <>
                   {/* Month/Year nav */}
-                  <div className="flex items-center justify-between px-3 py-2">
+                  <div className="flex items-center justify-between px-2 py-1.5">
                     <button type="button" onClick={prevMonth}
-                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"/></svg>
+                      className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"/></svg>
                     </button>
                     <button type="button" onClick={() => setShowYearPicker(true)}
-                      className="flex items-center gap-1 px-2 py-1 rounded-xl hover:bg-slate-100 transition-colors">
-                      <span className="text-[10px] font-black text-slate-800 uppercase">{MONTHS_PT[viewMonth]}</span>
-                      <span className="text-[10px] font-black text-blue-600">{viewYear}</span>
-                      <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg hover:bg-slate-100 transition-colors">
+                      <span className="text-[9px] font-black text-slate-800 uppercase">{MONTHS_PT[viewMonth]}</span>
+                      <span className="text-[9px] font-black text-blue-600">{viewYear}</span>
+                      <svg className="w-2.5 h-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <button type="button" onClick={nextMonth}
-                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"/></svg>
+                      className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"/></svg>
                     </button>
                   </div>
 
                   {/* Day-of-week headers */}
-                  <div className="grid grid-cols-7 px-3 pb-0.5">
+                  <div className="grid grid-cols-7 px-2">
                     {DAYS_PT.map((d, i) => (
-                      <div key={i} className="text-center text-[7px] font-black text-slate-400 uppercase py-0.5">{d}</div>
+                      <div key={i} className="text-center text-[7px] font-black text-slate-400 uppercase">{d}</div>
                     ))}
                   </div>
 
                   {/* Days grid */}
-                  <div className="grid grid-cols-7 px-3 pb-3 gap-0.5">
+                  <div className="grid grid-cols-7 px-2 pb-2 gap-px">
                     {Array.from({ length: firstDayOfMonth }, (_, i) => <div key={`e${i}`} />)}
                     {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
                       <button
@@ -385,9 +387,9 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
                         type="button"
                         disabled={isDisabled(d)}
                         onClick={() => !isDisabled(d) && selectDay(d)}
-                        className={`w-full aspect-square rounded-xl text-[10px] font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed
+                        className={`w-full h-7 rounded-lg text-[10px] font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed
                           ${isSelected(d)
-                            ? 'bg-blue-600 text-white font-black shadow-md scale-105'
+                            ? 'bg-blue-600 text-white font-black shadow-md'
                             : isTodayCell(d)
                               ? 'bg-blue-50 text-blue-700 font-black ring-1 ring-blue-200'
                               : 'text-slate-700 hover:bg-slate-100'
@@ -430,46 +432,44 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
             </div>
 
             {/* ════ RIGHT: Time ════ */}
-            <div className="w-40 shrink-0 p-3 flex flex-col items-center gap-2.5 bg-slate-50/40">
+            <div className="w-32 shrink-0 p-2 flex flex-col items-center gap-1.5 bg-slate-50/40">
 
-              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Horário</p>
+              <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Horário</p>
 
               {/* Hour : Minute */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
 
                 {/* Hour */}
-                <div className="flex flex-col items-center gap-1">
+                <div className="flex flex-col items-center gap-0.5">
                   <button type="button" onClick={incHour} className={arrowBtn}>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7"/></svg>
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7"/></svg>
                   </button>
-                  <div className="w-12 h-11 bg-blue-600 text-white rounded-xl flex items-center justify-center text-[20px] font-black tabular-nums shadow-sm select-none">
+                  <div className="w-9 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm font-black tabular-nums shadow-sm select-none">
                     {String(hour).padStart(2, '0')}
                   </div>
                   <button type="button" onClick={decHour} className={arrowBtn}>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>
                   </button>
-                  <p className="text-[7px] font-black text-slate-400 uppercase">Hora</p>
                 </div>
 
-                <span className="text-[22px] font-black text-slate-300 mb-5 select-none">:</span>
+                <span className="text-base font-black text-slate-300 select-none">:</span>
 
                 {/* Minute */}
-                <div className="flex flex-col items-center gap-1">
+                <div className="flex flex-col items-center gap-0.5">
                   <button type="button" onClick={incMinute} className={arrowBtn}>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7"/></svg>
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7"/></svg>
                   </button>
-                  <div className="w-12 h-11 bg-blue-600 text-white rounded-xl flex items-center justify-center text-[20px] font-black tabular-nums shadow-sm select-none">
+                  <div className="w-9 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm font-black tabular-nums shadow-sm select-none">
                     {String(minute).padStart(2, '0')}
                   </div>
                   <button type="button" onClick={decMinute} className={arrowBtn}>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>
                   </button>
-                  <p className="text-[7px] font-black text-slate-400 uppercase">Min</p>
                 </div>
               </div>
 
-              {/* Quick time presets */}
-              <div className="w-full space-y-0.5">
+              {/* Quick time presets — grade 2 colunas para reduzir altura */}
+              <div className="w-full grid grid-cols-2 gap-0.5">
                 {QUICK_TIMES.map(t => {
                   const [qh, qm] = t.split(':').map(Number);
                   const isActive = hour === qh && minute === qm;
@@ -478,7 +478,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
                       key={t}
                       type="button"
                       onClick={() => applyQuickTime(t)}
-                      className={`w-full py-1 rounded-lg text-[8px] font-black transition-all ${
+                      className={`py-1 rounded-md text-[8px] font-black transition-all ${
                         isActive
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'bg-white border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-600'
@@ -493,7 +493,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
           </div>
 
           {/* ── Bottom: Masked manual input + actions ── */}
-          <div className="px-3 pb-3 pt-2 border-t border-slate-100 flex items-center gap-2">
+          <div className="px-2 pb-2 pt-1.5 border-t border-slate-100 flex items-center gap-1.5">
 
             {/* Masked input: only digits accepted, auto-formats DD/MM/AAAA HH:MM */}
             <div className="flex-1 relative">
@@ -507,7 +507,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitManual(); } }}
                 placeholder="DD/MM/AAAA HH:MM"
                 maxLength={16}
-                className={`w-full px-3 py-2 rounded-xl border text-[10px] font-mono font-bold outline-none transition-all
+                className={`w-full px-2.5 py-1.5 rounded-lg border text-[10px] font-mono font-bold outline-none transition-all
                   ${manualError
                     ? 'border-red-400 bg-red-50 text-red-700 focus:ring-1 focus:ring-red-400'
                     : 'border-slate-200 bg-white text-slate-700 focus:border-blue-400 focus:ring-1 focus:ring-blue-300'
@@ -525,7 +525,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
               <button
                 type="button"
                 onClick={() => { onChange(''); setManualInput(''); setManualError(false); prevDigitsRef.current = ''; setIsOpen(false); }}
-                className="px-3 py-2 rounded-xl text-[8px] font-black uppercase text-slate-400 border border-slate-200 hover:bg-slate-50 transition-colors whitespace-nowrap"
+                className="px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase text-slate-400 border border-slate-200 hover:bg-slate-50 transition-colors whitespace-nowrap"
               >
                 Limpar
               </button>
@@ -535,7 +535,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[8px] font-black uppercase hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
+              className="px-3.5 py-1.5 rounded-lg bg-blue-600 text-white text-[8px] font-black uppercase hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
             >
               OK
             </button>
