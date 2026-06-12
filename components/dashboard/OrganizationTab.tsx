@@ -1279,6 +1279,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const dateTimeData = {
       scheduledDateTime: dateTime,
       ...(dateTime ? { isScheduled: true } : {}),
+      // Agendamento confirmado implica nota enviada — auto-marca se esqueceram
+      ...(dateTime && !trip.sentNF ? { sentNF: true } : {}),
       scheduling: {
         locationId: trip.scheduledLocationId || '',
         location: trip.scheduling?.location || '',
