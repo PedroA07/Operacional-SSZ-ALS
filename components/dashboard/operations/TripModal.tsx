@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Trip, Driver, Customer, Category, Port, PreStacking, User, TripStatus } from '../../../types';
 import { db } from '../../../utils/storage';
 import { showToast } from '../../shared/SimpleToast';
@@ -17,7 +18,7 @@ interface TripModalProps {
   initialCustomer?: Customer;
 }
 
-const TripModal: React.FC<TripModalProps> = ({ 
+const TripModal: React.FC<TripModalProps> = ({
   isOpen, onClose, onSuccess, drivers, customers, categories, editTrip, initialCategory, initialCustomer
 }) => {
   const [ports, setPorts] = useState<(Port | PreStacking)[]>([]);
@@ -42,7 +43,7 @@ const TripModal: React.FC<TripModalProps> = ({
         console.error("Erro ao ler sessão no modal", e);
       }
     }
-    
+
     const loadPorts = async () => {
       const [p, ps] = await Promise.all([db.getPorts(), db.getPreStacking()]);
       setPorts([...p, ...ps]);
@@ -53,18 +54,16 @@ const TripModal: React.FC<TripModalProps> = ({
   const handleSave = async (formData: any) => {
     if (isSaving) return;
     setIsSaving(true);
-    
+
     try {
       const tripId = editTrip?.id || `trip-${Date.now()}`;
       const now = new Date().toISOString();
-      
+
       if (formData.driver && formData.customer) {
         await osCategoryService.syncVinculos(formData.category || 'Geral', formData.driver, formData.customer);
       }
 
-      // Horário de Início (Agendado)
       const tripStartTime = new Date(formData.dateTime).toISOString();
-      
       const scheduling = editTrip ? editTrip.scheduling : null;
 
       const payload: Trip = {
@@ -74,11 +73,10 @@ const TripModal: React.FC<TripModalProps> = ({
         isLate: editTrip?.isLate || false,
         documents: editTrip?.documents || [],
         status: editTrip?.status || 'Pendente',
-        // REGRA SOLICITADA: O status pendente inicial deve ser o horário da criação (now)
-        statusHistory: editTrip?.statusHistory || [{ 
-          status: 'Pendente' as TripStatus, 
-          dateTime: now, 
-          createdAt: now 
+        statusHistory: editTrip?.statusHistory || [{
+          status: 'Pendente' as TripStatus,
+          dateTime: now,
+          createdAt: now
         }],
         advancePayment: editTrip?.advancePayment || { status: 'BLOQUEADO' },
         balancePayment: editTrip?.balancePayment || { status: 'AGUARDANDO_DOCS' },
@@ -91,7 +89,7 @@ const TripModal: React.FC<TripModalProps> = ({
       };
 
       const success = await db.saveTrip(payload, currentUser || undefined);
-      
+
       if (success) {
         setTimeout(() => {
           onSuccess();
@@ -112,41 +110,53 @@ const TripModal: React.FC<TripModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[92vh] flex flex-col">
+  return createPortal(
+    <div className="fixed inset-0 z-[9000] animate-in fade-in duration-200">
+      <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-400">
 
-        <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
+        {/* Header com identidade azul — Operações */}
+        <div className="px-8 py-5 bg-blue-600 flex items-center justify-between shrink-0 shadow-lg">
           <div className="flex items-center gap-4">
-             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
-             </div>
-             <div>
-                <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">{editTrip ? 'Edição de Viagem' : 'Nova Programação Operacional'}</h3>
-                <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 tracking-widest">Painel de Gerenciamento de Cargas</p>
-             </div>
+            <div className="w-10 h-10 bg-white/15 border border-white/20 rounded-2xl flex items-center justify-center overflow-hidden shrink-0">
+              <img src="/logo.jpg" alt="ALS" className="w-full h-full object-contain rounded-xl" />
+            </div>
+            <div>
+              <p className="text-[8px] font-black text-white/60 uppercase tracking-widest mb-0.5">Operações</p>
+              <h2 className="font-black text-white text-sm uppercase tracking-widest">
+                {editTrip ? 'Editar Programação Operacional' : 'Nova Programação Operacional'}
+              </h2>
+              <p className="text-[9px] text-white/60 font-bold uppercase tracking-widest mt-0.5">Painel de Gerenciamento de Cargas</p>
+            </div>
           </div>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center bg-white/15 border border-white/20 text-white/80 hover:text-white hover:bg-white/30 rounded-full transition-all active:scale-90"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
         </div>
 
-        <div className="p-10 overflow-y-auto custom-scrollbar flex-1 bg-white">
-          <TripForm 
-            editTrip={editTrip}
-            initialCategory={initialCategory}
-            initialCustomer={initialCustomer}
-            drivers={drivers}
-            customers={customers}
-            categories={categories}
-            ports={ports}
-            onCancel={onClose}
-            onSave={handleSave}
-            isSaving={isSaving}
-          />
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar bg-slate-50">
+          <div className="max-w-5xl mx-auto p-10">
+            <TripForm
+              editTrip={editTrip}
+              initialCategory={initialCategory}
+              initialCustomer={initialCustomer}
+              drivers={drivers}
+              customers={customers}
+              categories={categories}
+              ports={ports}
+              onCancel={onClose}
+              onSave={handleSave}
+              isSaving={isSaving}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

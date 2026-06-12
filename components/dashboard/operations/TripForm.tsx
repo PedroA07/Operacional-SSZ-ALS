@@ -29,6 +29,7 @@ const TripForm: React.FC<TripFormProps> = ({
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [operationTypes, setOperationTypes] = useState<any[]>([]);
   const [swapModalOpen, setSwapModalOpen] = useState(false);
+  const [userHasChosenCategory, setUserHasChosenCategory] = useState(!!editTrip?.category);
 
   useEffect(() => {
     db.getContainerTypes().then(types => {
@@ -121,6 +122,13 @@ const TripForm: React.FC<TripFormProps> = ({
     hasInitialized.current = currentId;
   }, [editTrip, initialCategory, initialCustomer, categories, operationTypes]);
 
+  const getCategoryForType = (typeName: string): string => {
+    const op = operationTypes.find((t: any) => t.name === typeName);
+    if (!op?.config?.defaultCategoryId) return '';
+    const cat = categories.find((c: Category) => c.id === op.config.defaultCategoryId);
+    return cat?.name?.toUpperCase() || '';
+  };
+
   const inputClass = "w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
   const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
 
@@ -156,24 +164,39 @@ const TripForm: React.FC<TripFormProps> = ({
             <input required className={`${inputClass} text-xl border-blue-100 text-blue-700`} placeholder="EX: 123ALC..." value={formData.os} onChange={e => setFormData({...formData, os: e.target.value.toUpperCase()})} />
           </div>
           <div className="md:col-span-4 space-y-1">
-            <label className={labelClass}>Tipo de Operação</label>
+            <label className={labelClass}>
+              Tipo de Operação <span className="text-red-400">*</span>
+            </label>
             <CustomSelect
               value={formData.type}
-              onChange={v => setFormData({...formData, type: v})}
+              onChange={v => {
+                const autoCat = getCategoryForType(v);
+                setFormData((prev: any) => ({
+                  ...prev,
+                  type: v,
+                  category: (!userHasChosenCategory && autoCat) ? autoCat : prev.category,
+                }));
+              }}
               options={operationTypes.map(op => ({ value: op.name, label: op.name }))}
-              inputClassName={inputClass}
+              inputClassName={`${inputClass} ${!formData.type ? 'border-red-300' : ''}`}
             />
+            {!formData.type && (
+              <p className="text-[8px] font-black text-red-500 uppercase mt-1 ml-1">Obrigatório</p>
+            )}
           </div>
           <div className="md:col-span-4 space-y-1">
             <label className={labelClass}>Vínculo Operacional</label>
             <CustomSelect
               required
               value={formData.category}
-              onChange={v => setFormData({...formData, category: v})}
-              placeholder="SELECIONE..."
+              onChange={v => { setUserHasChosenCategory(true); setFormData({...formData, category: v}); }}
+              placeholder={userHasChosenCategory ? 'SELECIONE...' : 'AUTO DETECTANDO...'}
               options={categories.filter(c => !c.parentId).map(c => ({ value: c.name, label: c.name.toUpperCase() }))}
-              inputClassName={inputClass}
+              inputClassName={`${inputClass} ${formData.category ? 'border-blue-300 text-blue-700' : ''}`}
             />
+            {formData.category && !userHasChosenCategory && (
+              <p className="text-[8px] font-black text-blue-500 uppercase mt-1 ml-1">✓ Detectado automaticamente</p>
+            )}
           </div>
           <div className="md:col-span-3 space-y-1">
             <label className={labelClass}>Navio / Embarcação</label>
@@ -380,7 +403,7 @@ const TripForm: React.FC<TripFormProps> = ({
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 space-y-6 shadow-sm">
         <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">V. Dados do Equipamento</h4>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-           <div className="md:col-span-3 space-y-1">
+           <div className="md:col-span-4 space-y-1">
               <label className={labelClass}>Container</label>
               <ContainerInput
                 value={formData.container}
@@ -392,19 +415,7 @@ const TripForm: React.FC<TripFormProps> = ({
                 className={inputClass}
               />
            </div>
-           <div className="md:col-span-3 space-y-1">
-              <label className={labelClass}>Armador (Agência)</label>
-              <input className={inputClass} value={formData.agencia} onChange={e => setFormData({...formData, agencia: e.target.value.toUpperCase()})} placeholder="MSC, MAERSK, ETC" />
-           </div>
-           <div className="md:col-span-2 space-y-1">
-              <label className={labelClass}>Certificado (CVA)</label>
-              <input className={inputClass} value={formData.cva} onChange={e => setFormData({...formData, cva: e.target.value.toUpperCase()})} placeholder="Nº CVA" />
-           </div>
-           <div className="md:col-span-2 space-y-1">
-              <label className={labelClass}>Lacre</label>
-              <input className={inputClass} value={formData.seal} onChange={e => setFormData({...formData, seal: maskSeal(e.target.value)})} placeholder="LACRE" />
-           </div>
-           <div className="md:col-span-2 space-y-1">
+           <div className="md:col-span-4 space-y-1">
               <label className={labelClass}>Tipo Unidade</label>
               <CustomSelect
                  value={formData.containerType}
@@ -412,6 +423,22 @@ const TripForm: React.FC<TripFormProps> = ({
                  options={containerTypes.map(type => ({ value: type.name, label: type.name }))}
                  inputClassName={inputClass}
               />
+           </div>
+           <div className="md:col-span-4 space-y-1">
+              <label className={labelClass}>Tara do Contêiner (kg)</label>
+              <input className={inputClass} value={formData.tara} onChange={e => setFormData({...formData, tara: e.target.value.replace(/[^0-9.,]/g, '')})} placeholder="EX: 4200" />
+           </div>
+           <div className="md:col-span-4 space-y-1">
+              <label className={labelClass}>Lacre</label>
+              <input className={inputClass} value={formData.seal} onChange={e => setFormData({...formData, seal: maskSeal(e.target.value)})} placeholder="LACRE" />
+           </div>
+           <div className="md:col-span-4 space-y-1">
+              <label className={labelClass}>Armador (Agência)</label>
+              <input className={inputClass} value={formData.agencia} onChange={e => setFormData({...formData, agencia: e.target.value.toUpperCase()})} placeholder="MSC, MAERSK, ETC" />
+           </div>
+           <div className="md:col-span-4 space-y-1">
+              <label className={labelClass}>Certificado (CVA)</label>
+              <input className={inputClass} value={formData.cva} onChange={e => setFormData({...formData, cva: e.target.value.toUpperCase()})} placeholder="Nº CVA" />
            </div>
         </div>
       </div>
