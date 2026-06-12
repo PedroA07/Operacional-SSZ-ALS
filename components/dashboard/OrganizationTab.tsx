@@ -1193,7 +1193,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         location: resolvedLocationName,
         dateTime: dateTime ? new Date(dateTime).toISOString() : '',
         obs: existing.scheduling?.obs || ''
-      }
+      },
+      // Se a nota ainda não foi marcada, auto-marca ao confirmar agendamento
+      ...(!existing.sentNF ? { sentNF: true } : {})
     };
 
     const tripId = selectedTripForScheduling.id;
