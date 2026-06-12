@@ -88,12 +88,18 @@ jobs:
 
       # ── 9. Atualizar versão no Supabase ──────────────────────────────────────
       - name: Update app version in Supabase
-        if: ${{ secrets.VITE_SUPABASE_URL != '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
-          BUILD_NUM=${{ github.run_number }}
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "Secrets do Supabase não configurados — pulando atualização de versão."
+            exit 0
+          fi
           curl -s -X POST \
-            "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/app_config" \
-            -H "apikey: ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
+            "$SUPABASE_URL/rest/v1/app_config" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
             -H "Content-Type: application/json" \
             -H "Prefer: resolution=merge-duplicates" \
-            -d "{\"key\": \"mobile_app_version\", \"value\": \"${BUILD_NUM}\"}" || true
+            -d "{\"key\": \"mobile_app_version\", \"value\": \"${{ github.run_number }}\"}" || true
