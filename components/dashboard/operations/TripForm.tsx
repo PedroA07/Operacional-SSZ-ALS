@@ -96,13 +96,14 @@ const TripForm: React.FC<TripFormProps> = ({
         booking: editTrip.booking || '',
         autColeta: editTrip.autColeta || '',
         embarcador: editTrip.embarcador || '',
-        scheduling: editTrip.scheduling || null
+        scheduling: editTrip.scheduling || null,
+        category: (editTrip.category || '').toUpperCase()
       });
     } else {
       setFormData((prev: any) => ({
         ...prev,
         type: '',
-        category: initialCategory || '',
+        category: (initialCategory || '').toUpperCase(),
         customer: initialCustomer || prev.customer,
         dateTime: getLocalISOTime(),
         scheduling: null
@@ -181,7 +182,7 @@ const TripForm: React.FC<TripFormProps> = ({
               value={formData.category}
               onChange={v => { setUserHasChosenCategory(true); setFormData({...formData, category: v}); }}
               placeholder={userHasChosenCategory ? 'SELECIONE...' : 'AUTO DETECTANDO...'}
-              options={categories.filter(c => !c.parentId).map(c => ({ value: c.name, label: c.name.toUpperCase() }))}
+              options={categories.filter(c => !c.parentId).map(c => ({ value: c.name.toUpperCase(), label: c.name.toUpperCase() }))}
               inputClassName={`${inputClass} ${formData.category ? 'border-blue-300 text-blue-700' : ''}`}
             />
             {formData.category && !userHasChosenCategory && (
