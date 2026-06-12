@@ -61,8 +61,8 @@ const TripForm: React.FC<TripFormProps> = ({
   };
 
   const [formData, setFormData] = useState<any>({
-    os: '', booking: '', ship: '', autColeta: '', embarcador: '', dateTime: getLocalISOTime(), type: 'EXPORTAÇÃO', status: 'Pendente',
-    category: '', container: '', tara: '', seal: '', cva: '', 
+    os: '', booking: '', ship: '', autColeta: '', embarcador: '', dateTime: getLocalISOTime(), type: '', status: 'Pendente',
+    category: '', container: '', tara: '', seal: '', cva: '',
     containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', obs: '',
     customer: null, destination: null, driver: null,
     scheduling: null,
@@ -99,23 +99,12 @@ const TripForm: React.FC<TripFormProps> = ({
         scheduling: editTrip.scheduling || null
       });
     } else {
-      const defaultCat = initialCategory || (categories.length > 0 ? categories[0].name : '');
-      const savedDefaultOp = localStorage.getItem('defaultColetaTipoViagem');
-      let defaultOpType = 'EXPORTAÇÃO';
-      
-      if (savedDefaultOp && operationTypes.length > 0) {
-        const found = operationTypes.find(t => t.id === savedDefaultOp);
-        if (found) defaultOpType = found.name;
-      } else if (operationTypes.length > 0) {
-        defaultOpType = operationTypes[0].name;
-      }
-
       setFormData((prev: any) => ({
         ...prev,
-        category: defaultCat,
+        type: '',
+        category: initialCategory || '',
         customer: initialCustomer || prev.customer,
         dateTime: getLocalISOTime(),
-        type: defaultOpType,
         scheduling: null
       }));
     }
@@ -177,6 +166,7 @@ const TripForm: React.FC<TripFormProps> = ({
                   category: (!userHasChosenCategory && autoCat) ? autoCat : prev.category,
                 }));
               }}
+              placeholder="SELECIONE O TIPO..."
               options={operationTypes.map(op => ({ value: op.name, label: op.name }))}
               inputClassName={`${inputClass} ${!formData.type ? 'border-red-300' : ''}`}
             />
@@ -212,7 +202,30 @@ const TripForm: React.FC<TripFormProps> = ({
           </div>
           <div className="md:col-span-3 space-y-1">
             <label className={labelClass}>Embarcador (Shipper)</label>
-            <input className={inputClass} placeholder="EMBARCADOR" value={formData.embarcador} onChange={e => setFormData({...formData, embarcador: e.target.value.toUpperCase()})} />
+            <input className={inputClass} placeholder="EMBARCADOR / SHIPPER" value={formData.embarcador} onChange={e => setFormData({...formData, embarcador: e.target.value.toUpperCase()})} />
+            {formData.customer && (formData.customer.name || formData.customer.legalName) && (
+              <div className="flex flex-wrap items-center gap-1.5 mt-1.5 ml-1">
+                <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest shrink-0">Sugerir:</span>
+                {formData.customer.name && (
+                  <button type="button"
+                    onClick={() => setFormData({...formData, embarcador: formData.customer.name.toUpperCase()})}
+                    className="text-[8px] font-black text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg hover:bg-blue-100 transition-all uppercase max-w-[160px] truncate"
+                    title={`Fantasia: ${formData.customer.name}`}
+                  >
+                    {formData.customer.name}
+                  </button>
+                )}
+                {formData.customer.legalName && formData.customer.legalName !== formData.customer.name && (
+                  <button type="button"
+                    onClick={() => setFormData({...formData, embarcador: formData.customer.legalName.toUpperCase()})}
+                    className="text-[8px] font-black text-slate-600 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-100 transition-all uppercase max-w-[160px] truncate"
+                    title={`Razão Social: ${formData.customer.legalName}`}
+                  >
+                    {formData.customer.legalName}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           <div className="md:col-span-4 space-y-1">
             <label className={labelClass}>Previsão Início</label>

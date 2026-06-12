@@ -408,7 +408,33 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1"><label className={labelClass}>Autorização Coleta</label><input className={inputClasses} value={formData.autColeta} onChange={e => handleInputChange('autColeta', e.target.value)} placeholder="Nº AUTORIZAÇÃO" /></div>
-            <div className="space-y-1"><label className={labelClass}>Embarcador</label><input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} placeholder="SHIPPER" /></div>
+            <div className="space-y-1">
+              <label className={labelClass}>Embarcador</label>
+              <input className={inputClasses} value={formData.embarcador} onChange={e => handleInputChange('embarcador', e.target.value)} placeholder="EMBARCADOR / SHIPPER" />
+              {selectedRemetente && (selectedRemetente.name || selectedRemetente.legalName) && (
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5 ml-1">
+                  <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest shrink-0">Sugerir:</span>
+                  {selectedRemetente.name && (
+                    <button type="button"
+                      onClick={() => setFormData((p: any) => ({ ...p, embarcador: selectedRemetente.name.toUpperCase() }))}
+                      className="text-[8px] font-black text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg hover:bg-blue-100 transition-all uppercase max-w-[160px] truncate"
+                      title={`Fantasia: ${selectedRemetente.name}`}
+                    >
+                      {selectedRemetente.name}
+                    </button>
+                  )}
+                  {selectedRemetente.legalName && selectedRemetente.legalName !== selectedRemetente.name && (
+                    <button type="button"
+                      onClick={() => setFormData((p: any) => ({ ...p, embarcador: selectedRemetente.legalName.toUpperCase() }))}
+                      className="text-[8px] font-black text-slate-600 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-100 transition-all uppercase max-w-[160px] truncate"
+                      title={`Razão Social: ${selectedRemetente.legalName}`}
+                    >
+                      {selectedRemetente.legalName}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
