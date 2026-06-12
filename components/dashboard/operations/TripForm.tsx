@@ -5,6 +5,7 @@ import ContainerInput from '../../shared/ContainerInput';
 import { maskSeal, maskCNPJ } from '../../../utils/masks';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import { searchService } from '../../../utils/searchService';
+import { osCategoryService } from '../../../utils/osCategoryService';
 import { db } from '../../../utils/storage';
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import CustomSelect from '../../shared/CustomSelect';
@@ -151,7 +152,18 @@ const TripForm: React.FC<TripFormProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           <div className="md:col-span-4 space-y-1">
             <label className={labelClass}>Número da OS</label>
-            <input required className={`${inputClass} text-xl border-blue-100 text-blue-700`} placeholder="EX: 123ALC..." value={formData.os} onChange={e => setFormData({...formData, os: e.target.value.toUpperCase()})} />
+            <input required className={`${inputClass} text-xl border-blue-100 text-blue-700`} placeholder="EX: 123ALC..." value={formData.os} onChange={e => {
+              const os = e.target.value.toUpperCase();
+              setFormData((prev: any) => {
+                const next = { ...prev, os };
+                // Detecção automática do vínculo pelo padrão da OS (ex: 123ALC456A → ALIANÇA)
+                if (!userHasChosenCategory) {
+                  const detected = osCategoryService.detectCategoryFromOS(os);
+                  if (detected) next.category = detected.toUpperCase();
+                }
+                return next;
+              });
+            }} />
           </div>
           <div className="md:col-span-4 space-y-1">
             <label className={labelClass}>
@@ -182,7 +194,11 @@ const TripForm: React.FC<TripFormProps> = ({
               value={formData.category}
               onChange={v => { setUserHasChosenCategory(true); setFormData({...formData, category: v}); }}
               placeholder={userHasChosenCategory ? 'SELECIONE...' : 'AUTO DETECTANDO...'}
-              options={categories.filter(c => !c.parentId).map(c => ({ value: c.name.toUpperCase(), label: c.name.toUpperCase() }))}
+              options={Array.from(new Set([
+                ...categories.filter(c => !c.parentId).map(c => c.name.toUpperCase()),
+                'ALIANÇA',
+                'MERCOSUL'
+              ])).sort().map(name => ({ value: name, label: name }))}
               inputClassName={`${inputClass} ${formData.category ? 'border-blue-300 text-blue-700' : ''}`}
             />
             {formData.category && !userHasChosenCategory && (

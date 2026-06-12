@@ -688,6 +688,35 @@ export const db = {
     await supabase.from('notifications').delete().lt('timestamp', cutoff);
   },
 
+  // Fallback: grava no form_history genérico quando a tabela dedicada falhar
+  // (tabela ausente, RLS, etc.) — a emissão nunca se perde.
+  _saveEmissaoFallback: async (formType: string, formData: any, label: string, user: any): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('form_history').insert({
+      form_type: formType,
+      form_data: formData,
+      label,
+      user_name: user?.displayName || 'Sistema',
+      user_id: user?.id || null,
+    });
+    if (error) { console.error('[_saveEmissaoFallback]', formType, error.message); return false; }
+    return true;
+  },
+
+  // Lê emissões do form_history genérico para um tipo (legado + fallback)
+  _getEmissoesFallback: async (formType: string, limit: number): Promise<import('../types').FormHistoryEntry[]> => {
+    if (!supabase) return [];
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase.from('form_history')
+      .select('*').eq('form_type', formType)
+      .gte('created_at', cutoff).order('created_at', { ascending: false }).limit(limit);
+    if (error) return [];
+    return (data || []).map((r: any) => ({
+      id: r.id, formType: r.form_type, formData: r.form_data,
+      label: r.label || '', userName: r.user_name || '', userId: r.user_id || '', createdAt: r.created_at,
+    }));
+  },
+
   // ─── ORDENS DE COLETA ────────────────────────────────────────────────────
   saveOrdemColeta: async (formData: any, user: any): Promise<boolean> => {
     if (!supabase) return false;
@@ -699,8 +728,11 @@ export const db = {
       user_name: user?.displayName || 'Sistema',
       user_id: user?.id || null,
     });
-    if (error) console.error('[saveOrdemColeta]', error.message);
-    return !error;
+    if (error) {
+      console.error('[saveOrdemColeta]', error.message);
+      return db._saveEmissaoFallback('ORDEM_COLETA', formData, formData.os || formData.container || formData.booking || '', user);
+    }
+    return true;
   },
 
   getOrdemColetaHistory: async (limit = 8): Promise<import('../types').FormHistoryEntry[]> => {
@@ -708,12 +740,16 @@ export const db = {
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase.from('ordens_coleta')
       .select('*').gte('created_at', cutoff).order('created_at', { ascending: false }).limit(limit);
-    if (error) { console.error('[getOrdemColetaHistory]', error.message); return []; }
-    return (data || []).map((r: any) => ({
+    if (error) console.error('[getOrdemColetaHistory]', error.message);
+    const dedicated = (data || []).map((r: any) => ({
       id: r.id, formType: 'ORDEM_COLETA', formData: r.form_data,
       label: r.os || r.container || r.booking || '',
       userName: r.user_name || '', userId: r.user_id || '', createdAt: r.created_at,
     }));
+    const fallback = await db._getEmissoesFallback('ORDEM_COLETA', limit);
+    return [...dedicated, ...fallback]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
   },
 
   deleteOrdemColeta: async (id: string): Promise<boolean> => {
@@ -733,8 +769,11 @@ export const db = {
       user_name: user?.displayName || 'Sistema',
       user_id: user?.id || null,
     });
-    if (error) console.error('[savePreStackingEmissao]', error.message);
-    return !error;
+    if (error) {
+      console.error('[savePreStackingEmissao]', error.message);
+      return db._saveEmissaoFallback('PRE_STACKING', formData, formData.container || formData.os || formData.booking || '', user);
+    }
+    return true;
   },
 
   getPreStackingEmissaoHistory: async (limit = 8): Promise<import('../types').FormHistoryEntry[]> => {
@@ -742,12 +781,16 @@ export const db = {
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase.from('pre_stacking_emissoes')
       .select('*').gte('created_at', cutoff).order('created_at', { ascending: false }).limit(limit);
-    if (error) { console.error('[getPreStackingEmissaoHistory]', error.message); return []; }
-    return (data || []).map((r: any) => ({
+    if (error) console.error('[getPreStackingEmissaoHistory]', error.message);
+    const dedicated = (data || []).map((r: any) => ({
       id: r.id, formType: 'PRE_STACKING', formData: r.form_data,
       label: r.container || r.os || r.booking || '',
       userName: r.user_name || '', userId: r.user_id || '', createdAt: r.created_at,
     }));
+    const fallback = await db._getEmissoesFallback('PRE_STACKING', limit);
+    return [...dedicated, ...fallback]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
   },
 
   deletePreStackingEmissao: async (id: string): Promise<boolean> => {
@@ -767,8 +810,11 @@ export const db = {
       user_name: user?.displayName || 'Sistema',
       user_id: user?.id || null,
     });
-    if (error) console.error('[saveRetiradaCheio]', error.message);
-    return !error;
+    if (error) {
+      console.error('[saveRetiradaCheio]', error.message);
+      return db._saveEmissaoFallback('RETIRADA_CHEIO', formData, formData.container || formData.booking || '', user);
+    }
+    return true;
   },
 
   getRetiradaCheioHistory: async (limit = 8): Promise<import('../types').FormHistoryEntry[]> => {
@@ -776,12 +822,16 @@ export const db = {
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase.from('retiradas_cheio')
       .select('*').gte('created_at', cutoff).order('created_at', { ascending: false }).limit(limit);
-    if (error) { console.error('[getRetiradaCheioHistory]', error.message); return []; }
-    return (data || []).map((r: any) => ({
+    if (error) console.error('[getRetiradaCheioHistory]', error.message);
+    const dedicated = (data || []).map((r: any) => ({
       id: r.id, formType: 'RETIRADA_CHEIO', formData: r.form_data,
       label: r.container || r.booking || '',
       userName: r.user_name || '', userId: r.user_id || '', createdAt: r.created_at,
     }));
+    const fallback = await db._getEmissoesFallback('RETIRADA_CHEIO', limit);
+    return [...dedicated, ...fallback]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
   },
 
   deleteRetiradaCheio: async (id: string): Promise<boolean> => {
@@ -840,12 +890,13 @@ export const db = {
     const q = (table: string, cols = '*') =>
       supabase!.from(table).select(cols).gte('created_at', cutoff).order('created_at', { ascending: false }).limit(limit);
 
-    const [ocR, psR, rcR, devR, libR] = await Promise.allSettled([
+    const [ocR, psR, rcR, devR, libR, fhR] = await Promise.allSettled([
       q('ordens_coleta'),
       q('pre_stacking_emissoes'),
       q('retiradas_cheio'),
       q('devolucoes', 'id, container, booking, driver_name, driver_id, user_name, user_id, created_at, container_type, agencia, pod'),
       q('liberacoes',  'id, booking, driver_name, driver_id, user_name, user_id, created_at, container_type, agencia, pod'),
+      q('form_history'),
     ]);
 
     const safe = (r: PromiseSettledResult<any>, map: (d: any) => any) =>
@@ -857,6 +908,8 @@ export const db = {
       ...safe(rcR,  (r) => ({ id: r.id, formType: 'RETIRADA_CHEIO',  formData: r.form_data, label: r.container || r.booking || '',           userName: r.user_name || '',                       userId: r.user_id || '',       createdAt: r.created_at })),
       ...safe(devR, (r) => ({ id: r.id, formType: 'DEVOLUCAO_VAZIO', formData: { container: r.container, booking: r.booking, tipo: r.container_type, agencia: r.agencia, pod: r.pod, driverId: r.driver_id }, label: r.container || r.booking || '', userName: r.user_name || r.driver_name || '', userId: r.user_id || r.driver_id || '', createdAt: r.created_at })),
       ...safe(libR, (r) => ({ id: r.id, formType: 'LIBERACAO_VAZIO', formData: { booking: r.booking, tipo: r.container_type, agencia: r.agencia, pod: r.pod, driverId: r.driver_id },           label: r.booking || '',        userName: r.user_name || r.driver_name || '', userId: r.user_id || r.driver_id || '', createdAt: r.created_at })),
+      // form_history genérico: emissões legadas + fallback quando a tabela dedicada falha
+      ...safe(fhR,  (r) => ({ id: r.id, formType: r.form_type,       formData: r.form_data, label: r.label || '',                            userName: r.user_name || '',                       userId: r.user_id || '',       createdAt: r.created_at })),
     ];
 
     const sorted = raw.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, limit);
@@ -884,9 +937,13 @@ export const db = {
       LIBERACAO_VAZIO:'liberacoes',
     };
     const table = tableMap[formType];
-    if (!table) return false;
-    const { error } = await supabase.from(table).delete().eq('id', id);
-    return !error;
+    if (table) {
+      const { data, error } = await supabase.from(table).delete().eq('id', id).select('id');
+      if (!error && (data || []).length > 0) return true;
+    }
+    // Registro pode estar no form_history genérico (legado / fallback)
+    const { error: fhError } = await supabase.from('form_history').delete().eq('id', id);
+    return !fhError;
   },
 
   // ─── AUDITORIA DA ORGANIZAÇÃO ────────────────────────────────────────────
