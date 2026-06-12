@@ -13,3 +13,6 @@ android/app/build/
 *.aab
 *.keystore
 *.jks
+# Keystore de debug fixo — necessário para que atualizações do APK
+# instalem por cima da versão anterior (mesma assinatura em todo build)
+!android/app/debug.keystore

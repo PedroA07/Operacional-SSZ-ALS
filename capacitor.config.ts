@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'br.com.als.operacional',
-  appName: 'ALS Operacional',
+  appName: 'ALS',
   webDir: 'dist',
 
   // Para produção com deploy em URL fixa (descomente e substitua a URL):
