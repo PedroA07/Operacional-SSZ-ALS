@@ -425,7 +425,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
                   )}
                   {selectedRemetente.legalName && selectedRemetente.legalName !== selectedRemetente.name && (
                     <button type="button"
-                      onClick={() => setFormData((p: any) => ({ ...p, embarcador: selectedRemetente.legalName.toUpperCase() }))}
+                      onClick={() => setFormData((p: any) => ({ ...p, embarcador: selectedRemetente.legalName!.toUpperCase() }))}
                       className="text-[8px] font-black text-slate-600 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-lg hover:bg-slate-100 transition-all uppercase max-w-[160px] truncate"
                       title={`Razão Social: ${selectedRemetente.legalName}`}
                     >
