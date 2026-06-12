@@ -151,6 +151,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     setHour(p.hour);
     setMinute(p.minute);
     setManualInput(toDisplay(value));
+    setManualError(false);
     prevDigitsRef.current = value.replace(/\D/g, '');
   }, [value]);
 
@@ -161,7 +162,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     const vh    = window.innerHeight;
     const vw    = window.innerWidth;
     const POP_W = 380;
-    const POP_H = 350;
+    const POP_H = 320;
     const style: React.CSSProperties = { position: 'fixed', width: POP_W, maxHeight: vh - 16, overflowY: 'auto' };
 
     // Vertical: abaixo se couber; senão acima; senão prende dentro da tela
@@ -297,12 +298,14 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   };
 
   // ── Display ────────────────────────────────────────────────────────────────
-  const displayValue = toDisplay(value);
-
   const triggerClass = [
-    'w-full px-4 py-3.5 rounded-2xl border-2',
-    isOpen ? 'border-blue-400 bg-white' : 'border-slate-100 bg-slate-50 hover:border-blue-300',
-    'text-[11px] font-bold uppercase cursor-pointer flex items-center justify-between transition-all select-none',
+    'w-full pl-4 pr-1.5 py-2 rounded-2xl border-2 flex items-center gap-1',
+    manualError
+      ? 'border-red-300 bg-red-50'
+      : isOpen
+        ? 'border-blue-400 bg-white'
+        : 'border-slate-100 bg-slate-50 hover:border-blue-300 focus-within:border-blue-400 focus-within:bg-white',
+    'text-[11px] font-bold uppercase text-slate-800 transition-all',
     inputClassName ?? '',
   ].join(' ');
 
@@ -311,17 +314,37 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   return (
     <div ref={containerRef} className={`relative ${className ?? ''}`}>
 
-      {/* ── Trigger ── */}
-      <div
-        onClick={() => { setIsOpen(v => !v); setShowYearPicker(false); }}
-        className={triggerClass}
-      >
-        <span className={displayValue ? 'text-slate-800' : 'text-slate-300'}>
-          {displayValue || placeholder || 'Selecionar data e hora...'}
-        </span>
-        <svg className="w-4 h-4 text-slate-400 shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-        </svg>
+      {/* ── Trigger: digitação direta com máscara + botão abre o calendário ── */}
+      <div className={triggerClass}>
+        <input
+          ref={manualRef}
+          type="text"
+          inputMode="numeric"
+          value={manualInput}
+          onChange={handleManualChange}
+          onBlur={commitManual}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitManual(); } }}
+          placeholder={placeholder || 'DD/MM/AAAA HH:MM'}
+          maxLength={16}
+          className="flex-1 min-w-0 bg-transparent outline-none placeholder:text-slate-300"
+        />
+        {manualError && (
+          <span className="shrink-0 text-[7px] font-black text-red-400 uppercase pointer-events-none">
+            Inválido
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => { setIsOpen(v => !v); setShowYearPicker(false); }}
+          title="Abrir calendário"
+          className={`shrink-0 p-1.5 rounded-lg transition-colors ${
+            isOpen ? 'bg-blue-100 text-blue-600' : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+        </button>
       </div>
 
       {/* ── Popup (portal para escapar overflow dos containers pais) ── */}
@@ -492,33 +515,8 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
             </div>
           </div>
 
-          {/* ── Bottom: Masked manual input + actions ── */}
-          <div className="px-2 pb-2 pt-1.5 border-t border-slate-100 flex items-center gap-1.5">
-
-            {/* Masked input: only digits accepted, auto-formats DD/MM/AAAA HH:MM */}
-            <div className="flex-1 relative">
-              <input
-                ref={manualRef}
-                type="text"
-                inputMode="numeric"
-                value={manualInput}
-                onChange={handleManualChange}
-                onBlur={commitManual}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitManual(); } }}
-                placeholder="DD/MM/AAAA HH:MM"
-                maxLength={16}
-                className={`w-full px-2.5 py-1.5 rounded-lg border text-[10px] font-mono font-bold outline-none transition-all
-                  ${manualError
-                    ? 'border-red-400 bg-red-50 text-red-700 focus:ring-1 focus:ring-red-400'
-                    : 'border-slate-200 bg-white text-slate-700 focus:border-blue-400 focus:ring-1 focus:ring-blue-300'
-                  }`}
-              />
-              {manualError && (
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[7px] font-black text-red-400 uppercase pointer-events-none">
-                  Inválido
-                </span>
-              )}
-            </div>
+          {/* ── Bottom: actions ── */}
+          <div className="px-2 pb-2 pt-1.5 border-t border-slate-100 flex items-center justify-end gap-1.5">
 
             {/* Clear */}
             {value && (
