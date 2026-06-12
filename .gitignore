@@ -4,3 +4,12 @@ dist/
 .env.local
 .env.*.local
 *.local
+
+# Android build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+*.apk
+*.aab
+*.keystore
+*.jks
