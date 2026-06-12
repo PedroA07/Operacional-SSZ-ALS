@@ -44,6 +44,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
   const [showPodResults, setShowPodResults] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
+  const [showDateError, setShowDateError] = useState(false);
 
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
@@ -160,6 +161,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
 
   const saveData = async () => {
     if (!devolucao || !onSave) return;
+    if (!formData.agendamentoDateTime) { setShowDateError(true); return; }
     setIsSaving(true);
     try {
       const updated = buildUpdatedDevolucao();
@@ -172,6 +174,10 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
   const downloadPDF = async () => {
     if (!effectiveDriver || !formData.container) {
       alert("Preencha Container e Motorista para prosseguir.");
+      return;
+    }
+    if (!formData.agendamentoDateTime) {
+      setShowDateError(true);
       return;
     }
     setIsExporting(true);
@@ -397,14 +403,18 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
             />
           </div>
           <div className="space-y-1">
-            <label className={labelAmberClass}>7. Data/Hora do Agendamento</label>
+            <label className={labelAmberClass}>7. Data/Hora do Agendamento <span className="text-red-500">*</span></label>
             <DateTimePicker
               value={formData.agendamentoDateTime}
-              onChange={val => setFormData(prev => ({ ...prev, agendamentoDateTime: val }))}
+              onChange={val => { setShowDateError(false); setFormData(prev => ({ ...prev, agendamentoDateTime: val })); }}
               placeholder="Selecionar data e hora..."
-              inputClassName={inputClasses}
+              inputClassName={`${inputClasses} ${showDateError && !formData.agendamentoDateTime ? 'border-red-400 bg-red-50' : ''}`}
             />
-            <p className="text-[8px] text-slate-400 font-bold mt-1">Apenas para controle interno — não aparece no PDF.</p>
+            {showDateError && !formData.agendamentoDateTime ? (
+              <p className="text-[8px] text-red-500 font-black mt-1">Campo obrigatório</p>
+            ) : (
+              <p className="text-[8px] text-slate-400 font-bold mt-1">Apenas para controle interno — não aparece no PDF.</p>
+            )}
           </div>
         </div>
 
