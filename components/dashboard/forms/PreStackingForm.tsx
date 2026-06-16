@@ -58,6 +58,36 @@ const TerminalCardItem: React.FC<any> = ({ unit, isSelected = false, onClick }) 
   </button>
 );
 
+/**
+ * Normaliza os campos de agendamento ao reabrir uma minuta já gerada.
+ * Quando a minuta foi salva na viagem (preStackingFormData), `schedulingDate`
+ * fica como ISO completo (ex.: "2026-06-16T17:30:00.000Z"). Sem separar em
+ * data (YYYY-MM-DD) + hora (HH:MM), ao baixar novamente o código montaria uma
+ * data inválida e `new Date(...).toISOString()` lançaria erro — impedindo
+ * baixar a minuta mais de uma vez.
+ */
+const normalizeSchedulingFields = (data: any) => {
+  if (!data) return data;
+  const sd = data.schedulingDate;
+  if (sd && typeof sd === 'string' && sd.includes('T')) {
+    const d = new Date(sd);
+    if (!isNaN(d.getTime())) {
+      return {
+        ...data,
+        schedulingDate: localDateStr(d),
+        schedulingTime: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+      };
+    }
+    const [datePart, timePart] = sd.split('T');
+    return {
+      ...data,
+      schedulingDate: datePart,
+      schedulingTime: (timePart || data.schedulingTime || '').slice(0, 5),
+    };
+  }
+  return data;
+};
+
 const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, customers, ports, onClose, initialOS, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isLoadingTrip, setIsLoadingTrip] = useState(false);
@@ -81,7 +111,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
 
   const [formData, setFormData] = useState<typeof defaultFormData>(
     initialFormData
-      ? { ...defaultFormData, ...initialFormData, displayDate: new Date().toLocaleDateString('pt-BR') }
+      ? { ...defaultFormData, ...normalizeSchedulingFields(initialFormData), displayDate: new Date().toLocaleDateString('pt-BR') }
       : defaultFormData
   );
 

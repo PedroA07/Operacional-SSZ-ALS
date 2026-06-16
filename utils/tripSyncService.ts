@@ -45,9 +45,13 @@ export const tripSyncService = {
       ship: formData.ship,
       dateTime: tripStartTime,
       isLate: false,
-      isScheduled: !!terminalTime,
-      scheduledLocationId: destination?.id || '',
-      scheduledDateTime: terminalTime || '',
+      // IMPORTANTE: quando NÃO há agendamento novo (terminalTime nulo), estes
+      // campos ficam `undefined` para que, ao reeditar uma OC já existente, o
+      // `sync` NÃO sobrescreva (e apague) o agendamento atual da viagem. Caso
+      // contrário a viagem sumiria do painel de Organização só por editar a OC.
+      isScheduled: terminalTime ? true : undefined,
+      scheduledLocationId: terminalTime ? (destination?.id || '') : undefined,
+      scheduledDateTime: terminalTime || undefined,
       type: (formData.type || formData.tipoOperacao || 'EXPORTAÇÃO').toUpperCase() as any,
       category: category, 
       container: formData.container,
