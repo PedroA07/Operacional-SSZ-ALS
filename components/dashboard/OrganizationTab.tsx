@@ -1311,6 +1311,56 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, [activeView, logAudit]);
 
+  // Cancela o agendamento gerado automaticamente pela minuta de Pré-Stacking.
+  // Quando uma minuta é emitida, a viagem é agendada automaticamente e o toggle
+  // "Agendado" fica bloqueado — então este é o único caminho para reverter um
+  // agendamento feito por engano, liberando a viagem para novo agendamento manual.
+  const handleCancelMinutaScheduling = useCallback((trip: Trip) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Cancelar Agendamento da Minuta?',
+      message: `A minuta de Pré-Stacking e o agendamento automático da OS ${trip.os} serão removidos, liberando a viagem para novo agendamento manual. A viagem permanece no painel. Deseja continuar?`,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
+        const schedulingData = {
+          preStackingFormData: null,
+          isScheduled: false,
+          scheduledLocationId: '',
+          scheduledDateTime: '',
+          scheduling: trip.scheduling ? { ...trip.scheduling, locationId: '', location: '', dateTime: '' } : null,
+        };
+
+        const now = Date.now();
+        setPendingUpdates(prev => ({
+          ...prev,
+          [trip.id]: {
+            data: { ...(prev[trip.id]?.data || {}), ...schedulingData },
+            timestamp: now,
+          },
+        }));
+
+        try {
+          await db.saveTrip({ ...trip, ...schedulingData });
+          logAudit(activeView, 'AGENDAMENTO', 'Agendamento de minuta cancelado', trip.os, [{ field: 'Agendamento (Minuta)', from: trip.scheduledDateTime || trip.scheduling?.dateTime || '', to: '' }], trip.id);
+          window.dispatchEvent(new CustomEvent('als_show_toast', {
+            detail: { message: 'Agendamento da minuta cancelado', type: 'success' }
+          }));
+        } catch (error) {
+          setPendingUpdates(prev => {
+            const next = { ...prev };
+            delete next[trip.id];
+            return next;
+          });
+          console.error("Erro ao cancelar agendamento da minuta:", error);
+          window.dispatchEvent(new CustomEvent('als_show_toast', {
+            detail: { message: 'Erro ao cancelar agendamento da minuta', type: 'error' }
+          }));
+        }
+      },
+    });
+  }, [activeView, logAudit]);
+
   const handleSaveDevAgendamento = useCallback(async (devId: string, dateTime: string) => {
     const dev = devolucoes.find(d => d.id === devId);
     if (!dev) return;
@@ -1972,6 +2022,19 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               </svg>
               {hasMinuta ? 'Minuta ✓' : 'Gerar Minuta'}
             </button>
+            {hasMinuta && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleCancelMinutaScheduling(t); }}
+                className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border bg-white border-red-200 text-red-500 hover:bg-red-50 hover:border-red-400"
+                title="Cancelar o agendamento gerado pela minuta (ex.: emitida por engano)"
+              >
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                Cancelar Agend.
+              </button>
+            )}
           </div>
         );
       }
@@ -2018,7 +2081,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao]);
 
   const handleDeleteDevolucao = useCallback((d: Devolucao) => {
     setConfirmModal({
