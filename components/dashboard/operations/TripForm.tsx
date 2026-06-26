@@ -176,7 +176,11 @@ const TripForm: React.FC<TripFormProps> = ({
                 setFormData((prev: any) => ({
                   ...prev,
                   type: v,
-                  category: (!userHasChosenCategory && autoCat) ? autoCat : prev.category,
+                  // O tipo de operação só PREENCHE o vínculo quando ainda está vazio.
+                  // Não sobrescreve o que a OS detectou (ALC→Aliança / SP→Mercosul)
+                  // nem a escolha manual, senão a viagem era salva sempre na
+                  // categoria padrão do tipo (ex.: Aliança), mesmo sendo Mercosul/Indústria.
+                  category: (!userHasChosenCategory && autoCat && !prev.category) ? autoCat : prev.category,
                 }));
               }}
               placeholder="SELECIONE O TIPO..."

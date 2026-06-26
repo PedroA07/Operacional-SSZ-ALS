@@ -138,12 +138,18 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
     setFormData((prev: any) => {
       let next = { ...prev, [field]: upValue };
 
-      if (field === 'tipoOperacao' && !userHasChosenCategory) {
+      // O Tipo de Operação apenas SUGERE um vínculo quando ainda não há nenhum
+      // definido. Nunca sobrescreve o vínculo já identificado pela OS
+      // (ALC→Aliança, SP→Mercosul) nem a escolha manual — caso contrário toda
+      // operação acabava salva na categoria padrão do tipo (ex.: Aliança),
+      // mesmo sendo Mercosul, Indústria ou qualquer outra.
+      if (field === 'tipoOperacao' && !userHasChosenCategory && !next.category) {
         const autoCategory = getCategoryForOpType(upValue);
         if (autoCategory) next.category = autoCategory;
       }
 
-      // Detecção automática por padrão de OS (apenas se o usuário não tiver selecionado manualmente ainda)
+      // Detecção automática por padrão de OS (apenas se o usuário não tiver selecionado manualmente ainda).
+      // A OS é a identificação autoritativa do vínculo, então pode corrigir uma sugestão do tipo de operação.
       if (field === 'os' && !userHasChosenCategory) {
         const detected = osCategoryService.detectCategoryFromOS(upValue);
         if (detected) {
