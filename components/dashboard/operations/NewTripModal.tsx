@@ -43,7 +43,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
         setOperationTypes(types);
         const defType = getDefaultType(types);
         const defCategory = getCategoryForType(defType, types);
-        setForm(prev => ({ ...prev, type: defType, category: defCategory || prev.category }));
+        setForm(prev => ({ ...prev, type: defType, category: prev.category || defCategory }));
       }
     });
   }, []);
@@ -97,7 +97,10 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
               value={form.type || ''}
               onChange={v => {
                 const autoCategory = getCategoryForType(v, operationTypes);
-                setForm(prev => ({ ...prev, type: v, category: autoCategory || prev.category || '' }));
+                // Só preenche o vínculo pelo tipo quando ainda está vazio — nunca
+                // sobrescreve uma categoria já escolhida, senão ela voltava para a
+                // categoria padrão do tipo (ex.: Aliança) ao trocar o tipo.
+                setForm(prev => ({ ...prev, type: v, category: prev.category || autoCategory || '' }));
               }}
               placeholder="Selecione..."
               options={
