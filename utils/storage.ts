@@ -21,6 +21,29 @@ export const supabase = (SUPABASE_URL && SUPABASE_KEY)
   ? createClient(SUPABASE_URL, SUPABASE_KEY)
   : null;
 
+// Fallback local para Mensagens Prontas (caso a tabela Supabase não exista ainda)
+const LOCAL_MESSAGE_TEMPLATES_KEY = 'als_message_templates';
+
+function readLocalMessageTemplates(): import('../types').MessageTemplate[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_MESSAGE_TEMPLATES_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list)
+      ? [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalMessageTemplates(list: import('../types').MessageTemplate[]) {
+  try {
+    localStorage.setItem(LOCAL_MESSAGE_TEMPLATES_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.error('[message_templates] erro ao salvar localmente', e);
+  }
+}
+
 function mapShipFromDb(row: any): Ship {
   return {
     id: row.id,
@@ -1335,6 +1358,64 @@ export const db = {
     if (!supabase) return false;
     const { error } = await supabase.from('email_templates').delete().eq('id', id);
     return !error;
+  },
+
+  // ---------------------------------------------------------------------------
+  // Mensagens Prontas (WhatsApp) — usa Supabase quando a tabela existe e cai
+  // para localStorage como fallback (resiliente caso a migração ainda não tenha
+  // sido aplicada ou o Supabase esteja indisponível).
+  // ---------------------------------------------------------------------------
+  getMessageTemplates: async (): Promise<import('../types').MessageTemplate[]> => {
+    if (supabase) {
+      const { data, error } = await supabase.from('message_templates').select('*').order('name');
+      if (!error) {
+        return (data || []).map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          body: t.body,
+          createdAt: t.created_at,
+          updatedAt: t.updated_at
+        }));
+      }
+    }
+    return readLocalMessageTemplates();
+  },
+
+  saveMessageTemplate: async (template: import('../types').MessageTemplate, user?: User) => {
+    if (supabase) {
+      const { error } = await supabase.from('message_templates').upsert({
+        id: template.id,
+        name: template.name,
+        body: template.body,
+        created_at: template.createdAt,
+        updated_at: template.updatedAt
+      });
+      if (!error) {
+        if (user) {
+          await db.addNotification(
+            user,
+            template.createdAt === template.updatedAt ? 'EMAIL_TEMPLATE_CREATED' : 'EMAIL_TEMPLATE_UPDATED',
+            `Mensagem Pronta: ${template.name}`,
+            `A mensagem pronta "${template.name}" foi salva por ${user.displayName}.`
+          );
+        }
+        return true;
+      }
+    }
+    // Fallback local
+    const list = readLocalMessageTemplates().filter(t => t.id !== template.id);
+    list.push(template);
+    writeLocalMessageTemplates(list);
+    return true;
+  },
+
+  deleteMessageTemplate: async (id: string) => {
+    if (supabase) {
+      const { error } = await supabase.from('message_templates').delete().eq('id', id);
+      if (!error) return true;
+    }
+    writeLocalMessageTemplates(readLocalMessageTemplates().filter(t => t.id !== id));
+    return true;
   },
 
   getCustomStatuses: async (): Promise<CustomStatus[]> => {

@@ -244,6 +244,14 @@ export interface EmailTemplate {
   updatedAt: string;
 }
 
+export interface MessageTemplate {
+  id: string;
+  name: string;
+  body: string;            // Texto com formatação WhatsApp (*negrito*, _itálico_, ~tachado~)
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Notification {
   id: string;
   title: string;
