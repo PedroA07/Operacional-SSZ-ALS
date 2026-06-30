@@ -1275,15 +1275,32 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const handleDateTimeChange = useCallback(async (trip: Trip, dateTime: string) => {
     // Salva como ISO UTC para consistência com SchedulingEditModal
     const isoDateTime = dateTime ? new Date(dateTime).toISOString() : '';
+
+    // Ao confirmar a data/hora, confirma junto o local sugerido (programação)
+    // quando nenhum local foi selecionado manualmente. A sugestão segue a mesma
+    // regra exibida na coluna "Local Agendamento": destino → cliente.
+    const suggestedLocationId = trip.destination?.id || trip.customer?.id || '';
+    const resolvedLocationId = trip.scheduledLocationId || trip.scheduling?.locationId || (dateTime ? suggestedLocationId : '');
+    const resolvedLoc = locations.find(l => l.id === resolvedLocationId);
+    const resolvedLocationName = resolvedLoc?.name || trip.scheduling?.location || trip.destination?.name || '';
+    const resolvedDestination = resolvedLoc ? {
+      id: resolvedLoc.id,
+      name: resolvedLoc.name,
+      legalName: resolvedLoc.legalName,
+      cnpj: resolvedLoc.cnpj,
+      city: resolvedLoc.city,
+      state: resolvedLoc.state
+    } : trip.destination;
+
     // Auto-confirma o agendamento quando uma data é selecionada
     const dateTimeData = {
       scheduledDateTime: dateTime,
-      ...(dateTime ? { isScheduled: true } : {}),
+      ...(dateTime ? { isScheduled: true, scheduledLocationId: resolvedLocationId, destination: resolvedDestination } : {}),
       // Agendamento confirmado implica nota enviada — auto-marca se esqueceram
       ...(dateTime && !trip.sentNF ? { sentNF: true } : {}),
       scheduling: {
-        locationId: trip.scheduledLocationId || '',
-        location: trip.scheduling?.location || '',
+        locationId: resolvedLocationId,
+        location: resolvedLocationName,
         dateTime: isoDateTime,
         obs: trip.scheduling?.obs || ''
       }
@@ -1292,15 +1309,18 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const now = Date.now();
     setPendingUpdates(prev => ({
       ...prev,
-      [trip.id]: { 
-        data: { ...(prev[trip.id]?.data || {}), ...dateTimeData }, 
-        timestamp: now 
+      [trip.id]: {
+        data: { ...(prev[trip.id]?.data || {}), ...dateTimeData },
+        timestamp: now
       }
     }));
 
     try {
       await db.saveTrip({ ...trip, ...dateTimeData });
-      logAudit(activeView, 'AGENDAMENTO', 'Data/hora de agendamento alterada', trip.os, [{ field: 'Data/Hora', from: trip.scheduledDateTime || '', to: dateTime }], trip.id);
+      logAudit(activeView, 'AGENDAMENTO', 'Data/hora de agendamento alterada', trip.os, [
+        { field: 'Data/Hora', from: trip.scheduledDateTime || '', to: dateTime },
+        ...(dateTime && resolvedLocationName && !trip.scheduledLocationId ? [{ field: 'Local', from: trip.scheduling?.location || '', to: resolvedLocationName }] : []),
+      ], trip.id);
     } catch (error) {
       // Não reverte pendingUpdates para evitar que o trip desapareça do painel.
       // O toast informa o erro e o timeout de 30s faz a limpeza quando necessário.
@@ -1309,7 +1329,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         detail: { message: 'Erro ao salvar data/hora de agendamento', type: 'error' }
       }));
     }
-  }, [activeView, logAudit]);
+  }, [activeView, logAudit, locations]);
 
   // Cancela o agendamento gerado automaticamente pela minuta de Pré-Stacking.
   // Quando uma minuta é emitida, a viagem é agendada automaticamente e o toggle
