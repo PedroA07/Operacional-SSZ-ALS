@@ -363,7 +363,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <div className="flex items-center gap-2">
             <DatabaseStatus />
             <EmailCenter user={user} trips={trips} />
-            <MessageCenter user={user} />
+            <MessageCenter user={user} trips={trips} />
             <NotificationCenter user={user} />
             <UserProfile user={user} />
           </div>

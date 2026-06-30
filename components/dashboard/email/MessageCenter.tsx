@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { User, MessageTemplate } from '../../../types';
+import { User, MessageTemplate, Trip } from '../../../types';
 import { db } from '../../../utils/storage';
 import MessageComposerModal from './MessageComposerModal';
 
 interface MessageCenterProps {
   user: User;
+  trips: Trip[];
 }
 
-const MessageCenter: React.FC<MessageCenterProps> = ({ user }) => {
+const MessageCenter: React.FC<MessageCenterProps> = ({ user, trips }) => {
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -147,6 +148,7 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ user }) => {
           onSuccess={loadTemplates}
           template={selectedTemplate}
           user={user}
+          trips={trips}
         />,
         document.body
       )}
