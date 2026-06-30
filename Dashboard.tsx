@@ -8,6 +8,7 @@ import DatabaseStatus from './components/dashboard/DatabaseStatus';
 import UserProfile from './components/dashboard/UserProfile';
 import NotificationCenter from './components/dashboard/notifications/NotificationCenter';
 import EmailCenter from './components/dashboard/email/EmailCenter';
+import MessageCenter from './components/dashboard/email/MessageCenter';
 import NotificationToast from './components/dashboard/notifications/NotificationToast';
 import SimpleToast from './components/shared/SimpleToast';
 import FeedbackModal from './components/shared/FeedbackModal';
@@ -362,6 +363,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <div className="flex items-center gap-2">
             <DatabaseStatus />
             <EmailCenter user={user} trips={trips} />
+            <MessageCenter user={user} />
             <NotificationCenter user={user} />
             <UserProfile user={user} />
           </div>
