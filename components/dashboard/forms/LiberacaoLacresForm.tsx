@@ -36,7 +36,8 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
     quantidade: '01',
     localRetirada: '',
     localId: '',
-    obs: 'RETIRADA DE LACRE APROVADO PELO AVANTIDA.',
+    obs: '',
+    porUnidade: false,
     booking: '',
     container: '',
     driverId: '',
@@ -44,6 +45,10 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
     rg: '',
     veiculo: '',
   };
+  const OBS_SUGGESTIONS = [
+    'RETIRADA DE LACRE APROVADA PELO AVANTIDA.',
+    'RETIRADA DE LACRE APROVADA POR E-MAIL.',
+  ];
   const [formData, setFormData] = useState<typeof defaultFormData>(initialFormData ?? defaultFormData);
 
   useEffect(() => {
@@ -87,20 +92,25 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
       alert('Selecione o Motorista responsável para continuar.');
       return;
     }
-    if (!formData.container && !formData.booking) {
-      alert('Preencha o Container ou o Booking para continuar.');
+    if (formData.porUnidade && !formData.container && !formData.booking) {
+      alert('Preencha o Container ou o Booking, ou desmarque "Vincular Booking / Container".');
       return;
     }
     setIsExporting(true);
     try {
       const activeUser = user || currentUser;
+      const localNome = selectedLocal?.legalName || selectedLocal?.name || formData.localRetirada;
+      // Quando não vinculado a uma unidade, não carrega booking/container
+      const booking = formData.porUnidade ? formData.booking : '';
+      const container = formData.porUnidade ? formData.container : '';
+      const referencia = container || booking || localNome || effectiveDriver.name;
       if (activeUser) {
         await db.addNotification(
           activeUser,
           'LIBERACAO_LACRES_GENERATED',
-          `Liberação de Lacres: ${formData.container || formData.booking}`,
+          `Liberação de Lacres: ${referencia}`,
           `Memorando de liberação de lacres para ${effectiveDriver.name} gerado com sucesso.`,
-          { container: formData.container, booking: formData.booking, motorista: effectiveDriver.name, placa: effectiveDriver.plateHorse },
+          { container, booking, motorista: effectiveDriver.name, placa: effectiveDriver.plateHorse },
         );
       }
       // Salva histórico: sempre se for novo; só se editado se vier do histórico
@@ -109,11 +119,13 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
         db.saveLiberacaoLacres(
           {
             ...formData,
+            booking,
+            container,
             motorista: effectiveDriver.name,
             veiculo: effectiveDriver.plateHorse || formData.veiculo,
             cpf: effectiveDriver.cpf,
             rg: effectiveDriver.rg,
-            localRetirada: selectedLocal?.legalName || selectedLocal?.name || formData.localRetirada,
+            localRetirada: localNome,
           },
           activeUser,
         );
@@ -127,7 +139,7 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      pdf.save(`LIBERAÇÃO DE LACRES - ${effectiveDriver.name} - ${formData.container || formData.booking}.pdf`);
+      pdf.save(`LIBERAÇÃO DE LACRES - ${effectiveDriver.name} - ${referencia}.pdf`);
     } catch (e) {
       console.error('Erro ao gerar PDF de Liberação de Lacres:', e);
     } finally {
@@ -149,6 +161,28 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
 
       {/* PAINEL ESQUERDO */}
       <div className="w-full lg:w-[480px] p-8 overflow-y-auto space-y-6 bg-slate-50 border-r border-slate-100 custom-scrollbar">
+
+        {/* Seletor de unidade — controla exibição de Booking/Container */}
+        <button
+          type="button"
+          onClick={() => setFormData(prev => ({ ...prev, porUnidade: !prev.porUnidade }))}
+          className={`w-full flex items-center justify-between gap-3 p-4 rounded-2xl border-2 transition-all text-left ${
+            formData.porUnidade ? 'border-rose-500 bg-rose-50' : 'border-slate-200 bg-white hover:border-slate-300'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${formData.porUnidade ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-700 uppercase tracking-widest leading-tight">Vincular Booking / Container</p>
+              <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">{formData.porUnidade ? 'Campos de unidade ativos' : 'Ative para informar a unidade'}</p>
+            </div>
+          </div>
+          <div className={`w-11 h-6 rounded-full flex items-center px-0.5 transition-all shrink-0 ${formData.porUnidade ? 'bg-rose-600 justify-end' : 'bg-slate-300 justify-start'}`}>
+            <div className="w-5 h-5 rounded-full bg-white shadow" />
+          </div>
+        </button>
 
         <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
           <p className={labelClass}>1. Dados da Liberação</p>
@@ -184,24 +218,14 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
         </div>
 
         <div className="space-y-1">
-          <label className={labelClass}>2. Local de Retirada (Manual)</label>
-          <input
-            type="text"
-            placeholder="TRANSTEC WORLD, DEPÓSITO..."
-            className={inputClasses}
-            value={formData.localRetirada}
-            onChange={e => setFormData(prev => ({ ...prev, localRetirada: e.target.value.toUpperCase(), localId: '' }))}
-          />
-        </div>
-        <div className="space-y-1">
-          <label className={labelClass}>Ou buscar Terminal / Depósito cadastrado</label>
+          <label className={labelClass}>2. Local de Retirada (Terminal / Depósito)</label>
           <AutocompleteSearch
             label=""
             placeholder="Nome do terminal, porto ou depósito..."
             data={allLocais}
             onSelect={(p: any) => setFormData(prev => ({ ...prev, localId: p.id, localRetirada: (p.legalName || p.name).toUpperCase() }))}
             mapToAutocomplete={searchService.mapPort}
-            initialValue={selectedLocal ? (selectedLocal.legalName || selectedLocal.name) : ''}
+            initialValue={selectedLocal ? (selectedLocal.legalName || selectedLocal.name) : (formData.localRetirada || '')}
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -211,30 +235,32 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
           />
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-          <p className={labelClass}>3. Dados da Operação</p>
-          <div className="space-y-1">
-            <label className={labelClass}>Booking</label>
-            <input
-              className={inputClasses}
-              value={formData.booking}
-              onChange={e => handleInputChange('booking', e.target.value)}
-              placeholder="NÚMERO DO BOOKING"
-            />
+        {formData.porUnidade && (
+          <div className="bg-white p-6 rounded-3xl border-2 border-rose-100 space-y-4 shadow-sm">
+            <p className={labelClass}>3. Dados da Unidade</p>
+            <div className="space-y-1">
+              <label className={labelClass}>Booking</label>
+              <input
+                className={inputClasses}
+                value={formData.booking}
+                onChange={e => handleInputChange('booking', e.target.value)}
+                placeholder="NÚMERO DO BOOKING"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>Container</label>
+              <ContainerInput
+                value={formData.container}
+                onChange={(containerValue, carrierName) => setFormData(prev => ({
+                  ...prev,
+                  container: containerValue,
+                  armador: carrierName !== '' ? carrierName : prev.armador,
+                }))}
+                className={`${inputClasses} font-mono tracking-widest`}
+              />
+            </div>
           </div>
-          <div className="space-y-1">
-            <label className={labelClass}>Container</label>
-            <ContainerInput
-              value={formData.container}
-              onChange={(containerValue, carrierName) => setFormData(prev => ({
-                ...prev,
-                container: containerValue,
-                armador: carrierName !== '' ? carrierName : prev.armador,
-              }))}
-              className={`${inputClasses} font-mono tracking-widest`}
-            />
-          </div>
-        </div>
+        )}
 
         <AutocompleteSearch
           label="4. Motorista Responsável"
@@ -282,14 +308,31 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
           </div>
         )}
 
-        <div className="space-y-1">
-          <label className={labelClass}>5. Observações</label>
+        <div className="space-y-2">
+          <label className={labelClass}>5. Observações (opcional)</label>
           <textarea
-            placeholder="RETIRADA DE LACRE APROVADO PELO AVANTIDA..."
+            placeholder="EX.: RETIRADA DE LACRE APROVADA PELO AVANTIDA..."
             className={`${inputClasses} h-24 resize-none py-4 leading-relaxed`}
             value={formData.obs}
             onChange={e => handleInputChange('obs', e.target.value)}
           />
+          <div className="flex flex-wrap gap-2">
+            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest self-center">Sugestões:</span>
+            {OBS_SUGGESTIONS.map(sug => (
+              <button
+                key={sug}
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, obs: sug }))}
+                className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-wide border transition-all active:scale-95 ${
+                  formData.obs === sug
+                    ? 'bg-rose-600 border-rose-600 text-white'
+                    : 'bg-white border-slate-200 text-slate-500 hover:border-rose-300 hover:text-rose-600'
+                }`}
+              >
+                {sug}
+              </button>
+            ))}
+          </div>
         </div>
 
         <button
