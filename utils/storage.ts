@@ -909,7 +909,8 @@ export const db = {
   // ─── MEMORANDOS: LIBERAÇÃO DE LACRES ─────────────────────────────────────
   // Persistido no form_history genérico (formType LIBERACAO_LACRES), sem tabela dedicada.
   saveLiberacaoLacres: async (formData: any, user: any): Promise<boolean> => {
-    return db._saveEmissaoFallback('LIBERACAO_LACRES', formData, formData.container || formData.booking || '', user);
+    const label = formData.container || formData.booking || formData.localRetirada || formData.armador || '';
+    return db._saveEmissaoFallback('LIBERACAO_LACRES', formData, label, user);
   },
 
   getLiberacaoLacresHistory: async (limit = 8): Promise<import('../types').FormHistoryEntry[]> => {

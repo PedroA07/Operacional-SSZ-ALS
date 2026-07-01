@@ -32,6 +32,11 @@ const LiberacaoLacresTemplate: React.FC<LiberacaoLacresTemplateProps> = ({
   const rg = formData?.rg || selectedDriver?.rg || '---';
   const motorista = selectedDriver?.name || formData?.motorista || '---';
 
+  const qtdNum = parseInt(String(formData?.quantidade ?? '').replace(/\D/g, ''), 10);
+  const lacreLabel = qtdNum === 1 ? 'LACRE' : 'LACRES';
+  const mostrarUnidade = !!formData?.porUnidade && (formData?.booking || formData?.container);
+  const temObs = !!(formData?.obs && String(formData.obs).trim());
+
   return (
     <div
       id="liberacao-lacres-doc"
@@ -88,7 +93,7 @@ const LiberacaoLacresTemplate: React.FC<LiberacaoLacresTemplateProps> = ({
         <div style={{ display: 'flex' }}>
           <div style={{ flex: 1, borderRight: BORDER, padding: '12px 14px', boxSizing: 'border-box' }}>
             <div style={lbl}>QUANTIDADE</div>
-            <div style={{ ...val, color: THEME }}>{formData?.quantidade || '01'} LACRE</div>
+            <div style={{ ...val, color: THEME }}>{formData?.quantidade || '01'} {lacreLabel}</div>
           </div>
           <div style={{ flex: 1, padding: '12px 14px', boxSizing: 'border-box' }}>
             <div style={lbl}>LOCAL DE RETIRADA</div>
@@ -98,24 +103,28 @@ const LiberacaoLacresTemplate: React.FC<LiberacaoLacresTemplateProps> = ({
       </div>
 
       {/* ── OBSERVAÇÕES ── */}
-      <div style={{ border: `2px solid ${THEME}`, backgroundColor: THEME_BG, borderRadius: '4px', padding: '12px 14px', marginBottom: '16px', boxSizing: 'border-box' }}>
-        <div style={{ ...lbl, marginBottom: '5px' }}>OBS.</div>
-        <div style={{ ...p0, fontSize: '13px', fontWeight: 900, lineHeight: '1.4', textTransform: 'uppercase', color: '#0f172a' }}>
-          {formData?.obs || 'RETIRADA DE LACRE APROVADO PELO AVANTIDA.'}
+      {temObs && (
+        <div style={{ border: `2px solid ${THEME}`, backgroundColor: THEME_BG, borderRadius: '4px', padding: '12px 14px', marginBottom: '16px', boxSizing: 'border-box' }}>
+          <div style={{ ...lbl, marginBottom: '5px' }}>OBS.</div>
+          <div style={{ ...p0, fontSize: '13px', fontWeight: 900, lineHeight: '1.4', textTransform: 'uppercase', color: '#0f172a' }}>
+            {formData.obs}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* ── BOOKING + CONTAINER ── */}
-      <div style={{ display: 'flex', border: BORDER, marginBottom: '22px', backgroundColor: '#f8fafc', boxSizing: 'border-box' }}>
-        <div style={{ flex: 1, borderRight: BORDER, padding: '12px 14px', boxSizing: 'border-box' }}>
-          <div style={lbl}>BOOKING</div>
-          <div style={{ ...p0, fontSize: '20px', fontWeight: 900, letterSpacing: '1px', lineHeight: '1.2' }}>{formData?.booking || '---'}</div>
+      {/* ── BOOKING + CONTAINER (somente por unidade) ── */}
+      {mostrarUnidade && (
+        <div style={{ display: 'flex', border: BORDER, marginBottom: '22px', backgroundColor: '#f8fafc', boxSizing: 'border-box' }}>
+          <div style={{ flex: 1, borderRight: BORDER, padding: '12px 14px', boxSizing: 'border-box' }}>
+            <div style={lbl}>BOOKING</div>
+            <div style={{ ...p0, fontSize: '20px', fontWeight: 900, letterSpacing: '1px', lineHeight: '1.2' }}>{formData?.booking || '---'}</div>
+          </div>
+          <div style={{ flex: 1, padding: '12px 14px', boxSizing: 'border-box' }}>
+            <div style={lbl}>CONTAINER</div>
+            <div style={{ ...p0, fontSize: '20px', fontWeight: 900, letterSpacing: '2px', lineHeight: '1.2', color: THEME }}>{formData?.container || '---'}</div>
+          </div>
         </div>
-        <div style={{ flex: 1, padding: '12px 14px', boxSizing: 'border-box' }}>
-          <div style={lbl}>CONTAINER</div>
-          <div style={{ ...p0, fontSize: '20px', fontWeight: 900, letterSpacing: '2px', lineHeight: '1.2', color: THEME }}>{formData?.container || '---'}</div>
-        </div>
-      </div>
+      )}
 
       {/* ── DADOS DO RESPONSÁVEL ── */}
       <div style={{
