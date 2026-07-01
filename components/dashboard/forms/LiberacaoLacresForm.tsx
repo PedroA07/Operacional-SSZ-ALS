@@ -1,15 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Driver, Customer, Port, PreStacking, User } from '../../../types';
+import { Driver, Customer, Port, PreStacking, User, AuthorizedPerson } from '../../../types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import LiberacaoLacresTemplate from './LiberacaoLacresTemplate';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
 import ContainerInput from '../../shared/ContainerInput';
-import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
-import { searchService } from '../../../utils/searchService';
+import { AutocompleteItem, searchService } from '../../../utils/searchService';
 import { db } from '../../../utils/storage';
 import { localDateStr, formFingerprint } from '../../../utils/dateHelpers';
-import { maskCPF, maskRG } from '../../../utils/masks';
+import { maskCPF, maskRG, maskPlate } from '../../../utils/masks';
 
 interface LiberacaoLacresFormProps {
   user?: User;
@@ -21,12 +20,22 @@ interface LiberacaoLacresFormProps {
   initialFormData?: any;
 }
 
-const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers, customers, ports, preStackings = [], onClose, initialFormData }) => {
+// Mapeia uma pessoa autorizada para o formato do autocomplete
+const mapAuthorizedPerson = (p: AuthorizedPerson): AutocompleteItem => ({
+  id: p.id,
+  type: 'STAFF',
+  mainText: p.name,
+  subText: p.veiculo ? `VEÍCULO: ${p.veiculo}` : undefined,
+  document: p.cpf,
+  location: p.rg ? `RG: ${p.rg}` : undefined,
+  originalData: p,
+});
+
+const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, customers, ports, preStackings = [], onClose, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
-  const [plateHorse, setPlateHorse] = useState('');
-  const [plateTrailer, setPlateTrailer] = useState('');
+  const [authorizedPersons, setAuthorizedPersons] = useState<AuthorizedPerson[]>([]);
 
   const defaultFormData = {
     date: localDateStr(),
@@ -40,7 +49,8 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
     porUnidade: false,
     booking: '',
     container: '',
-    driverId: '',
+    authorizedId: '',
+    motorista: '',
     cpf: '',
     rg: '',
     veiculo: '',
@@ -54,6 +64,7 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
     if (saved) setCurrentUser(JSON.parse(saved));
+    db.getAuthorizedPersons().then(setAuthorizedPersons).catch(() => {});
   }, []);
 
   const handleInputChange = (field: string, value: string) => {
@@ -61,35 +72,23 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
   };
 
   const allLocais = [...ports, ...preStackings];
-  const selectedDriver = drivers.find(d => d.id === formData.driverId);
   const selectedLocal = allLocais.find(l => l.id === formData.localId) ?? null;
+  const selectedPerson = authorizedPersons.find(p => p.id === formData.authorizedId) ?? null;
 
-  useEffect(() => {
-    if (selectedDriver) {
-      const horse = primaryHorse(selectedDriver);
-      setPlateHorse(horse);
-      setPlateTrailer(primaryTrailer(selectedDriver));
-      setFormData(prev => ({
-        ...prev,
-        cpf: prev.cpf || selectedDriver.cpf || '',
-        rg: prev.rg || selectedDriver.rg || '',
-        veiculo: horse || prev.veiculo,
-      }));
-    }
-  }, [formData.driverId]);
-
-  // Mantém o campo "VEÍCULO" alinhado à placa do cavalo escolhida no seletor
-  useEffect(() => {
-    if (plateHorse) setFormData(prev => ({ ...prev, veiculo: plateHorse }));
-  }, [plateHorse]);
-
-  const effectiveDriver = selectedDriver
-    ? { ...selectedDriver, plateHorse, plateTrailer, cpf: formData.cpf || selectedDriver.cpf, rg: formData.rg || selectedDriver.rg }
-    : undefined;
+  const handleSelectPerson = (p: AuthorizedPerson) => {
+    setFormData(prev => ({
+      ...prev,
+      authorizedId: p.id,
+      motorista: (p.name || '').toUpperCase(),
+      cpf: p.cpf || prev.cpf,
+      rg: p.rg || prev.rg,
+      veiculo: (p.veiculo || prev.veiculo || '').toUpperCase(),
+    }));
+  };
 
   const downloadPDF = async () => {
-    if (!effectiveDriver) {
-      alert('Selecione o Motorista responsável para continuar.');
+    if (!formData.motorista?.trim()) {
+      alert('Informe o responsável (Pessoa Autorizada) para continuar.');
       return;
     }
     if (formData.porUnidade && !formData.container && !formData.booking) {
@@ -103,14 +102,14 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
       // Quando não vinculado a uma unidade, não carrega booking/container
       const booking = formData.porUnidade ? formData.booking : '';
       const container = formData.porUnidade ? formData.container : '';
-      const referencia = container || booking || localNome || effectiveDriver.name;
+      const referencia = container || booking || localNome || formData.motorista;
       if (activeUser) {
         await db.addNotification(
           activeUser,
           'LIBERACAO_LACRES_GENERATED',
           `Liberação de Lacres: ${referencia}`,
-          `Memorando de liberação de lacres para ${effectiveDriver.name} gerado com sucesso.`,
-          { container, booking, motorista: effectiveDriver.name, placa: effectiveDriver.plateHorse },
+          `Memorando de liberação de lacres para ${formData.motorista} gerado com sucesso.`,
+          { container, booking, motorista: formData.motorista, veiculo: formData.veiculo },
         );
       }
       // Salva histórico: sempre se for novo; só se editado se vier do histórico
@@ -121,10 +120,6 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
             ...formData,
             booking,
             container,
-            motorista: effectiveDriver.name,
-            veiculo: effectiveDriver.plateHorse || formData.veiculo,
-            cpf: effectiveDriver.cpf,
-            rg: effectiveDriver.rg,
             localRetirada: localNome,
           },
           activeUser,
@@ -139,7 +134,7 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      pdf.save(`LIBERAÇÃO DE LACRES - ${effectiveDriver.name} - ${referencia}.pdf`);
+      pdf.save(`LIBERAÇÃO DE LACRES - ${formData.motorista} - ${referencia}.pdf`);
     } catch (e) {
       console.error('Erro ao gerar PDF de Liberação de Lacres:', e);
     } finally {
@@ -155,7 +150,7 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         <div ref={captureRef}>
-          <LiberacaoLacresTemplate formData={formData} selectedDriver={effectiveDriver} selectedLocal={selectedLocal} />
+          <LiberacaoLacresTemplate formData={formData} selectedDriver={undefined} selectedLocal={selectedLocal} />
         </div>
       </div>
 
@@ -262,51 +257,66 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
           </div>
         )}
 
-        <AutocompleteSearch
-          label="4. Motorista Responsável"
-          placeholder="Nome, placa ou CPF..."
-          data={drivers}
-          onSelect={(d: any) => setFormData(prev => ({ ...prev, driverId: d.id }))}
-          mapToAutocomplete={searchService.mapDriver}
-          initialValue={selectedDriver ? selectedDriver.name : ''}
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          }
-        />
-        {selectedDriver && (
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
-            <p className={labelClass}>Dados do Responsável</p>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className={labelClass}>CPF</label>
-                <input
-                  className={inputClasses}
-                  value={formData.cpf}
-                  onChange={e => setFormData(prev => ({ ...prev, cpf: maskCPF(e.target.value) }))}
-                  placeholder="000.000.000-00"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className={labelClass}>RG</label>
-                <input
-                  className={inputClasses}
-                  value={formData.rg}
-                  onChange={e => setFormData(prev => ({ ...prev, rg: maskRG(e.target.value) }))}
-                  placeholder="00.000.000-0"
-                />
-              </div>
-            </div>
-            <DriverPlateSelector
-              driver={selectedDriver}
-              plateHorse={plateHorse}
-              plateTrailer={plateTrailer}
-              onChangePlateHorse={setPlateHorse}
-              onChangePlateTrailer={setPlateTrailer}
+        <div className="space-y-2">
+          <AutocompleteSearch
+            label="4. Pessoa Autorizada (Responsável)"
+            placeholder="Buscar pessoa autorizada por nome, CPF ou placa..."
+            data={authorizedPersons}
+            onSelect={(p: any) => handleSelectPerson(p)}
+            mapToAutocomplete={mapAuthorizedPerson}
+            initialValue={selectedPerson ? selectedPerson.name : (formData.motorista || '')}
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            }
+          />
+          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wide">
+            Cadastre pessoas em Motoristas → Pessoas Autorizadas. Você também pode preencher manualmente abaixo.
+          </p>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm">
+          <p className={labelClass}>Dados do Responsável</p>
+          <div className="space-y-1">
+            <label className={labelClass}>Nome</label>
+            <input
+              className={inputClasses}
+              value={formData.motorista}
+              onChange={e => setFormData(prev => ({ ...prev, motorista: e.target.value.toUpperCase(), authorizedId: '' }))}
+              placeholder="NOME DO RESPONSÁVEL"
             />
           </div>
-        )}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className={labelClass}>CPF</label>
+              <input
+                className={inputClasses}
+                value={formData.cpf}
+                onChange={e => setFormData(prev => ({ ...prev, cpf: maskCPF(e.target.value) }))}
+                placeholder="000.000.000-00"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className={labelClass}>RG</label>
+              <input
+                className={inputClasses}
+                value={formData.rg}
+                onChange={e => setFormData(prev => ({ ...prev, rg: maskRG(e.target.value) }))}
+                placeholder="00.000.000-0"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>Veículo (Placa)</label>
+            <input
+              className={`${inputClasses} font-mono tracking-widest`}
+              value={formData.veiculo}
+              onChange={e => setFormData(prev => ({ ...prev, veiculo: maskPlate(e.target.value) }))}
+              placeholder="ABC1D23"
+            />
+          </div>
+        </div>
 
         <div className="space-y-2">
           <label className={labelClass}>5. Observações (opcional)</label>
@@ -347,7 +357,7 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, drivers
       {/* PAINEL DIREITO — PREVIEW */}
       <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-10 custom-scrollbar">
         <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
-          <LiberacaoLacresTemplate formData={formData} selectedDriver={effectiveDriver} selectedLocal={selectedLocal} />
+          <LiberacaoLacresTemplate formData={formData} selectedDriver={undefined} selectedLocal={selectedLocal} />
         </div>
       </div>
     </div>

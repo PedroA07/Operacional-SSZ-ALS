@@ -477,6 +477,16 @@ export interface ContainerType {
   createdAt?: string;
 }
 
+// Pessoa autorizada a ser selecionada nos memorandos (ex.: Liberação de Lacres)
+export interface AuthorizedPerson {
+  id: string;
+  name: string;
+  cpf?: string;
+  rg?: string;
+  veiculo?: string;
+  createdAt?: string;
+}
+
 export interface TripScheduling {
   dateTime: string;
   location: string;

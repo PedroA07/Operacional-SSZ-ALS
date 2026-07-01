@@ -73,7 +73,7 @@ const LiberacaoLacresTemplate: React.FC<LiberacaoLacresTemplateProps> = ({
 
       {/* ── TÍTULO ── */}
       <div style={{ textAlign: 'center', margin: '22px 0 26px' }}>
-        <div style={{ ...p0, fontSize: '30px', fontWeight: 900, letterSpacing: '2px', textDecoration: 'underline', textUnderlineOffset: '6px' }}>
+        <div style={{ ...p0, fontSize: '30px', fontWeight: 900, letterSpacing: '2px' }}>
           LIBERAÇÃO DE LACRES
         </div>
       </div>
