@@ -906,6 +906,16 @@ export const db = {
     }));
   },
 
+  // ─── MEMORANDOS: LIBERAÇÃO DE LACRES ─────────────────────────────────────
+  // Persistido no form_history genérico (formType LIBERACAO_LACRES), sem tabela dedicada.
+  saveLiberacaoLacres: async (formData: any, user: any): Promise<boolean> => {
+    return db._saveEmissaoFallback('LIBERACAO_LACRES', formData, formData.container || formData.booking || '', user);
+  },
+
+  getLiberacaoLacresHistory: async (limit = 8): Promise<import('../types').FormHistoryEntry[]> => {
+    return db._getEmissoesFallback('LIBERACAO_LACRES', limit);
+  },
+
   // ─── HISTÓRICO COMBINADO (todas as emissões) ─────────────────────────────
   getAllEmissoesHistory: async (limit = 500): Promise<import('../types').FormHistoryEntry[]> => {
     if (!supabase) return [];
