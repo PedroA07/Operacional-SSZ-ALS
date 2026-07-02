@@ -2029,6 +2029,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       label: 'Coleta do Dia',
       sortable: false,
       render: (t: Trip) => {
+        const isFreteMorto = t.status === 'Frete Morto';
         // Tipos sem e-mail (ex.: BL DE LONGO CUSTO) usam o Doc. Originário
         if (isColetaSemEmail(t)) {
           return (
@@ -2036,11 +2037,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               <ToggleIconBtn
                 checked={!!t.coletaDocGenerated}
                 onClick={() => handleToggleColetaDoc(t, !t.coletaDocGenerated)}
+                disabled={isFreteMorto}
                 loading={'coletaDocGenerated' in (pendingUpdates[t.id]?.data || {})}
                 activeClass="bg-emerald-50 border-emerald-400 text-emerald-600"
                 inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-emerald-300 hover:text-emerald-400"
                 badgeColor="bg-emerald-500"
-                title={t.coletaDocGenerated ? 'Doc. originário gerado — clique para desmarcar' : 'Marcar doc. originário como gerado'}
+                title={isFreteMorto ? 'Bloqueado — viagem em Frete Morto' : (t.coletaDocGenerated ? 'Doc. originário gerado — clique para desmarcar' : 'Marcar doc. originário como gerado')}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -2057,17 +2059,22 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             <ToggleIconBtn
               checked={!!t.coletaEmailSent}
               onClick={() => handleToggleColetaEmail(t, !t.coletaEmailSent)}
+              disabled={isFreteMorto}
               loading={'coletaEmailSent' in (pendingUpdates[t.id]?.data || {})}
               activeClass="bg-blue-50 border-blue-400 text-blue-600"
               inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-blue-300 hover:text-blue-400"
               badgeColor="bg-blue-500"
-              title={t.coletaEmailSent ? 'E-mail da coleta enviado — clique para desmarcar' : 'Marcar e-mail da coleta como enviado'}
+              title={isFreteMorto ? 'Bloqueado — viagem em Frete Morto' : (t.coletaEmailSent ? 'E-mail da coleta enviado — clique para desmarcar' : 'Marcar e-mail da coleta como enviado')}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
               </svg>
             </ToggleIconBtn>
-            {t.coletaEmailSent ? (
+            {isFreteMorto ? (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-[6px] font-black text-slate-500 uppercase tracking-tight" title="Bloqueado — viagem em Frete Morto">
+                Frete Morto
+              </span>
+            ) : t.coletaEmailSent ? (
               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-100 border border-blue-200 text-[6px] font-black text-blue-700 uppercase tracking-tight">
                 <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/>
