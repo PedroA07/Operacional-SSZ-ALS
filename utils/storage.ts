@@ -511,6 +511,42 @@ export const db = {
     return !error;
   },
 
+  // ─── PESSOAS AUTORIZADAS (selecionáveis nos memorandos) ──────────────────
+  getAuthorizedPersons: async (): Promise<import('../types').AuthorizedPerson[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('pessoas_autorizadas').select('*').order('name');
+    if (error) { console.error('[getAuthorizedPersons]', error.message); return []; }
+    return (data || []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      cpf: p.cpf || undefined,
+      rg: p.rg || undefined,
+      veiculo: p.veiculo || undefined,
+      createdAt: p.created_at,
+    }));
+  },
+
+  saveAuthorizedPerson: async (p: import('../types').AuthorizedPerson): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('pessoas_autorizadas').upsert({
+      id: p.id,
+      name: p.name,
+      cpf: p.cpf || null,
+      rg: p.rg || null,
+      veiculo: p.veiculo || null,
+      created_at: p.createdAt || new Date().toISOString(),
+    });
+    if (error) { console.error('[saveAuthorizedPerson]', error.message); return false; }
+    return true;
+  },
+
+  deleteAuthorizedPerson: async (id: string): Promise<boolean> => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('pessoas_autorizadas').delete().eq('id', id);
+    if (error) { console.error('[deleteAuthorizedPerson]', error.message); return false; }
+    return true;
+  },
+
   getColetaTiposViagem: async (): Promise<any[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('coleta_tipos_viagem').select('*').order('name');

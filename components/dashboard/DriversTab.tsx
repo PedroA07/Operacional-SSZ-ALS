@@ -9,6 +9,7 @@ import DriverModal from './drivers/DriverModal';
 import DriverDossierAction from './drivers/DriverDossierAction';
 import DriverVinculosCell from './drivers/DriverVinculosCell';
 import SmartOperationTable from './operations/SmartOperationTable';
+import AuthorizedPersonsTab from './AuthorizedPersonsTab';
 
 interface DriversTabProps {
   userId: string;
@@ -20,6 +21,7 @@ interface DriversTabProps {
 }
 
 const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onSaveDriver, onDeleteDriver, availableOps }) => {
+  const [activeSubTab, setActiveSubTab] = useState<'motoristas' | 'autorizados'>('motoristas');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCnhModalOpen, setIsCnhModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -195,6 +197,32 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
 
   return (
     <div className="max-w-full mx-auto space-y-6">
+      {/* Sub-abas: Motoristas | Pessoas Autorizadas */}
+      <div className="flex items-center gap-2 bg-white rounded-2xl border border-slate-200 p-1.5 shadow-sm w-fit">
+        <button
+          onClick={() => setActiveSubTab('motoristas')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            activeSubTab === 'motoristas' ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z" /></svg>
+          Motoristas
+        </button>
+        <button
+          onClick={() => setActiveSubTab('autorizados')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            activeSubTab === 'autorizados' ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          Pessoas Autorizadas
+        </button>
+      </div>
+
+      {activeSubTab === 'autorizados' ? (
+        <AuthorizedPersonsTab />
+      ) : (
+      <>
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         <div className="flex-1 w-full">
           <ListFilters
@@ -219,6 +247,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
         hideInternalSearch
         noMaxHeight
       />
+      </>
+      )}
 
       <DriverModal 
         isOpen={isModalOpen}
