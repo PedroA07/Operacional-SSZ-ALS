@@ -379,6 +379,16 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     return (explicit || fallback)?.tripTypeId || defaultTipoViagemId || null;
   }, [operationTypes, defaultTipoViagemId]);
 
+  // BL DE LONGO CUSTO não utiliza e-mail (usa apenas Doc. Originário)
+  const isBlLongoCusto = useCallback((t: Trip): boolean => {
+    return tiposViagem.find(tv => tv.id === resolveEffectiveTripTypeId(t))?.name?.toUpperCase() === 'BL DE LONGO CUSTO';
+  }, [tiposViagem, resolveEffectiveTripTypeId]);
+
+  // Prontidão para solicitar emissão: BL de longo custo depende só do Doc. Originário
+  const isReadyForEmissao = useCallback((t: Trip): boolean => {
+    return isBlLongoCusto(t) ? !!t.coletaDocGenerated : (!!t.coletaEmailSent && !!t.coletaDocGenerated);
+  }, [isBlLongoCusto]);
+
   // Troca de aba é apenas um filtro leve sobre baseTrips
   const trips = useMemo(() => {
     if (activeOpTab === 'TODOS') return baseTrips;
@@ -553,28 +563,38 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       key: 'coletaEmailSent',
       label: 'E-mail',
       sortable: false,
-      render: (t: Trip) => (
-        <div className="flex items-center justify-center">
-          <ToggleIconBtn
-            checked={!!t.coletaEmailSent}
-            onClick={() => {
-              const checked = !t.coletaEmailSent;
-              const updateData: Partial<Trip> = { coletaEmailSent: checked };
-              if (checked) updateData.sentNF = true;
-              handleUpdateTrip(t, updateData);
-            }}
-            loading={'coletaEmailSent' in (pendingUpdates[t.id]?.data || {})}
-            activeClass="bg-blue-50 border-blue-400 text-blue-600"
-            inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-blue-300 hover:text-blue-400"
-            badgeColor="bg-blue-500"
-            title={t.coletaEmailSent ? 'E-mail enviado — clique para desmarcar' : 'Marcar e-mail como enviado'}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-            </svg>
-          </ToggleIconBtn>
-        </div>
-      )
+      render: (t: Trip) => {
+        // BL DE LONGO CUSTO não usa e-mail (usa Doc. Originário) — não exibe o toggle
+        if (isBlLongoCusto(t)) {
+          return (
+            <div className="flex items-center justify-center">
+              <span className="text-[9px] font-black text-slate-300" title="BL de Longo Custo não utiliza e-mail">—</span>
+            </div>
+          );
+        }
+        return (
+          <div className="flex items-center justify-center">
+            <ToggleIconBtn
+              checked={!!t.coletaEmailSent}
+              onClick={() => {
+                const checked = !t.coletaEmailSent;
+                const updateData: Partial<Trip> = { coletaEmailSent: checked };
+                if (checked) updateData.sentNF = true;
+                handleUpdateTrip(t, updateData);
+              }}
+              loading={'coletaEmailSent' in (pendingUpdates[t.id]?.data || {})}
+              activeClass="bg-blue-50 border-blue-400 text-blue-600"
+              inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-blue-300 hover:text-blue-400"
+              badgeColor="bg-blue-500"
+              title={t.coletaEmailSent ? 'E-mail enviado — clique para desmarcar' : 'Marcar e-mail como enviado'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+            </ToggleIconBtn>
+          </div>
+        );
+      }
     },
     {
       key: 'coletaDocGenerated',
@@ -680,7 +700,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
                 )}
               </div>
             </div>
-            {tiposViagem.find(tv => tv.id === resolveEffectiveTripTypeId(t))?.name?.toUpperCase() !== 'BL DE LONGO CUSTO' && (
+            {!isBlLongoCusto(t) && (
               <button
                 onClick={() => setEmailSendModal({ isOpen: true, trip: t })}
                 className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
@@ -800,13 +820,13 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         </button>
       )
     }
-  ], [tiposViagem, handleUpdateTrip, pendingUpdates, categories, operationTypes]);
+  ], [tiposViagem, handleUpdateTrip, pendingUpdates, categories, operationTypes, isBlLongoCusto]);
 
   const handleEmissaoSolicitada = () => {
-    const readyTrips = trips.filter(t => t.coletaEmailSent && t.coletaDocGenerated);
+    const readyTrips = trips.filter(isReadyForEmissao);
 
     if (readyTrips.length === 0) {
-      alert("Nenhuma viagem está pronta para emissão. Certifique-se de que 'E-mail' e 'Doc Originário' estão marcados.");
+      alert("Nenhuma viagem está pronta para emissão. Marque 'E-mail' e 'Doc Originário' (ou apenas 'Doc Originário' no caso de BL de Longo Custo).");
       return;
     }
 
@@ -1020,7 +1040,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
           ) : (
             <>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
-              Emissão Solicitada ({trips.filter(t => t.coletaEmailSent && t.coletaDocGenerated).length})
+              Emissão Solicitada ({trips.filter(isReadyForEmissao).length})
             </>
           )}
         </button>
