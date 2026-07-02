@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Trip, Port, PreStacking, TripStatus, StatusHistoryEntry, TerminalVessel, Driver, Customer, Devolucao, Liberacao, OrgAuditEntry } from '../../types';
+import { Trip, Port, PreStacking, TripStatus, StatusHistoryEntry, TerminalVessel, Driver, Customer, Devolucao, Liberacao, OrgAuditEntry, EmailTemplate, ColetaTipoViagemOption } from '../../types';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { organizationService } from '../../services/organizationService';
 import { advanceService } from '../../services/advanceService';
@@ -12,6 +12,7 @@ import PreStackingForm from './forms/PreStackingForm';
 import OrdemColetaForm from './forms/OrdemColetaForm';
 import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
 import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
+import EmailGeneratorModal from './email/EmailGeneratorModal';
 import { localDateStr, localDateTimeStr, formatDateTimePtBR } from '../../utils/dateHelpers';
 import { r2Service } from '../../utils/r2Service';
 
@@ -451,6 +452,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   });
   const [ocTrip, setOcTrip] = useState<Trip | null>(null);
 
+  // ─── Coleta do Dia (status de envio de e-mail / doc originário) ─────────────
+  const [tiposViagem, setTiposViagem] = useState<ColetaTipoViagemOption[]>([]);
+  const [defaultColetaTipoViagemId, setDefaultColetaTipoViagemId] = useState<string>('');
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
+  const [coletaTemplateId, setColetaTemplateId] = useState<string>('');
+  const [emailSendModal, setEmailSendModal] = useState<{ isOpen: boolean; trip?: Trip }>({ isOpen: false });
+
   // ─── Auditoria ───────────────────────────────────────────────────────────
   const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [auditEntries, setAuditEntries] = useState<OrgAuditEntry[]>([]);
@@ -498,11 +506,30 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   // Auto-limpeza de atualizações que já foram confirmadas pelo servidor
   useEffect(() => {
     const fetchTypes = async () => {
-      const [types, cats] = await Promise.all([db.getOperationTypes(), db.getCategories()]);
+      const [types, cats, coletaTipos, templates] = await Promise.all([
+        db.getOperationTypes(),
+        db.getCategories(),
+        db.getColetaTiposViagem(),
+        db.getEmailTemplates(),
+      ]);
       setOperationTypes(types);
       setCategories(cats);
+      setTiposViagem(coletaTipos);
+      setEmailTemplates(templates);
+
+      // Mesma resolução de modelo padrão usada na aba Coleta do Dia
+      const savedTemplateId = localStorage.getItem('coletaDefaultTemplateId');
+      if (savedTemplateId && templates.some(t => t.id === savedTemplateId)) {
+        setColetaTemplateId(savedTemplateId);
+      } else {
+        const coletaTemplate = templates.find(t => t.name === 'Modelo Coleta' || t.config?.isColetaDefault);
+        if (coletaTemplate) setColetaTemplateId(coletaTemplate.id);
+      }
     };
     fetchTypes();
+
+    const savedDefault = localStorage.getItem('defaultColetaTipoViagem');
+    if (savedDefault) setDefaultColetaTipoViagemId(savedDefault);
   }, []);
 
   useEffect(() => {
@@ -1553,6 +1580,65 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, [activeView, logAudit]);
 
+  // Resolve o tipo de viagem efetivo da coleta (mesma regra da aba Coleta do Dia)
+  const resolveEffectiveTripTypeId = useCallback((t: Trip): string | null => {
+    if (t.coletaTipoViagem) return t.coletaTipoViagem;
+    const opType = operationTypes.find((ot: any) => ot.name?.toUpperCase() === t.type?.toUpperCase());
+    const rules: { tripTypeId: string; isDefault?: boolean; customerIds?: string[] }[] = opType?.config?.tripTypeRules || [];
+    const explicit = rules.find(r => r.customerIds?.length && r.customerIds.includes(t.customer.id));
+    const fallback = rules.find(r => r.isDefault) || rules.find(r => !r.customerIds?.length);
+    return (explicit || fallback)?.tripTypeId || defaultColetaTipoViagemId || null;
+  }, [operationTypes, defaultColetaTipoViagemId]);
+
+  // Tipos de viagem sem e-mail (ex.: BL DE LONGO CUSTO) usam Doc. Originário no lugar
+  const isColetaSemEmail = useCallback((t: Trip): boolean => {
+    const name = tiposViagem.find(tv => tv.id === resolveEffectiveTripTypeId(t))?.name?.toUpperCase();
+    return name === 'BL DE LONGO CUSTO';
+  }, [tiposViagem, resolveEffectiveTripTypeId]);
+
+  const activeColetaTemplate = useMemo(() => {
+    return emailTemplates.find(t => t.id === coletaTemplateId) || emailTemplates[0] || null;
+  }, [emailTemplates, coletaTemplateId]);
+
+  // Marca/desmarca o e-mail da coleta como enviado (mesma semântica da aba Coleta do Dia)
+  const handleToggleColetaEmail = useCallback(async (trip: Trip, checked: boolean) => {
+    const now = Date.now();
+    const updateData: Partial<Trip> = { coletaEmailSent: checked };
+    if (checked && !trip.sentNF) updateData.sentNF = true;
+
+    setPendingUpdates(prev => ({
+      ...prev,
+      [trip.id]: { data: { ...(prev[trip.id]?.data || {}), ...updateData }, timestamp: now }
+    }));
+
+    try {
+      await db.saveTrip({ ...trip, ...updateData });
+      logAudit(activeView, 'COLETA', checked ? 'E-mail da coleta marcado como enviado' : 'E-mail da coleta desmarcado', trip.os, undefined, trip.id);
+    } catch (error) {
+      setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
+      console.error('Erro ao salvar status do e-mail da coleta:', error);
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar status do e-mail', type: 'error' } }));
+    }
+  }, [activeView, logAudit]);
+
+  // Marca/desmarca o Doc. Originário como gerado
+  const handleToggleColetaDoc = useCallback(async (trip: Trip, checked: boolean) => {
+    const now = Date.now();
+    setPendingUpdates(prev => ({
+      ...prev,
+      [trip.id]: { data: { ...(prev[trip.id]?.data || {}), coletaDocGenerated: checked }, timestamp: now }
+    }));
+
+    try {
+      await db.saveTrip({ ...trip, coletaDocGenerated: checked });
+      logAudit(activeView, 'COLETA', checked ? 'Doc. originário marcado como gerado' : 'Doc. originário desmarcado', trip.os, undefined, trip.id);
+    } catch (error) {
+      setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
+      console.error('Erro ao salvar Doc. Originário:', error);
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar Doc. Originário', type: 'error' } }));
+    }
+  }, [activeView, logAudit]);
+
   const toggleTripType = (type: string) => {
     if (activeView === 'COLETA') {
       setHiddenTripTypesColeta(prev => {
@@ -1938,6 +2024,73 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     },
+    ...(activeView === 'COLETA' ? [{
+      key: 'coletaEmail',
+      label: 'Coleta do Dia',
+      sortable: false,
+      render: (t: Trip) => {
+        // Tipos sem e-mail (ex.: BL DE LONGO CUSTO) usam o Doc. Originário
+        if (isColetaSemEmail(t)) {
+          return (
+            <div className="flex flex-col items-center gap-1 min-w-[92px]">
+              <ToggleIconBtn
+                checked={!!t.coletaDocGenerated}
+                onClick={() => handleToggleColetaDoc(t, !t.coletaDocGenerated)}
+                loading={'coletaDocGenerated' in (pendingUpdates[t.id]?.data || {})}
+                activeClass="bg-emerald-50 border-emerald-400 text-emerald-600"
+                inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-emerald-300 hover:text-emerald-400"
+                badgeColor="bg-emerald-500"
+                title={t.coletaDocGenerated ? 'Doc. originário gerado — clique para desmarcar' : 'Marcar doc. originário como gerado'}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+              </ToggleIconBtn>
+              <span className="text-[6px] font-black uppercase tracking-tight text-emerald-600">Doc Orig.</span>
+            </div>
+          );
+        }
+
+        // Tipos com e-mail: mostra se a coleta foi enviada; se não, atalho de envio
+        return (
+          <div className="flex flex-col items-center gap-1 min-w-[96px]">
+            <ToggleIconBtn
+              checked={!!t.coletaEmailSent}
+              onClick={() => handleToggleColetaEmail(t, !t.coletaEmailSent)}
+              loading={'coletaEmailSent' in (pendingUpdates[t.id]?.data || {})}
+              activeClass="bg-blue-50 border-blue-400 text-blue-600"
+              inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-blue-300 hover:text-blue-400"
+              badgeColor="bg-blue-500"
+              title={t.coletaEmailSent ? 'E-mail da coleta enviado — clique para desmarcar' : 'Marcar e-mail da coleta como enviado'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+            </ToggleIconBtn>
+            {t.coletaEmailSent ? (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-100 border border-blue-200 text-[6px] font-black text-blue-700 uppercase tracking-tight">
+                <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/>
+                </svg>
+                Enviada
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setEmailSendModal({ isOpen: true, trip: t }); }}
+                className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border bg-white border-blue-200 text-blue-500 hover:bg-blue-50 hover:border-blue-400"
+                title="Enviar e-mail da coleta"
+              >
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+                Enviar E-mail
+              </button>
+            )}
+          </div>
+        );
+      }
+    }] : []),
     {
       key: 'isScheduled',
       label: 'Agendado',
@@ -2101,7 +2254,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao, tiposViagem, isColetaSemEmail, handleToggleColetaEmail, handleToggleColetaDoc]);
 
   const handleDeleteDevolucao = useCallback((d: Devolucao) => {
     setConfirmModal({
@@ -2993,6 +3146,27 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             {/* Conteúdo */}
             <div className="flex-1 overflow-hidden p-6">
               <ImageViewer url={viewingDoc.url} alt={viewingDoc.fileName} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Envio de E-mail da Coleta */}
+      {emailSendModal.isOpen && emailSendModal.trip && activeColetaTemplate && activeColetaTemplate.id ? (
+        <EmailGeneratorModal
+          isOpen={emailSendModal.isOpen}
+          onClose={() => setEmailSendModal({ isOpen: false })}
+          template={activeColetaTemplate}
+          trips={propTrips}
+          initialTrip={emailSendModal.trip}
+        />
+      ) : emailSendModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[600] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-lg font-black text-slate-800 mb-2">Nenhum Modelo Encontrado</h3>
+            <p className="text-sm text-slate-600 mb-6">Crie um modelo de e-mail na aba Administrativo &gt; Modelos de E-mail para utilizar esta função.</p>
+            <div className="flex justify-end">
+              <button onClick={() => setEmailSendModal({ isOpen: false })} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold">Fechar</button>
             </div>
           </div>
         </div>
