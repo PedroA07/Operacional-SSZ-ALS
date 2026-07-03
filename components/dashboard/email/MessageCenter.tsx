@@ -15,8 +15,29 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ user }) => {
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplate | null>(null);
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleCopy = async (e: React.MouseEvent, t: MessageTemplate) => {
+    e.stopPropagation();
+    const text = t.body || '';
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Fallback para navegadores/contextos sem Clipboard API
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch { /* ignore */ }
+      document.body.removeChild(ta);
+    }
+    setCopiedId(t.id);
+    setTimeout(() => setCopiedId(cur => (cur === t.id ? null : cur)), 1800);
+  };
 
   const loadTemplates = useCallback(async () => {
     setIsLoading(true);
@@ -126,7 +147,24 @@ const MessageCenter: React.FC<MessageCenterProps> = ({ user }) => {
                     </div>
                     <h5 className="text-[11px] font-black text-slate-800 uppercase leading-tight group-hover:text-emerald-600 transition-colors">{t.name}</h5>
                     <p className="text-[9px] text-slate-500 font-medium mt-1 leading-snug line-clamp-2 whitespace-pre-wrap">{t.body}</p>
-                    <div className="mt-4 pt-3 border-t border-slate-200/50 flex items-center justify-end">
+                    <div className="mt-4 pt-3 border-t border-slate-200/50 flex items-center justify-between gap-2">
+                      <button
+                        onClick={(e) => handleCopy(e, t)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all active:scale-95 ${copiedId === t.id ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-emerald-200 text-emerald-600 hover:bg-emerald-50'}`}
+                        title="Copiar mensagem"
+                      >
+                        {copiedId === t.id ? (
+                          <>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                            <span className="text-[8px] font-black uppercase tracking-widest">Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <span className="text-[8px] font-black uppercase tracking-widest">Copiar</span>
+                          </>
+                        )}
+                      </button>
                       <div className="flex items-center gap-1">
                         <span className="text-[8px] font-black text-emerald-600 uppercase">Abrir e Editar</span>
                         <svg className="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3"/></svg>
