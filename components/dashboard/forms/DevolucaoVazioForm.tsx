@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import DevolucaoVazioTemplate from './DevolucaoVazioTemplate';
 import ContainerInput from '../../shared/ContainerInput';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
+import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
 import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { db } from '../../../utils/storage';
@@ -99,6 +100,12 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
 
   const [formData, setFormData] = useState<typeof defaultFormData>(initData);
 
+  // Cadastro na hora sem fechar o formulário
+  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
+  const [extraDrivers, setExtraDrivers] = useState<Driver[]>([]);
+  const [extraCustomers, setExtraCustomers] = useState<Customer[]>([]);
+  const [extraPorts, setExtraPorts] = useState<Port[]>([]);
+
   const handleInputChange = (field: string, value: string) => {
     const val = value.toUpperCase();
     setFormData(prev => {
@@ -108,9 +115,11 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
     });
   };
 
-  const allLocais = [...ports, ...preStackings];
-  const selectedDriver       = drivers.find(d => d.id === formData.driverId);
-  const selectedRemetente    = customers.find(c => c.id === formData.remetenteId);
+  const allDrivers = [...extraDrivers.filter(e => !drivers.some(d => d.id === e.id)), ...drivers];
+  const allCustomers = [...extraCustomers.filter(e => !customers.some(c => c.id === e.id)), ...customers];
+  const allLocais = [...extraPorts.filter(e => !ports.some(p => p.id === e.id)), ...ports, ...preStackings];
+  const selectedDriver       = allDrivers.find(d => d.id === formData.driverId);
+  const selectedRemetente    = allCustomers.find(c => c.id === formData.remetenteId);
   const selectedDestinatario = allLocais.find(l => l.id === formData.destinatarioId) ?? null;
 
   useEffect(() => {
@@ -266,16 +275,20 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
           onSelect={(p) => setFormData(prev => ({ ...prev, manualLocal: (p.legalName || p.name).toUpperCase(), destinatarioId: p.id }))}
           mapToAutocomplete={searchService.mapPort}
           initialValue={formData.manualLocal}
+          onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData(prev => ({ ...prev, destinatarioId: p.id, manualLocal: (p.legalName || p.name).toUpperCase() })); } })}
+          quickAddLabel="Cadastrar novo porto / terminal"
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>}
         />
 
         <AutocompleteSearch
           label="2. Cliente (Exportador)"
           placeholder="Razão, Fantasia, CNPJ ou Cidade..."
-          data={customers}
+          data={allCustomers}
           onSelect={(c) => setFormData(prev => ({ ...prev, remetenteId: c.id }))}
           mapToAutocomplete={searchService.mapCustomer}
           initialValue={selectedRemetente ? (selectedRemetente.legalName || selectedRemetente.name) : ''}
+          onQuickAdd={(name) => setQuickAdd({ type: 'customer', name, onDone: (c) => { setExtraCustomers(prev => [c, ...prev]); setFormData(prev => ({ ...prev, remetenteId: c.id })); } })}
+          quickAddLabel="Cadastrar novo cliente"
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>}
         />
 
@@ -363,10 +376,12 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
         <AutocompleteSearch
           label="5. Motorista Transportador"
           placeholder="Nome, Placa ou CPF..."
-          data={drivers}
+          data={allDrivers}
           onSelect={(d) => setFormData(prev => ({ ...prev, driverId: d.id }))}
           mapToAutocomplete={searchService.mapDriver}
           initialValue={selectedDriver ? selectedDriver.name : ''}
+          onQuickAdd={(name) => setQuickAdd({ type: 'driver', name, onDone: (d) => { setExtraDrivers(prev => [d, ...prev]); setFormData(prev => ({ ...prev, driverId: d.id })); } })}
+          quickAddLabel="Cadastrar novo motorista"
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2.5"/></svg>}
         />
         <DriverPlateSelector
@@ -436,6 +451,17 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
           <DevolucaoVazioTemplate formData={formData} selectedDriver={effectiveDriver} selectedRemetente={selectedRemetente} selectedDestinatario={selectedDestinatario ?? null} />
         </div>
       </div>
+
+      {quickAdd && (
+        <QuickRegisterModal
+          type={quickAdd.type}
+          isOpen={true}
+          initialName={quickAdd.name}
+          accent="#d97706"
+          onClose={() => setQuickAdd(null)}
+          onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}
+        />
+      )}
     </div>
   );
 };

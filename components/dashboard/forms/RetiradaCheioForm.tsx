@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import RetiradaCheioTemplate from './RetiradaCheioTemplate';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
+import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
 import ContainerInput from '../../shared/ContainerInput';
 import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
@@ -63,6 +64,12 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
   };
   const [formData, setFormData] = useState<typeof defaultFormData>(initialFormData ?? defaultFormData);
 
+  // Cadastro na hora sem fechar o formulário
+  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
+  const [extraDrivers, setExtraDrivers] = useState<Driver[]>([]);
+  const [extraCustomers, setExtraCustomers] = useState<Customer[]>([]);
+  const [extraPorts, setExtraPorts] = useState<Port[]>([]);
+
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
     if (saved) setCurrentUser(JSON.parse(saved));
@@ -82,9 +89,12 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
     setFormData(prev => ({ ...prev, [field]: value.toUpperCase() }));
   };
 
-  const selectedDriver = drivers.find(d => d.id === formData.driverId);
-  const selectedCliente = customers.find(c => c.id === formData.clienteId);
-  const selectedTerminal = ports.find(p => p.id === formData.terminalId);
+  const allDrivers = [...extraDrivers.filter(e => !drivers.some(d => d.id === e.id)), ...drivers];
+  const allCustomers = [...extraCustomers.filter(e => !customers.some(c => c.id === e.id)), ...customers];
+  const allPorts = [...extraPorts.filter(e => !ports.some(p => p.id === e.id)), ...ports];
+  const selectedDriver = allDrivers.find(d => d.id === formData.driverId);
+  const selectedCliente = allCustomers.find(c => c.id === formData.clienteId);
+  const selectedTerminal = allPorts.find(p => p.id === formData.terminalId);
 
   useEffect(() => {
     if (selectedDriver) {
@@ -173,10 +183,12 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
           <AutocompleteSearch
             label=""
             placeholder="Nome do terminal ou porto..."
-            data={ports}
+            data={allPorts}
             onSelect={(p: any) => setFormData({ ...formData, terminalId: p.id })}
             mapToAutocomplete={searchService.mapPort}
             initialValue={selectedTerminal ? (selectedTerminal.legalName || selectedTerminal.name) : ''}
+            onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData(prev => ({ ...prev, terminalId: p.id })); } })}
+            quickAddLabel="Cadastrar novo porto / terminal"
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -189,10 +201,12 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
         <AutocompleteSearch
           label="2. Cliente / Importador"
           placeholder="Razão social, fantasia ou CNPJ..."
-          data={customers}
+          data={allCustomers}
           onSelect={(c: any) => setFormData({ ...formData, clienteId: c.id })}
           mapToAutocomplete={searchService.mapCustomer}
           initialValue={selectedCliente ? (selectedCliente.legalName || selectedCliente.name) : ''}
+          onQuickAdd={(name) => setQuickAdd({ type: 'customer', name, onDone: (c) => { setExtraCustomers(prev => [c, ...prev]); setFormData(prev => ({ ...prev, clienteId: c.id })); } })}
+          quickAddLabel="Cadastrar novo cliente"
           icon={
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -300,10 +314,12 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
         <AutocompleteSearch
           label="5. Motorista"
           placeholder="Nome ou placa do cavalo..."
-          data={drivers}
+          data={allDrivers}
           onSelect={(d: any) => setFormData({ ...formData, driverId: d.id })}
           mapToAutocomplete={searchService.mapDriver}
           initialValue={selectedDriver ? selectedDriver.name : ''}
+          onQuickAdd={(name) => setQuickAdd({ type: 'driver', name, onDone: (d) => { setExtraDrivers(prev => [d, ...prev]); setFormData(prev => ({ ...prev, driverId: d.id })); } })}
+          quickAddLabel="Cadastrar novo motorista"
           icon={
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -370,6 +386,17 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
           />
         </div>
       </div>
+
+      {quickAdd && (
+        <QuickRegisterModal
+          type={quickAdd.type}
+          isOpen={true}
+          initialName={quickAdd.name}
+          accent="#4f46e5"
+          onClose={() => setQuickAdd(null)}
+          onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}
+        />
+      )}
     </div>
   );
 };

@@ -12,10 +12,15 @@ interface AutocompleteSearchProps {
   icon?: React.ReactNode;
   required?: boolean;
   initialValue?: string;
+  /** Habilita a ação "Cadastrar na hora" quando o item buscado não é encontrado. Recebe o texto digitado. */
+  onQuickAdd?: (query: string) => void;
+  /** Rótulo da ação de cadastro (ex.: "Cadastrar novo cliente"). */
+  quickAddLabel?: string;
 }
 
-const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({ 
-  label, placeholder, data, onSelect, onChange, mapToAutocomplete, icon, required, initialValue = ''
+const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
+  label, placeholder, data, onSelect, onChange, mapToAutocomplete, icon, required, initialValue = '',
+  onQuickAdd, quickAddLabel = 'Cadastrar na hora'
 }) => {
   const [query, setQuery] = useState(initialValue);
   const [isOpen, setIsOpen] = useState(false);
@@ -71,6 +76,13 @@ const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
     setIsOpen(false);
   };
 
+  const handleQuickAdd = () => {
+    if (onQuickAdd) onQuickAdd(query.trim());
+    setIsOpen(false);
+  };
+
+  const showDropdown = isOpen && (results.length > 0 || (!!onQuickAdd && query.trim().length > 0));
+
   return (
     <div className="relative w-full" ref={containerRef}>
       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block">
@@ -92,8 +104,29 @@ const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
         />
       </div>
 
-      {isOpen && results.length > 0 && (
+      {showDropdown && (
         <div className="absolute z-[100] w-full mt-3 bg-white rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.18)] border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+          {results.length === 0 && onQuickAdd && (
+            <div className="p-3">
+              <button
+                type="button"
+                onClick={handleQuickAdd}
+                className="w-full flex items-center gap-3 p-4 rounded-[1.8rem] bg-blue-50/60 border border-dashed border-blue-200 hover:bg-blue-50 hover:border-blue-400 transition-all group text-left"
+              >
+                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-lg group-active:scale-90 transition-transform">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-black text-blue-700 uppercase leading-tight">{quickAddLabel}</p>
+                  {query.trim() && (
+                    <p className="text-[9px] font-bold text-blue-400 uppercase truncate mt-0.5">"{query.trim()}"</p>
+                  )}
+                  <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Não encontrado · cadastre sem fechar o formulário</p>
+                </div>
+              </button>
+            </div>
+          )}
+          {results.length > 0 && (
           <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-3 space-y-2">
             {results.map((item) => (
               <button
@@ -146,9 +179,21 @@ const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
               </button>
             ))}
           </div>
-          <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-center">
-             <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">ALS Inteligência de Dados</p>
-          </div>
+          )}
+          {results.length > 0 && onQuickAdd ? (
+            <button
+              type="button"
+              onClick={handleQuickAdd}
+              className="w-full bg-slate-50 hover:bg-blue-50 p-3.5 border-t border-slate-100 flex items-center justify-center gap-2 transition-all group"
+            >
+              <svg className="w-3.5 h-3.5 text-blue-500 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+              <p className="text-[8px] font-black text-blue-500 group-hover:text-blue-600 uppercase tracking-[0.2em]">Não é nenhum destes? {quickAddLabel}</p>
+            </button>
+          ) : (
+            <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-center">
+              <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">ALS Inteligência de Dados</p>
+            </div>
+          )}
         </div>
       )}
     </div>

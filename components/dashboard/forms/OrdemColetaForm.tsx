@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import JsBarcode from 'jsbarcode';
 import OrdemColetaTemplate from './OrdemColetaTemplate';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
+import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
 import DriverPlateSelector, { primaryHorse, primaryTrailer } from '../../shared/DriverPlateSelector';
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import { searchService } from '../../../utils/searchService';
@@ -42,6 +43,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
   const [plateHorse, setPlateHorse] = useState('');
   const [plateTrailer, setPlateTrailer] = useState('');
   const [swapModalOpen, setSwapModalOpen] = useState(false);
+
+  // Cadastro na hora (motorista/cliente/porto) sem fechar o formulário
+  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
+  const [extraDrivers, setExtraDrivers] = useState<Driver[]>([]);
+  const [extraCustomers, setExtraCustomers] = useState<Customer[]>([]);
+  const [extraPorts, setExtraPorts] = useState<Port[]>([]);
 
   const [formData, setFormData] = useState(initialData || {
     date: localDateStr(),
@@ -164,18 +171,24 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
     });
   };
 
-  const selectedDriver = drivers.find(d => d.id === formData.driverId);
-  const selectedRemetente = customers.find(c => c.id === formData.remetenteId);
+  // Listas mescladas: props + cadastros feitos na hora (disponíveis de imediato).
+  // Deduplica por id — assim que o refresh global traz o item nas props, a cópia local some.
+  const allDrivers = [...extraDrivers.filter(e => !drivers.some(d => d.id === e.id)), ...drivers];
+  const allCustomers = [...extraCustomers.filter(e => !customers.some(c => c.id === e.id)), ...customers];
+  const allPorts = [...extraPorts.filter(e => !ports.some(p => p.id === e.id)), ...ports];
+
+  const selectedDriver = allDrivers.find(d => d.id === formData.driverId);
+  const selectedRemetente = allCustomers.find(c => c.id === formData.remetenteId);
   const selectedDestinatario =
-    ports.find(p => p.id === formData.destinatarioId) ||
+    allPorts.find(p => p.id === formData.destinatarioId) ||
     preStackings.find(p => p.id === formData.destinatarioId) ||
-    customers.find(c => c.id === formData.destinatarioId) ||
+    allCustomers.find(c => c.id === formData.destinatarioId) ||
     null;
 
   const destinatarioOptions = [
-    ...ports.map(p => ({ ...p, _srcType: 'Porto' })),
+    ...allPorts.map(p => ({ ...p, _srcType: 'Porto' })),
     ...preStackings.map(p => ({ ...p, _srcType: 'Pré-Stacking' })),
-    ...customers.map(c => ({ ...c, _srcType: 'Cliente' })),
+    ...allCustomers.map(c => ({ ...c, _srcType: 'Cliente' })),
   ];
 
   const mapDestinatario = (item: any): import('../../../utils/searchService').AutocompleteItem => ({
@@ -336,13 +349,15 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
            </div>
         </div>
 
-        <AutocompleteSearch 
+        <AutocompleteSearch
           label="1. Remetente (Cliente)"
           placeholder="Razão, Fantasia, CNPJ ou Cidade..."
-          data={customers}
+          data={allCustomers}
           onSelect={(c) => setFormData({...formData, remetenteId: c.id})}
           mapToAutocomplete={searchService.mapCustomer}
           initialValue={selectedRemetente ? (selectedRemetente.legalName || selectedRemetente.name) : ''}
+          onQuickAdd={(name) => setQuickAdd({ type: 'customer', name, onDone: (c) => { setExtraCustomers(prev => [c, ...prev]); setFormData((p: any) => ({ ...p, remetenteId: c.id })); } })}
+          quickAddLabel="Cadastrar novo cliente"
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>}
         />
 
@@ -353,6 +368,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
           onSelect={(p) => setFormData({...formData, destinatarioId: p.id})}
           mapToAutocomplete={mapDestinatario}
           initialValue={selectedDestinatario ? (selectedDestinatario.legalName || selectedDestinatario.name) : ''}
+          onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData((prev: any) => ({ ...prev, destinatarioId: p.id })); } })}
+          quickAddLabel="Cadastrar novo porto / terminal"
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>}
         />
 
@@ -447,10 +464,12 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         <AutocompleteSearch
           label="5. Motorista Alocado"
           placeholder="Nome, Placa ou CPF..."
-          data={drivers}
+          data={allDrivers}
           onSelect={(d) => setFormData({...formData, driverId: d.id})}
           mapToAutocomplete={searchService.mapDriver}
           initialValue={selectedDriver ? selectedDriver.name : ''}
+          onQuickAdd={(name) => setQuickAdd({ type: 'driver', name, onDone: (d) => { setExtraDrivers(prev => [d, ...prev]); setFormData((p: any) => ({ ...p, driverId: d.id })); } })}
+          quickAddLabel="Cadastrar novo motorista"
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2.5"/></svg>}
         />
         <DriverPlateSelector
@@ -509,14 +528,25 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
 
       <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-12 custom-scrollbar">
         <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
-          <OrdemColetaTemplate 
-            formData={formData} 
+          <OrdemColetaTemplate
+            formData={formData}
             selectedDriver={effectiveDriver}
-            selectedRemetente={selectedRemetente} 
-            selectedDestinatario={selectedDestinatario} 
+            selectedRemetente={selectedRemetente}
+            selectedDestinatario={selectedDestinatario}
           />
         </div>
       </div>
+
+      {quickAdd && (
+        <QuickRegisterModal
+          type={quickAdd.type}
+          isOpen={true}
+          initialName={quickAdd.name}
+          accent="#2563eb"
+          onClose={() => setQuickAdd(null)}
+          onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}
+        />
+      )}
     </div>
   );
 };
