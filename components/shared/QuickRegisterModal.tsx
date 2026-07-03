@@ -46,7 +46,7 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
     lastSearchedCnpj.current = '';
     const nameHint = (initialName || '').toUpperCase();
     if (type === 'driver') {
-      setForm({ name: nameHint, cpf: '', phone: '', plateHorse: '', plateTrailer: '', driverType: 'Externo', status: 'Ativo' });
+      setForm({ name: nameHint, cpf: '', cnh: '', phone: '', plateHorse: '', plateTrailer: '', driverType: 'Externo', status: 'Ativo' });
     } else if (type === 'authorizedPerson') {
       setForm({ name: nameHint, cpf: '', rg: '', veiculo: '' });
     } else {
@@ -138,7 +138,7 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
           name: form.name.trim().toUpperCase(),
           cpf: (form.cpf || '').trim(),
           rg: '',
-          cnh: '',
+          cnh: (form.cnh || '').trim().toUpperCase(),
           phone: (form.phone || '').trim(),
           email: '',
           plateHorse: (form.plateHorse || '').trim().toUpperCase(),
@@ -301,9 +301,13 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
                   <input className={inputClasses} style={focusStyle} value={form.cpf || ''} onChange={e => setForm((f: any) => ({ ...f, cpf: maskCPF(e.target.value) }))} placeholder="000.000.000-00" />
                 </div>
                 <div className="space-y-1">
-                  <label className={labelClass}>Celular / Whatsapp</label>
-                  <input className={inputClasses} style={focusStyle} value={form.phone || ''} onChange={e => setForm((f: any) => ({ ...f, phone: maskPhone(e.target.value) }))} placeholder="(00) 00000-0000" />
+                  <label className={labelClass}>Registro CNH</label>
+                  <input className={inputClasses} style={focusStyle} value={form.cnh || ''} onChange={e => setForm((f: any) => ({ ...f, cnh: e.target.value.toUpperCase() }))} placeholder="Nº DA CNH" />
                 </div>
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Celular / Whatsapp</label>
+                <input className={inputClasses} style={focusStyle} value={form.phone || ''} onChange={e => setForm((f: any) => ({ ...f, phone: maskPhone(e.target.value) }))} placeholder="(00) 00000-0000" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
