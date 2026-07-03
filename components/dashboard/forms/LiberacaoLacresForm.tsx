@@ -76,7 +76,7 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, custome
     setFormData(prev => ({ ...prev, [field]: value.toUpperCase() }));
   };
 
-  const allLocais = [...extraPorts.filter(e => !ports.some(p => p.id === e.id)), ...ports, ...preStackings];
+  const allLocais = [...extraPorts.filter(e => !ports.some(p => p.id === e.id) && !preStackings.some(p => p.id === e.id)), ...ports, ...preStackings];
   const selectedLocal = allLocais.find(l => l.id === formData.localId) ?? null;
   const selectedPerson = authorizedPersons.find(p => p.id === formData.authorizedId) ?? null;
 
@@ -227,7 +227,7 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, custome
             mapToAutocomplete={searchService.mapPort}
             initialValue={selectedLocal ? (selectedLocal.legalName || selectedLocal.name) : (formData.localRetirada || '')}
             onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData(prev => ({ ...prev, localId: p.id, localRetirada: (p.legalName || p.name).toUpperCase() })); } })}
-            quickAddLabel="Cadastrar novo porto / terminal"
+            quickAddLabel="Cadastrar porto ou pré-stacking"
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />

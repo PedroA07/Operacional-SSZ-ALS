@@ -312,7 +312,7 @@ const TripForm: React.FC<TripFormProps> = ({
               onSelect={(p) => setFormData({...formData, destination: p})}
               mapToAutocomplete={searchService.mapPort}
               onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData((f: any) => ({ ...f, destination: p })); } })}
-              quickAddLabel="Cadastrar novo porto / terminal"
+              quickAddLabel="Cadastrar porto ou pré-stacking"
             />
           )}
         </div>
