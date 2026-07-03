@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import LiberacaoLacresTemplate from './LiberacaoLacresTemplate';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
+import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
 import ContainerInput from '../../shared/ContainerInput';
 import { AutocompleteItem, searchService } from '../../../utils/searchService';
 import { db } from '../../../utils/storage';
@@ -36,6 +37,10 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, custome
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const [authorizedPersons, setAuthorizedPersons] = useState<AuthorizedPerson[]>([]);
+
+  // Cadastro na hora sem fechar o formulário
+  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
+  const [extraPorts, setExtraPorts] = useState<Port[]>([]);
 
   const defaultFormData = {
     date: localDateStr(),
@@ -71,7 +76,7 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, custome
     setFormData(prev => ({ ...prev, [field]: value.toUpperCase() }));
   };
 
-  const allLocais = [...ports, ...preStackings];
+  const allLocais = [...extraPorts.filter(e => !ports.some(p => p.id === e.id)), ...ports, ...preStackings];
   const selectedLocal = allLocais.find(l => l.id === formData.localId) ?? null;
   const selectedPerson = authorizedPersons.find(p => p.id === formData.authorizedId) ?? null;
 
@@ -221,6 +226,8 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, custome
             onSelect={(p: any) => setFormData(prev => ({ ...prev, localId: p.id, localRetirada: (p.legalName || p.name).toUpperCase() }))}
             mapToAutocomplete={searchService.mapPort}
             initialValue={selectedLocal ? (selectedLocal.legalName || selectedLocal.name) : (formData.localRetirada || '')}
+            onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData(prev => ({ ...prev, localId: p.id, localRetirada: (p.legalName || p.name).toUpperCase() })); } })}
+            quickAddLabel="Cadastrar novo porto / terminal"
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -265,6 +272,8 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, custome
             onSelect={(p: any) => handleSelectPerson(p)}
             mapToAutocomplete={mapAuthorizedPerson}
             initialValue={selectedPerson ? selectedPerson.name : (formData.motorista || '')}
+            onQuickAdd={(name) => setQuickAdd({ type: 'authorizedPerson', name, onDone: (p) => { setAuthorizedPersons(prev => [p, ...prev]); handleSelectPerson(p); } })}
+            quickAddLabel="Cadastrar nova pessoa autorizada"
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -360,6 +369,17 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, custome
           <LiberacaoLacresTemplate formData={formData} selectedDriver={undefined} selectedLocal={selectedLocal} />
         </div>
       </div>
+
+      {quickAdd && (
+        <QuickRegisterModal
+          type={quickAdd.type}
+          isOpen={true}
+          initialName={quickAdd.name}
+          accent="#e11d48"
+          onClose={() => setQuickAdd(null)}
+          onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}
+        />
+      )}
     </div>
   );
 };

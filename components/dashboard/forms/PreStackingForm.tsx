@@ -11,6 +11,7 @@ import { maskCNPJ, maskCEP } from '../../../utils/masks';
 import { localDateStr } from '../../../utils/dateHelpers';
 import DateTimePicker from '../../shared/DateTimePicker';
 import CustomSelect from '../../shared/CustomSelect';
+import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
 import { tripSyncService } from '../../../utils/tripSyncService';
 import { osCategoryService } from '../../../utils/osCategoryService';
 
@@ -122,6 +123,13 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
   const [plateTrailer, setPlateTrailer] = useState('');
   const [swapModalOpen, setSwapModalOpen] = useState(false);
   const [mode, setMode] = useState<'viagem' | 'personalizado'>('viagem');
+
+  // Cadastro na hora sem fechar o formulário
+  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
+  const [extraDrivers, setExtraDrivers] = useState<Driver[]>([]);
+  const [extraCustomers, setExtraCustomers] = useState<Customer[]>([]);
+  const allDrivers = [...extraDrivers.filter(e => !drivers.some(d => d.id === e.id)), ...drivers];
+  const allCustomers = [...extraCustomers.filter(e => !customers.some(c => c.id === e.id)), ...customers];
 
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
@@ -458,29 +466,59 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
             </div>
           </div>
           <div className="space-y-1">
-            <label className={labelClass}>Motorista <span className="text-red-500">*</span></label>
+            <div className="flex items-center justify-between">
+              <label className={labelClass}>Motorista <span className="text-red-500">*</span></label>
+              <button
+                type="button"
+                onClick={() => setQuickAdd({ type: 'driver', name: '', onDone: (d) => {
+                  setExtraDrivers(prev => [d, ...prev]);
+                  setFormData(f => ({ ...f, driverId: d.id }));
+                  setSelectedDriver(d);
+                  setPlateHorse(primaryHorse(d));
+                  setPlateTrailer(primaryTrailer(d));
+                } })}
+                className="flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase tracking-widest hover:text-emerald-700"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+                Cadastrar
+              </button>
+            </div>
             <CustomSelect
               value={formData.driverId}
               onChange={v => {
-                const drv = drivers.find(d => d.id === v) || null;
+                const drv = allDrivers.find(d => d.id === v) || null;
                 setFormData({...formData, driverId: v});
                 setSelectedDriver(drv);
                 if (drv) { setPlateHorse(primaryHorse(drv)); setPlateTrailer(primaryTrailer(drv)); }
               }}
-              options={drivers.map(d => ({ value: d.id, label: d.name }))}
+              options={allDrivers.map(d => ({ value: d.id, label: d.name }))}
               placeholder="SELECIONAR MOTORISTA..."
               inputClassName={inputClass}
             />
           </div>
           <div className="space-y-1">
-            <label className={labelClass}>Cliente / Remetente <span className="text-red-500">*</span></label>
+            <div className="flex items-center justify-between">
+              <label className={labelClass}>Cliente / Remetente <span className="text-red-500">*</span></label>
+              <button
+                type="button"
+                onClick={() => setQuickAdd({ type: 'customer', name: '', onDone: (c) => {
+                  setExtraCustomers(prev => [c, ...prev]);
+                  setFormData(f => ({ ...f, remetenteId: c.id }));
+                  setSelectedRemetente(c);
+                } })}
+                className="flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase tracking-widest hover:text-emerald-700"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+                Cadastrar
+              </button>
+            </div>
             <CustomSelect
               value={formData.remetenteId}
               onChange={v => {
                 setFormData({...formData, remetenteId: v});
-                setSelectedRemetente(customers.find(c => c.id === v) || null);
+                setSelectedRemetente(allCustomers.find(c => c.id === v) || null);
               }}
-              options={customers.map(c => ({ value: c.id, label: c.name }))}
+              options={allCustomers.map(c => ({ value: c.id, label: c.name }))}
               placeholder="SELECIONAR CLIENTE..."
               inputClassName={inputClass}
             />
@@ -544,18 +582,38 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
                 </div>
                 <div className="max-h-[350px] overflow-y-auto custom-scrollbar p-3 space-y-1">
                   {filteredUnits.length > 0 ? filteredUnits.map(unit => (
-                    <TerminalCardItem 
-                      key={unit.id} 
-                      unit={unit} 
-                      onClick={() => { 
-                        setSelectedDestinatario(unit); 
-                        setFormData({...formData, destinatarioId: unit.id}); 
-                        setIsTerminalDropdownOpen(false); 
-                      }} 
+                    <TerminalCardItem
+                      key={unit.id}
+                      unit={unit}
+                      onClick={() => {
+                        setSelectedDestinatario(unit);
+                        setFormData({...formData, destinatarioId: unit.id});
+                        setIsTerminalDropdownOpen(false);
+                      }}
                     />
                   )) : (
-                    <div className="py-10 text-center text-slate-300 text-[10px] font-bold uppercase italic">Nenhum terminal encontrado</div>
+                    <div className="py-8 text-center text-slate-300 text-[10px] font-bold uppercase italic">Nenhum terminal encontrado</div>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsTerminalDropdownOpen(false);
+                      setQuickAdd({ type: 'preStacking', name: searchTerm.trim(), onDone: (u) => {
+                        setPreStackingList(prev => [u, ...prev]);
+                        setSelectedDestinatario(u);
+                        setFormData(f => ({ ...f, destinatarioId: u.id }));
+                      } });
+                    }}
+                    className="w-full flex items-center gap-3 p-4 rounded-[1.8rem] bg-emerald-50/60 border border-dashed border-emerald-200 hover:bg-emerald-50 hover:border-emerald-400 transition-all group text-left"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-lg group-active:scale-90 transition-transform">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black text-emerald-700 uppercase leading-tight">Cadastrar novo pré-stacking</p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Sem fechar o formulário</p>
+                    </div>
+                  </button>
                 </div>
               </div>
             )}
@@ -601,6 +659,17 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
           </div>
         )}
       </div>
+
+      {quickAdd && (
+        <QuickRegisterModal
+          type={quickAdd.type}
+          isOpen={true}
+          initialName={quickAdd.name}
+          accent="#059669"
+          onClose={() => setQuickAdd(null)}
+          onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}
+        />
+      )}
     </div>
   );
 };
