@@ -610,7 +610,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[10px] font-black text-emerald-700 uppercase leading-tight">Cadastrar novo pré-stacking</p>
+                      <p className="text-[10px] font-black text-emerald-700 uppercase leading-tight">Cadastrar porto ou pré-stacking</p>
                       <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Sem fechar o formulário</p>
                     </div>
                   </button>

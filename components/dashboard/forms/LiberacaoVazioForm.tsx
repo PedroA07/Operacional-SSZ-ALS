@@ -105,7 +105,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
 
   const allDrivers = [...extraDrivers.filter(e => !drivers.some(d => d.id === e.id)), ...drivers];
   const allCustomers = [...extraCustomers.filter(e => !customers.some(c => c.id === e.id)), ...customers];
-  const allLocais = [...extraPorts.filter(e => !ports.some(p => p.id === e.id)), ...ports, ...preStackings];
+  const allLocais = [...extraPorts.filter(e => !ports.some(p => p.id === e.id) && !preStackings.some(p => p.id === e.id)), ...ports, ...preStackings];
   const selectedDriver    = allDrivers.find(d => d.id === formData.driverId);
   const selectedRemetente = allCustomers.find(c => c.id === formData.remetenteId);
   const selectedLocalObj  = allLocais.find(l => l.id === formData.destinatarioId) ?? null;
@@ -255,7 +255,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
           mapToAutocomplete={searchService.mapPort}
           initialValue={formData.manualLocal}
           onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData(prev => ({ ...prev, destinatarioId: p.id, manualLocal: (p.legalName || p.name).toUpperCase() })); } })}
-          quickAddLabel="Cadastrar novo porto / terminal"
+          quickAddLabel="Cadastrar porto ou pré-stacking"
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>}
         />
 

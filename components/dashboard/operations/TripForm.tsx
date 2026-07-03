@@ -4,6 +4,7 @@ import { Trip, Driver, Customer, Category, Port, PreStacking } from '../../../ty
 import ContainerInput from '../../shared/ContainerInput';
 import { maskSeal, maskCNPJ } from '../../../utils/masks';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
+import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
 import { searchService } from '../../../utils/searchService';
 import { osCategoryService } from '../../../utils/osCategoryService';
 import { db } from '../../../utils/storage';
@@ -31,6 +32,15 @@ const TripForm: React.FC<TripFormProps> = ({
   const [operationTypes, setOperationTypes] = useState<any[]>([]);
   const [swapModalOpen, setSwapModalOpen] = useState(false);
   const [userHasChosenCategory, setUserHasChosenCategory] = useState(!!editTrip?.category);
+
+  // Cadastro na hora (motorista/cliente/porto) sem fechar a programação
+  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
+  const [extraDrivers, setExtraDrivers] = useState<Driver[]>([]);
+  const [extraCustomers, setExtraCustomers] = useState<Customer[]>([]);
+  const [extraPorts, setExtraPorts] = useState<(Port | PreStacking)[]>([]);
+  const allDrivers = [...extraDrivers.filter(e => !drivers.some(d => d.id === e.id)), ...drivers];
+  const allCustomers = [...extraCustomers.filter(e => !customers.some(c => c.id === e.id)), ...customers];
+  const allPorts = [...extraPorts.filter(e => !ports.some(p => p.id === e.id)), ...ports];
 
   useEffect(() => {
     db.getContainerTypes().then(types => {
@@ -279,7 +289,15 @@ const TripForm: React.FC<TripFormProps> = ({
           {formData.customer ? (
             <SelectedEntityCard entity={formData.customer} type="customer" onClear={() => setFormData({...formData, customer: null})} />
           ) : (
-            <AutocompleteSearch label="Buscar Cliente" placeholder="Razão ou CNPJ..." data={customers} onSelect={(c) => setFormData({...formData, customer: c})} mapToAutocomplete={searchService.mapCustomer} />
+            <AutocompleteSearch
+              label="Buscar Cliente"
+              placeholder="Razão ou CNPJ..."
+              data={allCustomers}
+              onSelect={(c) => setFormData({...formData, customer: c})}
+              mapToAutocomplete={searchService.mapCustomer}
+              onQuickAdd={(name) => setQuickAdd({ type: 'customer', name, onDone: (c) => { setExtraCustomers(prev => [c, ...prev]); setFormData((f: any) => ({ ...f, customer: c })); } })}
+              quickAddLabel="Cadastrar novo cliente"
+            />
           )}
         </div>
         <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
@@ -287,7 +305,15 @@ const TripForm: React.FC<TripFormProps> = ({
           {formData.destination ? (
             <SelectedEntityCard entity={formData.destination} type="destination" onClear={() => setFormData({...formData, destination: null})} />
           ) : (
-            <AutocompleteSearch label="Buscar Terminal" placeholder="Nome do Terminal..." data={ports} onSelect={(p) => setFormData({...formData, destination: p})} mapToAutocomplete={searchService.mapPort} />
+            <AutocompleteSearch
+              label="Buscar Terminal"
+              placeholder="Nome do Terminal..."
+              data={allPorts}
+              onSelect={(p) => setFormData({...formData, destination: p})}
+              mapToAutocomplete={searchService.mapPort}
+              onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData((f: any) => ({ ...f, destination: p })); } })}
+              quickAddLabel="Cadastrar porto ou pré-stacking"
+            />
           )}
         </div>
       </div>
@@ -344,7 +370,7 @@ const TripForm: React.FC<TripFormProps> = ({
 
             {/* Seletores de placa */}
             {(() => {
-              const driverFull = drivers.find(d => d.id === formData.driver?.id);
+              const driverFull = allDrivers.find(d => d.id === formData.driver?.id);
               const horses = driverFull?.platesHorse || (formData.driver?.plateHorse ? [{ id: 'h0', plate: formData.driver.plateHorse, isPrimary: true }] : []);
               const trailers = driverFull?.platesTrailer || (formData.driver?.plateTrailer ? [{ id: 't0', plate: formData.driver.plateTrailer, isPrimary: true }] : []);
               if (horses.length <= 1 && trailers.length <= 1) return null;
@@ -399,7 +425,7 @@ const TripForm: React.FC<TripFormProps> = ({
           <AutocompleteSearch
             label="Buscar Motorista"
             placeholder="Nome ou Placa..."
-            data={drivers}
+            data={allDrivers}
             onSelect={(d: Driver) => {
               const ph = d.platesHorse?.find(e => e.isPrimary) || d.platesHorse?.[0];
               const pt = d.platesTrailer?.find(e => e.isPrimary) || d.platesTrailer?.[0];
@@ -413,6 +439,13 @@ const TripForm: React.FC<TripFormProps> = ({
               });
             }}
             mapToAutocomplete={searchService.mapDriver}
+            onQuickAdd={(name) => setQuickAdd({ type: 'driver', name, onDone: (d: Driver) => {
+              setExtraDrivers(prev => [d, ...prev]);
+              const ph = d.platesHorse?.find(e => e.isPrimary) || d.platesHorse?.[0];
+              const pt = d.platesTrailer?.find(e => e.isPrimary) || d.platesTrailer?.[0];
+              setFormData((f: any) => ({ ...f, driver: { ...d, plateHorse: ph?.plate || d.plateHorse || '', plateTrailer: pt?.plate || d.plateTrailer || '' } }));
+            } })}
+            quickAddLabel="Cadastrar novo motorista"
           />
         )}
 
@@ -420,8 +453,8 @@ const TripForm: React.FC<TripFormProps> = ({
         <DriverSwapModal
           isOpen={swapModalOpen}
           onClose={() => setSwapModalOpen(false)}
-          driver={drivers.find(d => d.id === formData.driver?.id) || formData.driver || null}
-          drivers={drivers}
+          driver={allDrivers.find(d => d.id === formData.driver?.id) || formData.driver || null}
+          drivers={allDrivers}
           currentPlateHorse={formData.driver?.plateHorse || ''}
           currentPlateTrailer={formData.driver?.plateTrailer || ''}
           onConfirm={(result: DriverSwapResult) => {
@@ -483,6 +516,17 @@ const TripForm: React.FC<TripFormProps> = ({
           {isSaving ? 'Gravando...' : editTrip ? 'Confirmar Alterações' : 'Salvar Nova Programação'}
         </button>
       </div>
+
+      {quickAdd && (
+        <QuickRegisterModal
+          type={quickAdd.type}
+          isOpen={true}
+          initialName={quickAdd.name}
+          accent="#2563eb"
+          onClose={() => setQuickAdd(null)}
+          onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}
+        />
+      )}
     </form>
   );
 };

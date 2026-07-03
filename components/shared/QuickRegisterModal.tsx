@@ -30,23 +30,30 @@ const genId = (prefix: string) =>
   (typeof crypto !== 'undefined' && crypto.randomUUID ? `${prefix}-${crypto.randomUUID()}` : `${prefix}-${Date.now()}`);
 
 const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, onClose, onCreated, initialName = '', accent = '#2563eb' }) => {
-  const meta = TYPE_META[type];
   const isJuridical = type === 'customer' || type === 'port' || type === 'preStacking';
+  // Portos e pré-stackings são "locais": o usuário escolhe qual dos dois cadastrar.
+  const isLocation = type === 'port' || type === 'preStacking';
 
   const [form, setForm] = useState<any>({});
+  const [locationKind, setLocationKind] = useState<'port' | 'preStacking'>(type === 'preStacking' ? 'preStacking' : 'port');
   const [isSaving, setIsSaving] = useState(false);
   const [isCnpjLoading, setIsCnpjLoading] = useState(false);
   const [error, setError] = useState('');
   const lastSearchedCnpj = useRef<string>('');
+
+  // Tipo efetivo para locais: respeita a escolha Porto/Pré-Stacking do seletor.
+  const effectiveType: QuickRegisterType = isLocation ? locationKind : type;
+  const meta = TYPE_META[effectiveType];
 
   // Inicializa o formulário sempre que o modal abre
   useEffect(() => {
     if (!isOpen) return;
     setError('');
     lastSearchedCnpj.current = '';
+    if (isLocation) setLocationKind(type === 'preStacking' ? 'preStacking' : 'port');
     const nameHint = (initialName || '').toUpperCase();
     if (type === 'driver') {
-      setForm({ name: nameHint, cpf: '', phone: '', plateHorse: '', plateTrailer: '', driverType: 'Externo', status: 'Ativo' });
+      setForm({ name: nameHint, cpf: '', cnh: '', phone: '', plateHorse: '', plateTrailer: '', driverType: 'Externo', status: 'Ativo' });
     } else if (type === 'authorizedPerson') {
       setForm({ name: nameHint, cpf: '', rg: '', veiculo: '' });
     } else {
@@ -138,7 +145,7 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
           name: form.name.trim().toUpperCase(),
           cpf: (form.cpf || '').trim(),
           rg: '',
-          cnh: '',
+          cnh: (form.cnh || '').trim().toUpperCase(),
           phone: (form.phone || '').trim(),
           email: '',
           plateHorse: (form.plateHorse || '').trim().toUpperCase(),
@@ -176,8 +183,8 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
           zipCode: form.zipCode || '',
           registrationDate: new Date().toISOString().split('T')[0],
         };
-        if (type === 'customer') { (base as Customer).operations = []; entity = base; ok = await db.saveCustomer(base); }
-        else if (type === 'port') { entity = base; ok = await db.savePort(base); }
+        if (effectiveType === 'customer') { (base as Customer).operations = []; entity = base; ok = await db.saveCustomer(base); }
+        else if (effectiveType === 'port') { entity = base; ok = await db.savePort(base); }
         else { entity = base; ok = await db.savePreStacking(base); }
       }
 
@@ -228,6 +235,37 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
           {/* ── CLIENTE / PORTO / PRÉ-STACKING ── */}
           {isJuridical && (
             <>
+              {/* Seletor Porto x Pré-Stacking (somente para locais) */}
+              {isLocation && (
+                <div className="space-y-1.5">
+                  <label className={labelClass}>Tipo de Local</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { kind: 'port' as const, label: 'Porto / Terminal' },
+                      { kind: 'preStacking' as const, label: 'Pré-Stacking' },
+                    ]).map(opt => {
+                      const active = locationKind === opt.kind;
+                      return (
+                        <button
+                          key={opt.kind}
+                          type="button"
+                          onClick={() => setLocationKind(opt.kind)}
+                          className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl border-2 text-[10px] font-black uppercase tracking-widest transition-all"
+                          style={active
+                            ? { backgroundColor: accent, borderColor: accent, color: '#fff' }
+                            : { backgroundColor: '#fff', borderColor: '#e2e8f0', color: '#94a3b8' }}
+                        >
+                          {active && (
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                          )}
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1">
                 <label className={labelClass}>CNPJ</label>
                 <div className="relative">
@@ -301,9 +339,13 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
                   <input className={inputClasses} style={focusStyle} value={form.cpf || ''} onChange={e => setForm((f: any) => ({ ...f, cpf: maskCPF(e.target.value) }))} placeholder="000.000.000-00" />
                 </div>
                 <div className="space-y-1">
-                  <label className={labelClass}>Celular / Whatsapp</label>
-                  <input className={inputClasses} style={focusStyle} value={form.phone || ''} onChange={e => setForm((f: any) => ({ ...f, phone: maskPhone(e.target.value) }))} placeholder="(00) 00000-0000" />
+                  <label className={labelClass}>Registro CNH</label>
+                  <input className={inputClasses} style={focusStyle} value={form.cnh || ''} onChange={e => setForm((f: any) => ({ ...f, cnh: e.target.value.toUpperCase() }))} placeholder="Nº DA CNH" />
                 </div>
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Celular / Whatsapp</label>
+                <input className={inputClasses} style={focusStyle} value={form.phone || ''} onChange={e => setForm((f: any) => ({ ...f, phone: maskPhone(e.target.value) }))} placeholder="(00) 00000-0000" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
