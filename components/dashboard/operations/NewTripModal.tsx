@@ -3,6 +3,7 @@ import { Trip, Driver, Customer, Category, TripStatus, OperationType } from '../
 import { db } from '../../../utils/storage';
 import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
+import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
 
 interface NewTripModalProps {
   isOpen: boolean;
@@ -36,6 +37,13 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
     os: '', booking: '', ship: '', dateTime: '', type: 'EXPORTAÇÃO', status: 'Pendente',
     category: '', subCategory: '', container: '', tara: '', seal: '', cva: ''
   });
+
+  // Cadastro na hora (motorista/cliente) sem fechar a programação
+  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
+  const [extraDrivers, setExtraDrivers] = useState<Driver[]>([]);
+  const [extraCustomers, setExtraCustomers] = useState<Customer[]>([]);
+  const allDrivers = [...extraDrivers.filter(e => !drivers.some(d => d.id === e.id)), ...drivers];
+  const allCustomers = [...extraCustomers.filter(e => !customers.some(c => c.id === e.id)), ...customers];
 
   useEffect(() => {
     db.getOperationTypes().then(types => {
@@ -168,16 +176,29 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
 
           {/* Row 3: Customer (Full Width) */}
           <div className="relative">
-            <label className={labelBlueClass}>Cliente</label>
+            <div className="flex items-center justify-between">
+              <label className={labelBlueClass}>Cliente</label>
+              <button
+                type="button"
+                onClick={() => setQuickAdd({ type: 'customer', name: '', onDone: (c) => {
+                  setExtraCustomers(prev => [c, ...prev]);
+                  setForm(f => ({ ...f, customer: { id: c.id, name: c.name, legalName: c.legalName, cnpj: c.cnpj, city: c.city, state: c.state } }));
+                } })}
+                className="flex items-center gap-1 text-[8px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 mb-1.5 mr-1"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+                Cadastrar
+              </button>
+            </div>
             <CustomSelect
               required
               value={form.customer?.id || ''}
               onChange={v => {
-                const c = customers.find(cust => cust.id === v);
-                if (c) setForm({...form, customer: { id: c.id, name: c.name, city: c.city, state: c.state }});
+                const c = allCustomers.find(cust => cust.id === v);
+                if (c) setForm({...form, customer: { id: c.id, name: c.name, legalName: c.legalName, cnpj: c.cnpj, city: c.city, state: c.state }});
               }}
               placeholder="Selecione o cliente..."
-              options={customers.map(c => ({ value: c.id, label: c.name }))}
+              options={allCustomers.map(c => ({ value: c.id, label: c.name }))}
               inputClassName={selectClass}
             />
           </div>
@@ -208,16 +229,29 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
 
           {/* Row 6: Driver (Full Width) */}
           <div className="relative">
-            <label className={labelBlueClass}>Motorista</label>
+            <div className="flex items-center justify-between">
+              <label className={labelBlueClass}>Motorista</label>
+              <button
+                type="button"
+                onClick={() => setQuickAdd({ type: 'driver', name: '', onDone: (d) => {
+                  setExtraDrivers(prev => [d, ...prev]);
+                  setForm(f => ({ ...f, driver: { id: d.id, name: d.name, plateHorse: d.plateHorse, plateTrailer: d.plateTrailer, status: 'Pronto', cpf: d.cpf, phone: d.phone } }));
+                } })}
+                className="flex items-center gap-1 text-[8px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 mb-1.5 mr-1"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+                Cadastrar
+              </button>
+            </div>
             <CustomSelect
               required
               value={form.driver?.id || ''}
               onChange={v => {
-                const d = drivers.find(drv => drv.id === v);
+                const d = allDrivers.find(drv => drv.id === v);
                 if (d) setForm({...form, driver: { id: d.id, name: d.name, plateHorse: d.plateHorse, plateTrailer: d.plateTrailer, status: 'Pronto', cpf: d.cpf, phone: d.phone }});
               }}
               placeholder="Selecione o motorista..."
-              options={drivers.map(d => ({ value: d.id, label: `${d.name} (${d.plateHorse})` }))}
+              options={allDrivers.map(d => ({ value: d.id, label: `${d.name} (${d.plateHorse})` }))}
               inputClassName={selectClass}
             />
           </div>
@@ -240,6 +274,17 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
           </button>
         </form>
       </div>
+
+      {quickAdd && (
+        <QuickRegisterModal
+          type={quickAdd.type}
+          isOpen={true}
+          initialName={quickAdd.name}
+          accent="#2563eb"
+          onClose={() => setQuickAdd(null)}
+          onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}
+        />
+      )}
     </div>
   );
 };
