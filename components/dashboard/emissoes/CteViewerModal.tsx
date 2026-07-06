@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { EmissaoCteAttachment } from '../../../types';
-import { fmtMoney, fmtQty, PartyCard } from './cteDisplay';
+import { fmtMoney, fmtQty, copyMoney, copyQty, CopyButton, PartyCard } from './cteDisplay';
 
 export interface CteProcessTotals {
   count: number;
@@ -34,7 +34,7 @@ const CteViewerModal: React.FC<CteViewerModalProps> = ({ attachment, url, title,
   };
 
   return (
-    <div className="fixed inset-0 z-[3000] bg-slate-950 flex flex-col animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[9500] bg-slate-950 flex flex-col animate-in fade-in duration-300">
       {/* Header */}
       <header className="h-16 bg-slate-900 border-b border-white/10 flex items-center justify-between px-4 sm:px-8 shrink-0 shadow-2xl safe-top">
         <div className="flex items-center gap-3 min-w-0">
@@ -107,16 +107,27 @@ const CteViewerModal: React.FC<CteViewerModalProps> = ({ attachment, url, title,
                 {/* Identificação */}
                 <div className="p-3 bg-white/5 border border-white/10 rounded-2xl space-y-1">
                   <div className="flex items-baseline justify-between">
-                    <p className="text-sm font-black text-white">CT-E {info.numero || '—'}</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-sm font-black text-white">CT-E {info.numero || '—'}</p>
+                      <CopyButton value={info.numero} title="Copiar nº do CT-e" light />
+                    </div>
                     {info.serie && <p className="text-[9px] font-bold text-slate-400">Série {info.serie}</p>}
                   </div>
                   {info.dataEmissao && (
-                    <p className="text-[9px] text-slate-400">
+                    <p className="text-[9px] text-slate-400 flex items-center gap-1">
                       Emissão: {new Date(info.dataEmissao).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                      <CopyButton
+                        value={new Date(info.dataEmissao).toLocaleDateString('pt-BR')}
+                        title="Copiar data de emissão"
+                        light
+                      />
                     </p>
                   )}
                   {info.chave && (
-                    <p className="text-[8px] text-slate-500 break-all leading-relaxed">{info.chave.replace(/(\d{4})(?=\d)/g, '$1 ')}</p>
+                    <div className="flex items-start gap-1">
+                      <p className="text-[8px] text-slate-500 break-all leading-relaxed flex-1">{info.chave.replace(/(\d{4})(?=\d)/g, '$1 ')}</p>
+                      <CopyButton value={info.chave} title="Copiar chave de acesso (sem espaços)" light />
+                    </div>
                   )}
                 </div>
 
@@ -124,18 +135,25 @@ const CteViewerModal: React.FC<CteViewerModalProps> = ({ attachment, url, title,
                 <div className="grid grid-cols-1 gap-2">
                   <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
                     <p className="text-[8px] font-black text-emerald-400 uppercase">Valor do CT-E (Prestação)</p>
-                    <p className="text-base font-black text-emerald-300 mt-0.5">{fmtMoney(info.valorPrestacao)}</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-base font-black text-emerald-300 mt-0.5">{fmtMoney(info.valorPrestacao)}</p>
+                      <CopyButton value={copyMoney(info.valorPrestacao)} title="Copiar valor" light />
+                    </div>
                   </div>
                   <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl">
                     <p className="text-[8px] font-black text-indigo-400 uppercase">Valor da Mercadoria</p>
-                    <p className="text-base font-black text-indigo-300 mt-0.5">{fmtMoney(info.valorCarga)}</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-base font-black text-indigo-300 mt-0.5">{fmtMoney(info.valorCarga)}</p>
+                      <CopyButton value={copyMoney(info.valorCarga)} title="Copiar valor" light />
+                    </div>
                   </div>
                   {info.volumes && info.volumes.length > 0 && (
                     <div className="p-3 bg-white/5 border border-white/10 rounded-2xl">
                       <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Volume</p>
                       {info.volumes.map((v, i) => (
-                        <p key={i} className="text-[11px] font-black text-white">
+                        <p key={i} className="text-[11px] font-black text-white flex items-center gap-1">
                           {v.tipo}: {fmtQty(v.quantidade)}{v.unidade ? ` ${v.unidade}` : ''}
+                          <CopyButton value={copyQty(v.quantidade)} title={`Copiar ${v.tipo.toLowerCase()}`} light />
                         </p>
                       ))}
                     </div>
