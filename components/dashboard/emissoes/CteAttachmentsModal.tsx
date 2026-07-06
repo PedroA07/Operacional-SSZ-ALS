@@ -3,7 +3,8 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Trip, EmissaoCteAttachment, CteDocParty } from '../../../types';
 import { fileStorage } from '../../../utils/fileStorage';
 import { cteXmlToPdfBlob, extractCteSummary } from '../../../utils/cteXmlToPdf';
-import DocumentViewerModal from '../operations/DocumentViewerModal';
+import CteViewerModal from './CteViewerModal';
+import { fmtMoney, fmtQty, PartyCard } from './cteDisplay';
 
 interface CteAttachmentsModalProps {
   trip: Trip;
@@ -12,26 +13,6 @@ interface CteAttachmentsModalProps {
 }
 
 const genId = () => `cte-att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-const fmtMoney = (v?: number): string =>
-  v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-const fmtQty = (v: number): string =>
-  v.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
-
-const fmtCnpjCpf = (v?: string): string => {
-  if (!v) return '';
-  const d = v.replace(/\D/g, '');
-  if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-  if (d.length === 11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-  return v;
-};
-
-const fmtCep = (v?: string): string => {
-  if (!v) return '';
-  const d = v.replace(/\D/g, '');
-  return d.length === 8 ? d.replace(/(\d{5})(\d{3})/, '$1-$2') : v;
-};
 
 // Baixa um arquivo forçando download; se o fetch falhar (ex: CORS), abre em nova aba
 const downloadFile = async (url: string, fileName: string) => {
@@ -58,40 +39,13 @@ const DownloadIcon = () => (
   </svg>
 );
 
-const PartyCard: React.FC<{ party: CteDocParty; ctes: string[] }> = ({ party, ctes }) => (
-  <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-0.5">
-    <div className="flex items-start justify-between gap-2">
-      <p className="text-[10px] font-black text-slate-800 uppercase">{party.nome || '—'}</p>
-      {ctes.length > 0 && (
-        <span className="text-[7px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-black shrink-0 uppercase">
-          CT-E {ctes.join(', ')}
-        </span>
-      )}
-    </div>
-    {party.cnpjCpf && (
-      <p className="text-[9px] text-slate-600">
-        <span className="font-bold">CNPJ/CPF:</span> {fmtCnpjCpf(party.cnpjCpf)}
-        {party.ie ? <span className="ml-2"><span className="font-bold">IE:</span> {party.ie}</span> : null}
-      </p>
-    )}
-    {party.endereco && <p className="text-[9px] text-slate-600">{party.endereco}</p>}
-    {(party.municipio || party.uf || party.cep) && (
-      <p className="text-[9px] text-slate-600">
-        {[party.municipio, party.uf].filter(Boolean).join(' - ')}
-        {party.cep ? ` — CEP: ${fmtCep(party.cep)}` : ''}
-      </p>
-    )}
-    {party.fone && <p className="text-[9px] text-slate-600"><span className="font-bold">Fone:</span> {party.fone}</p>}
-  </div>
-);
-
 const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose, onUpdate }) => {
   const [activeTab, setActiveTab] = useState<'anexos' | 'valores'>('anexos');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null);
+  const [viewer, setViewer] = useState<{ att: EmissaoCteAttachment; url: string; title: string } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -190,6 +144,25 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
             console.error('Erro na conversão XML→PDF:', convErr);
             newErrors.push(`"${file.name}": XML anexado, mas houve erro na conversão para PDF.`);
           }
+        } else {
+          // PDF: extrai valores da camada de texto do DACTE (best-effort)
+          setProgress(`Lendo valores de ${file.name}...`);
+          try {
+            const { parseCtePdf } = await import('../../../utils/ctePdfParser');
+            const result = await parseCtePdf(file);
+            if (result.found) {
+              att.cteInfo = result.summary;
+              if (result.summary.numero) {
+                att.cteNumber = result.summary.numero;
+                extractedCteNumber = extractedCteNumber || result.summary.numero;
+              }
+            } else {
+              newErrors.push(`"${file.name}": PDF anexado; não foi possível extrair valores automaticamente (PDF sem camada de texto ou layout não reconhecido). Para valores completos, anexe também o XML.`);
+            }
+          } catch (parseErr) {
+            console.error('Erro ao extrair valores do PDF:', parseErr);
+            newErrors.push(`"${file.name}": PDF anexado; houve erro na leitura dos valores.`);
+          }
         }
 
         newAttachments.push(att);
@@ -237,9 +210,9 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
 
   const handleView = (att: EmissaoCteAttachment) => {
     if (att.fileType === 'pdf') {
-      setViewer({ url: att.url, title: `CT-E — ${att.fileName}` });
+      setViewer({ att, url: att.url, title: `CT-E — ${att.fileName}` });
     } else if (att.pdfUrl) {
-      setViewer({ url: att.pdfUrl, title: `DACTE — ${att.fileName}` });
+      setViewer({ att, url: att.pdfUrl, title: `DACTE — ${att.fileName}` });
     } else {
       window.open(att.url, '_blank', 'noopener');
     }
@@ -471,8 +444,9 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                 <div className="text-center py-8 space-y-1">
                   <p className="text-[11px] font-black text-slate-500 uppercase">Sem valores para exibir</p>
                   <p className="text-[9px] text-slate-400 max-w-xs mx-auto">
-                    Os valores são extraídos automaticamente dos anexos em <span className="font-bold">XML</span>.
-                    Anexe o XML do CT-e para ver prestação, mercadoria, volumes, remetentes e destinatários.
+                    Os valores são extraídos automaticamente dos anexos em <span className="font-bold">XML</span> e,
+                    quando possível, da camada de texto de anexos em <span className="font-bold">PDF</span>.
+                    Para dados completos e confiáveis, prefira anexar o XML do CT-e.
                   </p>
                 </div>
               ) : (
@@ -587,8 +561,9 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                   {/* Anexos sem dados extraídos */}
                   {summary.semInfo.length > 0 && (
                     <p className="text-[8px] text-slate-400 italic">
-                      {summary.semInfo.length} anexo(s) sem valores extraídos (PDFs ou XMLs não reconhecidos):{' '}
-                      {summary.semInfo.map(a => a.fileName).join(', ')}. Valores são lidos apenas de anexos XML.
+                      {summary.semInfo.length} anexo(s) sem valores extraídos:{' '}
+                      {summary.semInfo.map(a => a.fileName).join(', ')}. PDFs escaneados (imagem) e XMLs
+                      não reconhecidos não permitem extração — anexe o XML do CT-e para dados completos.
                     </p>
                   )}
                 </div>
@@ -598,13 +573,19 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
         </div>
       </div>
 
-      {/* PDF viewer */}
+      {/* PDF viewer com painel de valores */}
       {viewer && (
-        <DocumentViewerModal
-          isOpen
-          onClose={() => setViewer(null)}
+        <CteViewerModal
+          attachment={viewer.att}
           url={viewer.url}
           title={viewer.title}
+          totals={{
+            count: summary.withInfo.length,
+            totalPrestacao: summary.totalPrestacao,
+            totalCarga: summary.totalCarga,
+            volumeTotals: summary.volumeTotals,
+          }}
+          onClose={() => setViewer(null)}
         />
       )}
     </>

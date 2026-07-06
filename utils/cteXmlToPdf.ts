@@ -213,6 +213,7 @@ export const generateDactePdf = (data: CteData): jsPDF => {
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
   const M = 8;                       // margem
   const W = 210 - M * 2;             // largura útil
+  const PAGE_BOTTOM = 289;           // limite inferior útil do A4
   let y = M;
 
   const LABEL = 5.2;
@@ -220,6 +221,14 @@ export const generateDactePdf = (data: CteData): jsPDF => {
 
   pdf.setDrawColor(60, 60, 60);
   pdf.setLineWidth(0.25);
+
+  // Quebra de página automática quando a próxima seção não cabe
+  const ensure = (h: number) => {
+    if (y + h > PAGE_BOTTOM) {
+      pdf.addPage();
+      y = M;
+    }
+  };
 
   // Caixa com rótulo pequeno em cima e valor embaixo
   const box = (x: number, yy: number, w: number, h: number, label: string, value: string, opts?: { bold?: boolean; size?: number; center?: boolean }) => {
@@ -325,11 +334,11 @@ export const generateDactePdf = (data: CteData): jsPDF => {
   y += 8;
 
   // ── Natureza / tipo ────────────────────────────────────────────────────────
-  box(M, y, W * 0.4, 8, 'NATUREZA DA OPERAÇÃO', data.natOp || '');
-  box(M + W * 0.4, y, W * 0.15, 8, 'CFOP', data.cfop || '', { center: true });
-  box(M + W * 0.55, y, W * 0.225, 8, 'TIPO DO CT-E', data.tipoCte || '', { center: true });
-  box(M + W * 0.775, y, W * 0.225, 8, 'TIPO DO SERVIÇO', data.tipoServico || '', { center: true });
-  y += 8;
+  box(M, y, W * 0.4, 11, 'NATUREZA DA OPERAÇÃO', data.natOp || '', { size: 6.5 });
+  box(M + W * 0.4, y, W * 0.15, 11, 'CFOP', data.cfop || '', { center: true });
+  box(M + W * 0.55, y, W * 0.225, 11, 'TIPO DO CT-E', data.tipoCte || '', { center: true });
+  box(M + W * 0.775, y, W * 0.225, 11, 'TIPO DO SERVIÇO', data.tipoServico || '', { center: true });
+  y += 11;
 
   // ── Origem / destino / tomador ─────────────────────────────────────────────
   const orig = [data.munIni, data.ufIni].filter(Boolean).join(' - ');
@@ -372,17 +381,20 @@ export const generateDactePdf = (data: CteData): jsPDF => {
     return h;
   };
 
+  ensure(21);
   partyBox(M, W / 2, 'REMETENTE', data.remetente);
   partyBox(M + W / 2, W / 2, 'DESTINATÁRIO', data.destinatario);
   y += 21;
 
   if (data.expedidor?.nome || data.recebedor?.nome) {
+    ensure(21);
     partyBox(M, W / 2, 'EXPEDIDOR', data.expedidor);
     partyBox(M + W / 2, W / 2, 'RECEBEDOR', data.recebedor);
     y += 21;
   }
 
   // ── Carga ──────────────────────────────────────────────────────────────────
+  ensure(8);
   box(M, y, W * 0.4, 8, 'PRODUTO PREDOMINANTE', data.produtoPredominante || '');
   box(M + W * 0.4, y, W * 0.25, 8, 'VALOR TOTAL DA CARGA', fmtMoney(data.valorCarga), { bold: true });
   box(M + W * 0.65, y, W * 0.35, 8, 'QUANTIDADES',
@@ -392,14 +404,15 @@ export const generateDactePdf = (data: CteData): jsPDF => {
   y += 8;
 
   // ── Componentes do valor da prestação ──────────────────────────────────────
-  sectionTitle('COMPONENTES DO VALOR DA PRESTAÇÃO DO SERVIÇO');
-  const comps = data.componentes || [];
+  const comps = (data.componentes || []).slice(0, 20);
   const compH = Math.max(10, Math.ceil(Math.max(comps.length, 1) / 2) * 4 + 4);
+  ensure(4.2 + compH);
+  sectionTitle('COMPONENTES DO VALOR DA PRESTAÇÃO DO SERVIÇO');
   pdf.rect(M, y, W * 0.6, compH);
   pdf.setFontSize(6.5);
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(0, 0, 0);
-  comps.slice(0, 10).forEach((c, i) => {
+  comps.forEach((c, i) => {
     const colX = M + (i % 2) * (W * 0.3);
     const rowY = y + 4 + Math.floor(i / 2) * 4;
     pdf.text(pdf.splitTextToSize(c.nome, W * 0.3 - 24)[0] || '', colX + 1.5, rowY);
@@ -412,6 +425,7 @@ export const generateDactePdf = (data: CteData): jsPDF => {
 
   // ── ICMS ───────────────────────────────────────────────────────────────────
   if (data.icms && (data.icms.vICMS || data.icms.cst)) {
+    ensure(4.2 + 8);
     sectionTitle('INFORMAÇÕES RELATIVAS AO IMPOSTO');
     box(M, y, W * 0.25, 8, 'SITUAÇÃO TRIBUTÁRIA', data.icms.cst ? `CST ${data.icms.cst}` : '');
     box(M + W * 0.25, y, W * 0.25, 8, 'BASE DE CÁLCULO', fmtMoney(data.icms.vBC));
@@ -422,34 +436,55 @@ export const generateDactePdf = (data: CteData): jsPDF => {
 
   // ── Documentos originários (NF-e) ──────────────────────────────────────────
   if (data.chavesNfe && data.chavesNfe.length > 0) {
+    ensure(4.2 + 6.1);
     sectionTitle('DOCUMENTOS ORIGINÁRIOS — CHAVES DE ACESSO NF-E');
-    const nfH = Math.min(data.chavesNfe.length, 8) * 3.6 + 2.5;
-    pdf.rect(M, y, W, nfH);
-    pdf.setFontSize(6.8);
-    pdf.setFont('helvetica', 'normal');
-    data.chavesNfe.slice(0, 8).forEach((c, i) => {
-      pdf.text(fmtChave(c), M + 2, y + 4 + i * 3.6);
-    });
-    if (data.chavesNfe.length > 8) {
-      pdf.setFontSize(5.5);
-      pdf.text(`(+${data.chavesNfe.length - 8} chaves não exibidas)`, M + W - 2, y + nfH - 1.5, { align: 'right' });
+    const keys = data.chavesNfe;
+    const PER_ROW = 2;
+    const ROW_H = 3.6;
+    let i = 0;
+    // Renderiza em blocos de linhas que cabem na página; continua nas seguintes
+    while (i < keys.length) {
+      const availRows = Math.floor((PAGE_BOTTOM - y - 2.5) / ROW_H);
+      if (availRows < 1) { pdf.addPage(); y = M; continue; }
+      const rowsHere = Math.min(availRows, Math.ceil((keys.length - i) / PER_ROW));
+      const h = rowsHere * ROW_H + 2.5;
+      pdf.rect(M, y, W, h);
+      pdf.setFontSize(6.8);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(0, 0, 0);
+      for (let r = 0; r < rowsHere; r++) {
+        for (let c = 0; c < PER_ROW && i < keys.length; c++, i++) {
+          pdf.text(fmtChave(keys[i]), M + 2 + c * (W / 2), y + 4 + r * ROW_H);
+        }
+      }
+      y += h;
     }
-    y += nfH;
   }
 
   // ── Observações ────────────────────────────────────────────────────────────
   if (data.observacoes) {
+    ensure(4.2 + 6.2);
     sectionTitle('OBSERVAÇÕES');
-    const obsLines = pdf.splitTextToSize(data.observacoes, W - 4).slice(0, 8);
-    const obsH = obsLines.length * 3.2 + 3;
-    pdf.rect(M, y, W, obsH);
-    pdf.setFontSize(6.5);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(obsLines, M + 2, y + 3.8);
-    y += obsH;
+    const obsLines: string[] = pdf.splitTextToSize(data.observacoes, W - 4);
+    const LINE_H = 3.2;
+    let i = 0;
+    while (i < obsLines.length) {
+      const availLines = Math.floor((PAGE_BOTTOM - y - 3) / LINE_H);
+      if (availLines < 1) { pdf.addPage(); y = M; continue; }
+      const chunk = obsLines.slice(i, i + availLines);
+      const h = chunk.length * LINE_H + 3;
+      pdf.rect(M, y, W, h);
+      pdf.setFontSize(6.5);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(0, 0, 0);
+      pdf.text(chunk, M + 2, y + 3.8);
+      y += h;
+      i += availLines;
+    }
   }
 
   // ── Rodapé ─────────────────────────────────────────────────────────────────
+  ensure(8);
   pdf.setFontSize(5.5);
   pdf.setTextColor(...GRAY);
   pdf.text(
