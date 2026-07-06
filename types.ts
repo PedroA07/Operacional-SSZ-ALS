@@ -471,6 +471,7 @@ export interface CteDocParty {
   municipio?: string;
   uf?: string;
   cep?: string;
+  pais?: string;
   fone?: string;
 }
 

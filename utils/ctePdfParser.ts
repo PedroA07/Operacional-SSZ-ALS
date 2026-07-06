@@ -90,9 +90,9 @@ export async function parseCtePdf(file: File): Promise<CtePdfParseResult> {
 
   const findLabels = (re: RegExp): TextItem[] => items.filter(it => re.test(it.norm));
 
-  const labeledCurrency = (labelRe: RegExp): number | undefined => {
+  const labeledCurrency = (labelRe: RegExp, maxDy = 25, maxDx = 140): number | undefined => {
     for (const label of findLabels(labelRe)) {
-      const raw = valueNear(label, CURRENCY_RE);
+      const raw = valueNear(label, CURRENCY_RE, maxDy, maxDx);
       const n = raw !== undefined ? parseBrNumber(raw) : undefined;
       if (n !== undefined) return n;
     }
@@ -131,13 +131,27 @@ export async function parseCtePdf(file: File): Promise<CtePdfParseResult> {
   }
 
   // ── Valores ────────────────────────────────────────────────────────────────
-  const valorPrestacao = labeledCurrency(/VALOR TOTAL (DO SERVICO|DA PRESTACAO)/);
+  // Alguns layouts alinham o valor à direita da caixa — janela horizontal ampla.
+  // Fallback: "VALOR (TOTAL) A RECEBER" costuma repetir o valor da prestação.
+  const valorPrestacao = labeledCurrency(/VALOR TOTAL (DO SERVICO|DA PRESTACAO)/)
+    ?? labeledCurrency(/VALOR (TOTAL )?A RECEBER/);
   const valorCarga = labeledCurrency(/VALOR (TOTAL )?DA (CARGA|MERCADORIA)/);
 
-  // ── Volume (peso) ──────────────────────────────────────────────────────────
+  // ── Data de emissão ────────────────────────────────────────────────────────
+  let dataEmissao: string | undefined;
+  for (const label of findLabels(/DATA E HORA D[EA] EMISS/)) {
+    const raw = valueNear(label, /^\d{2}\/\d{2}\/\d{4}/, 20, 120);
+    const m = raw?.match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (m) {
+      dataEmissao = `${m[3]}-${m[2]}-${m[1]}T${m[4] || '00'}:${m[5] || '00'}:${m[6] || '00'}`;
+      break;
+    }
+  }
+
+  // ── Volumes ────────────────────────────────────────────────────────────────
   const volumes: CteDocVolume[] = [];
+  // Layout 1: rótulo "PESO BRUTO" (inline ou com valor abaixo)
   for (const label of findLabels(/PESO (BRUTO|BASE|B\.? ?CALC)/)) {
-    // Inline: "PESO BRUTO: 28.000,0000 KG" no mesmo item
     const inline = label.norm.match(/PESO[^0-9]*([\d.,]+)/);
     const raw = (inline && inline[1]) || valueNear(label, NUMBER_RE, 15, 60);
     const quantidade = raw !== undefined ? parseBrNumber(raw) : undefined;
@@ -145,6 +159,19 @@ export async function parseCtePdf(file: File): Promise<CtePdfParseResult> {
       volumes.push({ tipo: 'PESO BRUTO', unidade: 'KG', quantidade });
       break;
     }
+  }
+  // Layout 2: colunas TIPO MEDIDA / QTDE/UN.MEDIDA — valores como "24.130,9000/KG"
+  const qtyUnitRe = /^([\d.,]+)\s*\/\s*(KG|KGS|TON|UND?|UN)\.?$/;
+  for (const it of items) {
+    const m = it.norm.match(qtyUnitRe);
+    if (!m) continue;
+    const quantidade = parseBrNumber(m[1]);
+    if (quantidade === undefined || quantidade <= 0) continue;
+    const un = m[2].startsWith('KG') ? 'KG' : m[2] === 'TON' ? 'TON' : 'UN';
+    const tipo = un === 'KG' ? 'PESO BRUTO' : un === 'TON' ? 'PESO (TON)' : 'UNIDADE';
+    // Evita duplicar o peso já capturado pelo layout 1
+    if (un === 'KG' && volumes.some(v => v.unidade === 'KG')) continue;
+    volumes.push({ tipo, unidade: un, quantidade });
   }
 
   // ── Remetente / Destinatário (apenas nome e CNPJ, best-effort) ─────────────
@@ -167,15 +194,17 @@ export async function parseCtePdf(file: File): Promise<CtePdfParseResult> {
         if (score < bestScore) { bestScore = score; nome = it.str; }
       }
       if (!nome) continue;
-      // CNPJ formatado no bloco logo abaixo do rótulo
+      // CNPJ formatado no bloco do rótulo (layouts variam: logo abaixo ou
+      // várias linhas abaixo, em coluna à direita) — pega o mais próximo
       let cnpjCpf: string | undefined;
+      let cnpjBest = Infinity;
       for (const it of items) {
         if (it.page !== label.page) continue;
         const dy = label.y - it.y;
         const dx = Math.abs(it.x - label.x);
-        if (dy < 1 || dy > 30 || dx > 90) continue;
+        if (dy < 1 || dy > 55 || dx > 130) continue;
         const m = it.str.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
-        if (m) { cnpjCpf = m[0].replace(/\D/g, ''); break; }
+        if (m && dy + dx * 0.3 < cnpjBest) { cnpjBest = dy + dx * 0.3; cnpjCpf = m[0].replace(/\D/g, ''); }
       }
       return { nome, cnpjCpf };
     }
@@ -189,6 +218,7 @@ export async function parseCtePdf(file: File): Promise<CtePdfParseResult> {
     numero,
     serie,
     chave,
+    dataEmissao,
     valorPrestacao,
     valorCarga,
     volumes,

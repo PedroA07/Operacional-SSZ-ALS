@@ -1,6 +1,7 @@
 
 import { jsPDF } from 'jspdf';
 import JsBarcode from 'jsbarcode';
+import qrcode from 'qrcode-generator';
 import { CteDocParty, CteDocSummary, CteDocVolume } from '../types';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -21,6 +22,7 @@ export interface CteData {
   munFim?: string;
   ufFim?: string;
   tomador?: string;
+  tomadorParty?: CteParty;
   emitente?: CteParty;
   remetente?: CteParty;
   destinatario?: CteParty;
@@ -29,11 +31,13 @@ export interface CteData {
   valorTotal?: string;
   valorReceber?: string;
   componentes?: { nome: string; valor: string }[];
-  icms?: { cst?: string; vBC?: string; pICMS?: string; vICMS?: string };
+  icms?: { cst?: string; vBC?: string; pICMS?: string; vICMS?: string; pRedBC?: string };
   produtoPredominante?: string;
+  outrasCaracteristicas?: string;
   valorCarga?: string;
   quantidades?: { tipo: string; unidade?: string; qtd: string }[];
   chavesNfe?: string[];
+  qrCod?: string;
   observacoes?: string;
   protocolo?: string;
   dataProtocolo?: string;
@@ -83,6 +87,7 @@ const parseParty = (el: Element | null): CteParty | undefined => {
     municipio: text(ender, 'xMun'),
     uf: text(ender, 'UF'),
     cep: text(ender, 'CEP'),
+    pais: text(ender, 'xPais'),
     fone: text(el, 'fone'),
   };
 };
@@ -115,6 +120,7 @@ export const parseCteXml = (xmlText: string): CteData | null => {
       vBC: text(icmsEl, 'vBC'),
       pICMS: text(icmsEl, 'pICMS'),
       vICMS: text(icmsEl, 'vICMS'),
+      pRedBC: text(icmsEl, 'pRedBC'),
     } : undefined;
 
     const infCarga = first(infCte, 'infCarga');
@@ -133,6 +139,15 @@ export const parseCteXml = (xmlText: string): CteData | null => {
 
     const infProt = first(doc, 'infProt');
 
+    const remetente = parseParty(first(infCte, 'rem'));
+    const destinatario = parseParty(first(infCte, 'dest'));
+    const expedidor = parseParty(first(infCte, 'exped'));
+    const recebedor = parseParty(first(infCte, 'receb'));
+    // Tomador: papéis 0-3 referenciam uma das partes; toma4 traz dados próprios
+    const tomadorParty = toma === '4'
+      ? parseParty(tomaEl)
+      : ({ '0': remetente, '1': expedidor, '2': recebedor, '3': destinatario } as Record<string, CteParty | undefined>)[toma];
+
     return {
       chave,
       numero: text(ide, 'nCT'),
@@ -148,19 +163,22 @@ export const parseCteXml = (xmlText: string): CteData | null => {
       munFim: text(ide, 'xMunFim'),
       ufFim: text(ide, 'UFFim'),
       tomador: TOMADORES[toma] || toma,
+      tomadorParty,
       emitente: parseParty(first(infCte, 'emit')),
-      remetente: parseParty(first(infCte, 'rem')),
-      destinatario: parseParty(first(infCte, 'dest')),
-      expedidor: parseParty(first(infCte, 'exped')),
-      recebedor: parseParty(first(infCte, 'receb')),
+      remetente,
+      destinatario,
+      expedidor,
+      recebedor,
       valorTotal: text(vPrest, 'vTPrest'),
       valorReceber: text(vPrest, 'vRec'),
       componentes,
       icms,
       produtoPredominante: text(infCarga, 'proPred'),
+      outrasCaracteristicas: text(infCarga, 'xOutCat'),
       valorCarga: text(infCarga, 'vCarga'),
       quantidades,
       chavesNfe,
+      qrCod: text(doc, 'qrCodCTe'),
       observacoes: text(first(infCte, 'compl'), 'xObs'),
       protocolo: text(infProt, 'nProt'),
       dataProtocolo: text(infProt, 'dhRecbto'),
@@ -260,6 +278,27 @@ export const generateDactePdf = (data: CteData): jsPDF => {
     y += 4.2;
   };
 
+  // ── Canhoto de recebimento ─────────────────────────────────────────────────
+  pdf.rect(M, y, W, 4.5);
+  pdf.setFontSize(5.5);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setTextColor(0, 0, 0);
+  pdf.text(
+    'DECLARO QUE RECEBI OS VOLUMES DESTE CONHECIMENTO EM PERFEITO ESTADO PELO QUE DOU POR CUMPRIDO O PRESENTE CONTRATO DE TRANSPORTE',
+    M + W / 2, y + 3, { align: 'center' }
+  );
+  y += 4.5;
+  box(M, y, W * 0.38, 8, 'NOME / RG', '');
+  box(M + W * 0.38, y, W * 0.27, 8, 'ASSINATURA / CARIMBO', '');
+  box(M + W * 0.65, y, W * 0.19, 8, 'CHEGADA — DATA / HORA', '');
+  box(M + W * 0.84, y, W * 0.16, 8, 'CT-E',
+    `Nº ${data.numero || '—'}  SÉRIE ${data.serie || '—'}`, { bold: true, size: 6.5, center: true });
+  y += 8;
+  pdf.setLineDashPattern([1.2, 1.2], 0);
+  pdf.line(M, y + 1.8, M + W, y + 1.8);
+  pdf.setLineDashPattern([], 0);
+  y += 3.5;
+
   // ── Cabeçalho: emitente + identificação DACTE ──────────────────────────────
   const headerH = 24;
   const emitW = W * 0.55;
@@ -296,14 +335,18 @@ export const generateDactePdf = (data: CteData): jsPDF => {
   pdf.text('Documento Auxiliar do Conhecimento', idX + idW / 2, y + 9, { align: 'center' });
   pdf.text('de Transporte Eletrônico', idX + idW / 2, y + 11.5, { align: 'center' });
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(7.5);
-  pdf.text(`MODAL: ${data.modal || '—'}`, idX + idW / 2, y + 16, { align: 'center' });
-  pdf.setFontSize(7);
-  pdf.text(
-    `Nº ${data.numero || '—'}   SÉRIE ${data.serie || '—'}   ${fmtDateTime(data.dataEmissao)}`,
-    idX + idW / 2, y + 21, { align: 'center' }
-  );
+  pdf.setFontSize(8.5);
+  pdf.text(`MODAL: ${data.modal || '—'}`, idX + idW / 2, y + 17.5, { align: 'center' });
   y += headerH;
+
+  // ── Modelo / série / número / folha / emissão ──────────────────────────────
+  box(M, y, W * 0.12, 8, 'MODELO', '57', { center: true });
+  box(M + W * 0.12, y, W * 0.12, 8, 'SÉRIE', data.serie || '', { center: true });
+  box(M + W * 0.24, y, W * 0.2, 8, 'NÚMERO', data.numero || '', { bold: true, center: true });
+  box(M + W * 0.44, y, W * 0.1, 8, 'FL', '1/1', { center: true });
+  box(M + W * 0.54, y, W * 0.26, 8, 'DATA E HORA DE EMISSÃO', fmtDateTime(data.dataEmissao), { center: true });
+  box(M + W * 0.8, y, W * 0.2, 8, 'INSC. SUFRAMA DESTINATÁRIO', '', { center: true });
+  y += 8;
 
   // ── Chave de acesso + código de barras ─────────────────────────────────────
   const chaveH = 17;
@@ -327,11 +370,49 @@ export const generateDactePdf = (data: CteData): jsPDF => {
   pdf.text(fmtChave(data.chave) || '—', M + W / 2, y + 15.2, { align: 'center' });
   y += chaveH;
 
-  // ── Protocolo ──────────────────────────────────────────────────────────────
-  box(M, y, W, 8, 'PROTOCOLO DE AUTORIZAÇÃO DE USO',
+  // ── Consulta de autenticidade + protocolo + QR Code ────────────────────────
+  const qrH = 24;
+  const qrBoxW = 26;
+  const infoW = W - qrBoxW;
+  pdf.rect(M, y, infoW, qrH);
+  pdf.setFontSize(6.2);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(0, 0, 0);
+  pdf.text('Chave de acesso para consulta de autenticidade no site www.cte.fazenda.gov.br ou da Sefaz Autorizadora', M + infoW / 2, y + 4.5, { align: 'center' });
+  pdf.setFontSize(LABEL);
+  pdf.setTextColor(...GRAY);
+  pdf.text('PROTOCOLO DE AUTORIZAÇÃO DE USO', M + 1.2, y + 10);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(8.5);
+  pdf.setTextColor(0, 0, 0);
+  pdf.text(
     data.protocolo ? `${data.protocolo}   ${fmtDateTime(data.dataProtocolo)}` : '—',
-    { bold: true, center: true });
-  y += 8;
+    M + infoW / 2, y + 16, { align: 'center' }
+  );
+  // QR Code de consulta (qrCodCTe do XML; fallback: chave de acesso)
+  pdf.rect(M + infoW, y, qrBoxW, qrH);
+  const qrContent = data.qrCod || data.chave || '';
+  if (qrContent) {
+    try {
+      const qr = qrcode(0, 'M');
+      qr.addData(qrContent);
+      qr.make();
+      const n = qr.getModuleCount();
+      const qrSize = qrH - 5;
+      const cell = qrSize / n;
+      const qx = M + infoW + (qrBoxW - qrSize) / 2;
+      const qy = y + 2.5;
+      pdf.setFillColor(0, 0, 0);
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          if (qr.isDark(r, c)) pdf.rect(qx + c * cell, qy + r * cell, cell, cell, 'F');
+        }
+      }
+    } catch (e) {
+      console.warn('[cteXmlToPdf] Falha ao gerar QR Code:', e);
+    }
+  }
+  y += qrH;
 
   // ── Natureza / tipo ────────────────────────────────────────────────────────
   box(M, y, W * 0.4, 11, 'NATUREZA DA OPERAÇÃO', data.natOp || '', { size: 6.5 });
@@ -347,6 +428,23 @@ export const generateDactePdf = (data: CteData): jsPDF => {
   box(M + W * 0.4, y, W * 0.4, 8, 'TÉRMINO DA PRESTAÇÃO', dest, { bold: true });
   box(M + W * 0.8, y, W * 0.2, 8, 'TOMADOR DO SERVIÇO', data.tomador || '', { center: true });
   y += 8;
+
+  // ── Tomador do serviço (dados completos) ───────────────────────────────────
+  if (data.tomadorParty && (data.tomadorParty.nome || data.tomadorParty.cnpjCpf)) {
+    ensure(9);
+    const tp = data.tomadorParty;
+    const tEnd = [
+      tp.endereco,
+      [tp.municipio, tp.uf].filter(Boolean).join(' - '),
+      tp.cep ? `CEP: ${fmtCep(tp.cep)}` : '',
+      tp.pais && tp.pais.toUpperCase() !== 'BRASIL' ? tp.pais : '',
+    ].filter(Boolean).join(' — ');
+    box(M, y, W * 0.3, 9, 'TOMADOR DO SERVIÇO', tp.nome || '', { bold: true, size: 7 });
+    box(M + W * 0.3, y, W * 0.38, 9, 'ENDEREÇO', tEnd, { size: 6 });
+    box(M + W * 0.68, y, W * 0.18, 9, 'CNPJ/CPF', fmtCnpjCpf(tp.cnpjCpf) || '', { size: 6.5 });
+    box(M + W * 0.86, y, W * 0.14, 9, 'FONE', tp.fone || '', { size: 6.5 });
+    y += 9;
+  }
 
   // ── Remetente / Destinatário ───────────────────────────────────────────────
   const partyBox = (x: number, w: number, title: string, p?: CteParty) => {
@@ -367,10 +465,13 @@ export const generateDactePdf = (data: CteData): jsPDF => {
     pdf.text(pdf.splitTextToSize(p.nome || '', w - 2.4)[0] || '', x + 1.2, y + 5.6);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(6.2);
+    const munLine = [p.municipio, p.uf].filter(Boolean).join(' - ')
+      + (p.cep ? ` - CEP: ${fmtCep(p.cep)}` : '')
+      + (p.pais && p.pais.toUpperCase() !== 'BRASIL' ? ` - ${p.pais}` : '');
     const lines = [
       p.cnpjCpf ? `CNPJ/CPF: ${fmtCnpjCpf(p.cnpjCpf)}${p.ie ? `  IE: ${p.ie}` : ''}` : '',
       p.endereco,
-      [p.municipio, p.uf].filter(Boolean).join(' - ') + (p.cep ? ` - CEP: ${fmtCep(p.cep)}` : ''),
+      munLine,
       p.fone ? `Fone: ${p.fone}` : '',
     ].filter(Boolean) as string[];
     let py = y + 9;
@@ -394,13 +495,27 @@ export const generateDactePdf = (data: CteData): jsPDF => {
   }
 
   // ── Carga ──────────────────────────────────────────────────────────────────
-  ensure(8);
+  ensure(16);
   box(M, y, W * 0.4, 8, 'PRODUTO PREDOMINANTE', data.produtoPredominante || '');
-  box(M + W * 0.4, y, W * 0.25, 8, 'VALOR TOTAL DA CARGA', fmtMoney(data.valorCarga), { bold: true });
-  box(M + W * 0.65, y, W * 0.35, 8, 'QUANTIDADES',
-    (data.quantidades || [])
+  box(M + W * 0.4, y, W * 0.35, 8, 'OUTRAS CARACTERÍSTICAS DA CARGA', data.outrasCaracteristicas || '', { size: 6.5 });
+  box(M + W * 0.75, y, W * 0.25, 8, 'VALOR TOTAL DA CARGA', fmtMoney(data.valorCarga), { bold: true });
+  y += 8;
+
+  const qtds = data.quantidades || [];
+  const numQ = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
+  const cubagem = qtds.filter(q => q.unidade === 'M³').reduce((s, q) => s + numQ(q.qtd), 0);
+  const qtdVolumes = qtds.filter(q => q.unidade === 'UN').reduce((s, q) => s + numQ(q.qtd), 0);
+  box(M, y, W * 0.6, 8, 'QUANTIDADES',
+    qtds
+      .filter(q => q.unidade !== 'M³')
       .map(q => `${q.tipo ? `${q.tipo}: ` : ''}${q.qtd}${q.unidade ? ` ${q.unidade}` : ''}`)
-      .join('  |  '));
+      .join('  |  '), { size: 6.5 });
+  box(M + W * 0.6, y, W * 0.2, 8, 'CUBAGEM (M³)',
+    cubagem > 0 ? cubagem.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 3 }) : '0,00',
+    { center: true });
+  box(M + W * 0.8, y, W * 0.2, 8, 'QUANTIDADE DE VOLUMES',
+    qtdVolumes > 0 ? qtdVolumes.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : '—',
+    { center: true });
   y += 8;
 
   // ── Componentes do valor da prestação ──────────────────────────────────────
@@ -427,34 +542,69 @@ export const generateDactePdf = (data: CteData): jsPDF => {
   if (data.icms && (data.icms.vICMS || data.icms.cst)) {
     ensure(4.2 + 8);
     sectionTitle('INFORMAÇÕES RELATIVAS AO IMPOSTO');
-    box(M, y, W * 0.25, 8, 'SITUAÇÃO TRIBUTÁRIA', data.icms.cst ? `CST ${data.icms.cst}` : '');
-    box(M + W * 0.25, y, W * 0.25, 8, 'BASE DE CÁLCULO', fmtMoney(data.icms.vBC));
-    box(M + W * 0.5, y, W * 0.25, 8, 'ALÍQUOTA ICMS', data.icms.pICMS ? `${data.icms.pICMS}%` : '');
-    box(M + W * 0.75, y, W * 0.25, 8, 'VALOR ICMS', fmtMoney(data.icms.vICMS), { bold: true });
+    box(M, y, W * 0.28, 8, 'SITUAÇÃO TRIBUTÁRIA', data.icms.cst ? `CST ${data.icms.cst}` : '');
+    box(M + W * 0.28, y, W * 0.18, 8, 'BASE DE CÁLCULO', fmtMoney(data.icms.vBC));
+    box(M + W * 0.46, y, W * 0.18, 8, 'ALÍQUOTA ICMS', data.icms.pICMS ? `${data.icms.pICMS}%` : '');
+    box(M + W * 0.64, y, W * 0.18, 8, 'VALOR ICMS', fmtMoney(data.icms.vICMS), { bold: true });
+    box(M + W * 0.82, y, W * 0.18, 8, '% RED. BC CÁLC.', data.icms.pRedBC ? `${data.icms.pRedBC}%` : '0,00');
     y += 8;
   }
 
   // ── Documentos originários (NF-e) ──────────────────────────────────────────
   if (data.chavesNfe && data.chavesNfe.length > 0) {
-    ensure(4.2 + 6.1);
-    sectionTitle('DOCUMENTOS ORIGINÁRIOS — CHAVES DE ACESSO NF-E');
+    ensure(4.2 + 4 + 6.1);
+    sectionTitle('DOCUMENTOS ORIGINÁRIOS');
     const keys = data.chavesNfe;
     const PER_ROW = 2;
     const ROW_H = 3.6;
+    const HALF = W / 2;
+    // Modelo/série/número derivados das posições fixas da chave de acesso
+    const docCols = (k: string) => {
+      if (/^\d{44}$/.test(k)) {
+        return {
+          modelo: k.substring(20, 22) === '55' ? 'NF-e' : k.substring(20, 22),
+          serie: String(parseInt(k.substring(22, 25), 10)),
+          numero: String(parseInt(k.substring(25, 34), 10)),
+        };
+      }
+      return { modelo: '—', serie: '—', numero: '—' };
+    };
+    const drawDocHeader = () => {
+      pdf.rect(M, y, W, 4);
+      pdf.setFontSize(LABEL);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(...GRAY);
+      for (let c = 0; c < PER_ROW; c++) {
+        const bx = M + c * HALF;
+        pdf.text('MODELO', bx + 1.5, y + 2.8);
+        pdf.text('SÉRIE', bx + 12, y + 2.8);
+        pdf.text('NÚMERO', bx + 20, y + 2.8);
+        pdf.text('CHAVE DE ACESSO', bx + 34, y + 2.8);
+      }
+      y += 4;
+    };
+    drawDocHeader();
     let i = 0;
     // Renderiza em blocos de linhas que cabem na página; continua nas seguintes
     while (i < keys.length) {
       const availRows = Math.floor((PAGE_BOTTOM - y - 2.5) / ROW_H);
-      if (availRows < 1) { pdf.addPage(); y = M; continue; }
+      if (availRows < 1) { pdf.addPage(); y = M; drawDocHeader(); continue; }
       const rowsHere = Math.min(availRows, Math.ceil((keys.length - i) / PER_ROW));
       const h = rowsHere * ROW_H + 2.5;
       pdf.rect(M, y, W, h);
-      pdf.setFontSize(6.8);
+      pdf.setFontSize(5.8);
       pdf.setFont('helvetica', 'normal');
       pdf.setTextColor(0, 0, 0);
       for (let r = 0; r < rowsHere; r++) {
         for (let c = 0; c < PER_ROW && i < keys.length; c++, i++) {
-          pdf.text(fmtChave(keys[i]), M + 2 + c * (W / 2), y + 4 + r * ROW_H);
+          const k = keys[i];
+          const d = docCols(k);
+          const bx = M + c * HALF;
+          const by = y + 4 + r * ROW_H;
+          pdf.text(d.modelo, bx + 1.5, by);
+          pdf.text(d.serie, bx + 12, by);
+          pdf.text(d.numero, bx + 20, by);
+          pdf.text(fmtChave(k), bx + 34, by);
         }
       }
       y += h;
