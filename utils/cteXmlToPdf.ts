@@ -1,18 +1,10 @@
 
 import { jsPDF } from 'jspdf';
 import JsBarcode from 'jsbarcode';
+import { CteDocParty, CteDocSummary, CteDocVolume } from '../types';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
-interface CteParty {
-  nome?: string;
-  cnpjCpf?: string;
-  ie?: string;
-  endereco?: string;
-  municipio?: string;
-  uf?: string;
-  cep?: string;
-  fone?: string;
-}
+type CteParty = CteDocParty;
 
 export interface CteData {
   chave?: string;
@@ -40,7 +32,7 @@ export interface CteData {
   icms?: { cst?: string; vBC?: string; pICMS?: string; vICMS?: string };
   produtoPredominante?: string;
   valorCarga?: string;
-  quantidades?: string[];
+  quantidades?: { tipo: string; unidade?: string; qtd: string }[];
   chavesNfe?: string[];
   observacoes?: string;
   protocolo?: string;
@@ -61,6 +53,9 @@ const TIPOS_SERVICO: Record<string, string> = {
 };
 const TOMADORES: Record<string, string> = {
   '0': 'REMETENTE', '1': 'EXPEDIDOR', '2': 'RECEBEDOR', '3': 'DESTINATÁRIO', '4': 'OUTROS',
+};
+const UNIDADES: Record<string, string> = {
+  '00': 'M³', '01': 'KG', '02': 'TON', '03': 'UN', '04': 'L', '05': 'MMBTU',
 };
 
 // ── Parser ────────────────────────────────────────────────────────────────────
@@ -124,11 +119,11 @@ export const parseCteXml = (xmlText: string): CteData | null => {
 
     const infCarga = first(infCte, 'infCarga');
     const quantidades = infCarga
-      ? Array.from(infCarga.getElementsByTagName('infQ')).map(q => {
-          const tp = text(q, 'tpMed');
-          const qtd = text(q, 'qCarga');
-          return [tp, qtd].filter(Boolean).join(': ');
-        }).filter(Boolean)
+      ? Array.from(infCarga.getElementsByTagName('infQ')).map(q => ({
+          tipo: text(q, 'tpMed'),
+          unidade: UNIDADES[text(q, 'cUnid')] || undefined,
+          qtd: text(q, 'qCarga'),
+        })).filter(q => q.tipo || q.qtd)
       : [];
 
     const infDoc = first(infCte, 'infDoc');
@@ -390,7 +385,10 @@ export const generateDactePdf = (data: CteData): jsPDF => {
   // ── Carga ──────────────────────────────────────────────────────────────────
   box(M, y, W * 0.4, 8, 'PRODUTO PREDOMINANTE', data.produtoPredominante || '');
   box(M + W * 0.4, y, W * 0.25, 8, 'VALOR TOTAL DA CARGA', fmtMoney(data.valorCarga), { bold: true });
-  box(M + W * 0.65, y, W * 0.35, 8, 'QUANTIDADES', (data.quantidades || []).join('  |  '));
+  box(M + W * 0.65, y, W * 0.35, 8, 'QUANTIDADES',
+    (data.quantidades || [])
+      .map(q => `${q.tipo ? `${q.tipo}: ` : ''}${q.qtd}${q.unidade ? ` ${q.unidade}` : ''}`)
+      .join('  |  '));
   y += 8;
 
   // ── Componentes do valor da prestação ──────────────────────────────────────
@@ -468,4 +466,30 @@ export const cteXmlToPdfBlob = (xmlText: string): { blob: Blob; data: CteData } 
   if (!data) return null;
   const pdf = generateDactePdf(data);
   return { blob: pdf.output('blob'), data };
+};
+
+/** Monta o resumo estruturado do CT-e (valores numéricos, volumes e partes) para persistir no anexo. */
+export const extractCteSummary = (data: CteData): CteDocSummary => {
+  const num = (v?: string): number | undefined => {
+    const n = parseFloat(v || '');
+    return isNaN(n) ? undefined : n;
+  };
+  const volumes: CteDocVolume[] = [];
+  (data.quantidades || []).forEach(q => {
+    const quantidade = num(q.qtd);
+    if (quantidade !== undefined) {
+      volumes.push({ tipo: q.tipo || 'VOLUME', unidade: q.unidade, quantidade });
+    }
+  });
+  return {
+    numero: data.numero || undefined,
+    serie: data.serie || undefined,
+    chave: data.chave || undefined,
+    dataEmissao: data.dataEmissao || undefined,
+    valorPrestacao: num(data.valorTotal),
+    valorCarga: num(data.valorCarga),
+    volumes,
+    remetente: data.remetente,
+    destinatario: data.destinatario,
+  };
 };

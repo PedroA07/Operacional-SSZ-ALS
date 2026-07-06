@@ -1,8 +1,8 @@
 
-import React, { useRef, useState } from 'react';
-import { Trip, EmissaoCteAttachment } from '../../../types';
+import React, { useMemo, useRef, useState } from 'react';
+import { Trip, EmissaoCteAttachment, CteDocParty } from '../../../types';
 import { fileStorage } from '../../../utils/fileStorage';
-import { cteXmlToPdfBlob } from '../../../utils/cteXmlToPdf';
+import { cteXmlToPdfBlob, extractCteSummary } from '../../../utils/cteXmlToPdf';
 import DocumentViewerModal from '../operations/DocumentViewerModal';
 
 interface CteAttachmentsModalProps {
@@ -13,7 +13,80 @@ interface CteAttachmentsModalProps {
 
 const genId = () => `cte-att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+const fmtMoney = (v?: number): string =>
+  v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const fmtQty = (v: number): string =>
+  v.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+
+const fmtCnpjCpf = (v?: string): string => {
+  if (!v) return '';
+  const d = v.replace(/\D/g, '');
+  if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  if (d.length === 11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  return v;
+};
+
+const fmtCep = (v?: string): string => {
+  if (!v) return '';
+  const d = v.replace(/\D/g, '');
+  return d.length === 8 ? d.replace(/(\d{5})(\d{3})/, '$1-$2') : v;
+};
+
+// Baixa um arquivo forçando download; se o fetch falhar (ex: CORS), abre em nova aba
+const downloadFile = async (url: string, fileName: string) => {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objUrl), 5000);
+  } catch {
+    window.open(url, '_blank', 'noopener');
+  }
+};
+
+const DownloadIcon = () => (
+  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+  </svg>
+);
+
+const PartyCard: React.FC<{ party: CteDocParty; ctes: string[] }> = ({ party, ctes }) => (
+  <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-0.5">
+    <div className="flex items-start justify-between gap-2">
+      <p className="text-[10px] font-black text-slate-800 uppercase">{party.nome || '—'}</p>
+      {ctes.length > 0 && (
+        <span className="text-[7px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-black shrink-0 uppercase">
+          CT-E {ctes.join(', ')}
+        </span>
+      )}
+    </div>
+    {party.cnpjCpf && (
+      <p className="text-[9px] text-slate-600">
+        <span className="font-bold">CNPJ/CPF:</span> {fmtCnpjCpf(party.cnpjCpf)}
+        {party.ie ? <span className="ml-2"><span className="font-bold">IE:</span> {party.ie}</span> : null}
+      </p>
+    )}
+    {party.endereco && <p className="text-[9px] text-slate-600">{party.endereco}</p>}
+    {(party.municipio || party.uf || party.cep) && (
+      <p className="text-[9px] text-slate-600">
+        {[party.municipio, party.uf].filter(Boolean).join(' - ')}
+        {party.cep ? ` — CEP: ${fmtCep(party.cep)}` : ''}
+      </p>
+    )}
+    {party.fone && <p className="text-[9px] text-slate-600"><span className="font-bold">Fone:</span> {party.fone}</p>}
+  </div>
+);
+
 const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose, onUpdate }) => {
+  const [activeTab, setActiveTab] = useState<'anexos' | 'valores'>('anexos');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
@@ -24,6 +97,49 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
 
   const attachments = trip.emissaoCteAttachments || [];
 
+  // ── Consolidação dos valores do processo ───────────────────────────────────
+  const summary = useMemo(() => {
+    const withInfo = attachments.filter(a => a.cteInfo);
+    let totalPrestacao: number | undefined;
+    let totalCarga: number | undefined;
+    const volumeTotals = new Map<string, { tipo: string; unidade?: string; total: number }>();
+    const remetentes = new Map<string, { party: CteDocParty; ctes: string[] }>();
+    const destinatarios = new Map<string, { party: CteDocParty; ctes: string[] }>();
+
+    withInfo.forEach(a => {
+      const info = a.cteInfo!;
+      const cteLabel = info.numero || a.fileName;
+      if (info.valorPrestacao !== undefined) totalPrestacao = (totalPrestacao || 0) + info.valorPrestacao;
+      if (info.valorCarga !== undefined) totalCarga = (totalCarga || 0) + info.valorCarga;
+      (info.volumes || []).forEach(v => {
+        const key = `${v.tipo.toUpperCase()}|${v.unidade || ''}`;
+        const cur = volumeTotals.get(key);
+        if (cur) cur.total += v.quantidade;
+        else volumeTotals.set(key, { tipo: v.tipo, unidade: v.unidade, total: v.quantidade });
+      });
+      const addParty = (map: Map<string, { party: CteDocParty; ctes: string[] }>, p?: CteDocParty) => {
+        if (!p || (!p.nome && !p.cnpjCpf)) return;
+        const key = p.cnpjCpf || p.nome || '';
+        const cur = map.get(key);
+        if (cur) { if (!cur.ctes.includes(cteLabel)) cur.ctes.push(cteLabel); }
+        else map.set(key, { party: p, ctes: [cteLabel] });
+      };
+      addParty(remetentes, info.remetente);
+      addParty(destinatarios, info.destinatario);
+    });
+
+    return {
+      withInfo,
+      semInfo: attachments.filter(a => !a.cteInfo),
+      totalPrestacao,
+      totalCarga,
+      volumeTotals: Array.from(volumeTotals.values()),
+      remetentes: Array.from(remetentes.values()),
+      destinatarios: Array.from(destinatarios.values()),
+    };
+  }, [attachments]);
+
+  // ── Upload ─────────────────────────────────────────────────────────────────
   const processFiles = async (files: File[]) => {
     const valid = files.filter(f => {
       const ext = f.name.split('.').pop()?.toLowerCase();
@@ -62,6 +178,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
               const baseName = file.name.replace(/\.[^.]+$/, '');
               const pdfFile = new File([result.blob], `dacte_${baseName}.pdf`, { type: 'application/pdf' });
               att.pdfUrl = await fileStorage.uploadEmissaoCte(pdfFile, trip.os);
+              att.cteInfo = extractCteSummary(result.data);
               if (result.data.numero) {
                 att.cteNumber = result.data.numero;
                 extractedCteNumber = extractedCteNumber || result.data.numero;
@@ -134,7 +251,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
         className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[500] p-4 animate-in fade-in duration-200"
         onClick={e => { if (e.target === e.currentTarget && !uploading) onClose(); }}
       >
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh]">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[88vh]">
 
           {/* Header */}
           <div className="flex items-center justify-between p-5 pb-3 shrink-0">
@@ -155,149 +272,327 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
             </button>
           </div>
 
-          <div className="px-5 pb-5 space-y-3 overflow-y-auto">
-
-            {/* Dropzone */}
-            <div
-              onClick={() => !uploading && inputRef.current?.click()}
-              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={e => {
-                e.preventDefault();
-                setDragOver(false);
-                if (!uploading) processFiles(Array.from(e.dataTransfer.files));
-              }}
-              className={`border-2 border-dashed rounded-2xl p-5 text-center transition-all ${
-                uploading
-                  ? 'border-slate-200 bg-slate-50 cursor-wait'
-                  : dragOver
-                    ? 'border-blue-400 bg-blue-50 cursor-pointer'
-                    : 'border-slate-300 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer'
-              }`}
-            >
-              <input
-                ref={inputRef}
-                type="file"
-                accept=".pdf,.xml,application/pdf,text/xml"
-                multiple
-                className="hidden"
-                onChange={e => processFiles(Array.from(e.target.files || []))}
-              />
-              {uploading ? (
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                  <p className="text-[10px] font-bold text-slate-600">{progress}</p>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-1.5">
-                  <svg className="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
-                  </svg>
-                  <p className="text-[11px] font-black text-slate-600 uppercase">Clique ou arraste arquivos aqui</p>
-                  <p className="text-[9px] text-slate-400">
-                    PDF ou XML — pode anexar vários. XMLs de CT-e são convertidos automaticamente para PDF (DACTE).
-                  </p>
-                </div>
-              )}
+          {/* Tabs */}
+          <div className="px-5 shrink-0">
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl w-fit">
+              {([
+                { id: 'anexos', label: 'Anexos', count: attachments.length },
+                { id: 'valores', label: 'Valores do CT-E', count: summary.withInfo.length },
+              ] as const).map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-white text-blue-600 shadow-sm border border-blue-100'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {tab.label}
+                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${
+                    activeTab === tab.id ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-500'
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
             </div>
+          </div>
 
-            {/* Errors */}
-            {errors.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 space-y-1">
-                {errors.map((err, i) => (
-                  <p key={i} className="text-[9px] font-bold text-amber-700 flex items-start gap-1.5">
-                    <svg className="w-3 h-3 shrink-0 mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                    </svg>
-                    {err}
-                  </p>
-                ))}
-              </div>
+          <div className="px-5 py-4 space-y-3 overflow-y-auto">
+
+            {/* ══ Aba Anexos ══════════════════════════════════════════════════ */}
+            {activeTab === 'anexos' && (
+              <>
+                {/* Dropzone */}
+                <div
+                  onClick={() => !uploading && inputRef.current?.click()}
+                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={e => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    if (!uploading) processFiles(Array.from(e.dataTransfer.files));
+                  }}
+                  className={`border-2 border-dashed rounded-2xl p-5 text-center transition-all ${
+                    uploading
+                      ? 'border-slate-200 bg-slate-50 cursor-wait'
+                      : dragOver
+                        ? 'border-blue-400 bg-blue-50 cursor-pointer'
+                        : 'border-slate-300 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer'
+                  }`}
+                >
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    accept=".pdf,.xml,application/pdf,text/xml"
+                    multiple
+                    className="hidden"
+                    onChange={e => processFiles(Array.from(e.target.files || []))}
+                  />
+                  {uploading ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      <p className="text-[10px] font-bold text-slate-600">{progress}</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5">
+                      <svg className="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                      </svg>
+                      <p className="text-[11px] font-black text-slate-600 uppercase">Clique ou arraste arquivos aqui</p>
+                      <p className="text-[9px] text-slate-400">
+                        PDF ou XML — pode anexar vários. XMLs de CT-e são convertidos automaticamente para PDF (DACTE).
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Errors */}
+                {errors.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 space-y-1">
+                    {errors.map((err, i) => (
+                      <p key={i} className="text-[9px] font-bold text-amber-700 flex items-start gap-1.5">
+                        <svg className="w-3 h-3 shrink-0 mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        {err}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {/* Attachment list */}
+                {attachments.length === 0 ? (
+                  <p className="text-[10px] text-slate-400 text-center py-3 italic">Nenhum anexo ainda.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {attachments.map(att => {
+                      const isXml = att.fileType === 'xml';
+                      return (
+                        <div
+                          key={att.id}
+                          className="flex items-center gap-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-2xl hover:border-blue-200 transition-all"
+                        >
+                          {/* Type badge */}
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-[8px] font-black ${
+                            isXml ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'
+                          }`}>
+                            {isXml ? 'XML' : 'PDF'}
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-black text-slate-700 truncate" title={att.fileName}>{att.fileName}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[8px] text-slate-400">
+                                {new Date(att.uploadDate).toLocaleDateString('pt-BR')}
+                              </span>
+                              {att.cteNumber && (
+                                <span className="text-[8px] font-black text-blue-600">CT-E {att.cteNumber}</span>
+                              )}
+                              {att.cteInfo?.valorPrestacao !== undefined && (
+                                <span className="text-[8px] font-black text-emerald-600">{fmtMoney(att.cteInfo.valorPrestacao)}</span>
+                              )}
+                              {isXml && !att.pdfUrl && (
+                                <span className="text-[7px] px-1.5 py-px bg-slate-200 text-slate-500 rounded font-black uppercase" title="XML não reconhecido como CT-e">sem prévia</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleView(att)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                              title={isXml && att.pdfUrl ? 'Visualizar DACTE (PDF)' : 'Visualizar'}
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                              </svg>
+                            </button>
+
+                            {/* Download XML (original) */}
+                            {isXml && (
+                              <button
+                                type="button"
+                                onClick={() => downloadFile(att.url, att.fileName)}
+                                className="flex items-center gap-1 px-1.5 py-1 text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-[7px] font-black uppercase transition-colors"
+                                title="Baixar XML original"
+                              >
+                                <DownloadIcon /> XML
+                              </button>
+                            )}
+
+                            {/* Download PDF (original ou DACTE gerado) */}
+                            {(!isXml || att.pdfUrl) && (
+                              <button
+                                type="button"
+                                onClick={() => downloadFile(
+                                  isXml ? att.pdfUrl! : att.url,
+                                  isXml ? `dacte_${att.fileName.replace(/\.[^.]+$/, '')}.pdf` : att.fileName
+                                )}
+                                className="flex items-center gap-1 px-1.5 py-1 text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg text-[7px] font-black uppercase transition-colors"
+                                title={isXml ? 'Baixar DACTE em PDF' : 'Baixar PDF'}
+                              >
+                                <DownloadIcon /> PDF
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(att)}
+                              disabled={deletingId === att.id}
+                              className="p-1.5 text-red-400 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-40"
+                              title="Excluir anexo"
+                            >
+                              {deletingId === att.id ? (
+                                <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
 
-            {/* Attachment list */}
-            {attachments.length === 0 ? (
-              <p className="text-[10px] text-slate-400 text-center py-3 italic">Nenhum anexo ainda.</p>
-            ) : (
-              <div className="space-y-1.5">
-                {attachments.map(att => {
-                  const isXml = att.fileType === 'xml';
-                  return (
-                    <div
-                      key={att.id}
-                      className="flex items-center gap-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-2xl hover:border-blue-200 transition-all"
-                    >
-                      {/* Type badge */}
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-[8px] font-black ${
-                        isXml ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'
-                      }`}>
-                        {isXml ? 'XML' : 'PDF'}
-                      </div>
+            {/* ══ Aba Valores ═════════════════════════════════════════════════ */}
+            {activeTab === 'valores' && (
+              summary.withInfo.length === 0 ? (
+                <div className="text-center py-8 space-y-1">
+                  <p className="text-[11px] font-black text-slate-500 uppercase">Sem valores para exibir</p>
+                  <p className="text-[9px] text-slate-400 max-w-xs mx-auto">
+                    Os valores são extraídos automaticamente dos anexos em <span className="font-bold">XML</span>.
+                    Anexe o XML do CT-e para ver prestação, mercadoria, volumes, remetentes e destinatários.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-black text-slate-700 truncate" title={att.fileName}>{att.fileName}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[8px] text-slate-400">
-                            {new Date(att.uploadDate).toLocaleDateString('pt-BR')}
-                          </span>
-                          {att.cteNumber && (
-                            <span className="text-[8px] font-black text-blue-600">CT-E {att.cteNumber}</span>
-                          )}
-                          {isXml && att.pdfUrl && (
-                            <span className="text-[7px] px-1.5 py-px bg-emerald-100 text-emerald-700 rounded font-black uppercase">DACTE PDF</span>
-                          )}
-                          {isXml && !att.pdfUrl && (
-                            <span className="text-[7px] px-1.5 py-px bg-slate-200 text-slate-500 rounded font-black uppercase" title="XML não reconhecido como CT-e">sem prévia</span>
-                          )}
-                        </div>
+                  {/* Totais do processo */}
+                  <div>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Totais do Processo</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="p-3 bg-blue-50 border border-blue-100 rounded-2xl">
+                        <p className="text-[8px] font-black text-blue-500 uppercase">CT-Es</p>
+                        <p className="text-base font-black text-blue-700 mt-0.5">{summary.withInfo.length}</p>
                       </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleView(att)}
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
-                          title={isXml && att.pdfUrl ? 'Visualizar DACTE (PDF)' : 'Visualizar'}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                          </svg>
-                        </button>
-                        <a
-                          href={att.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download={att.fileName}
-                          className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
-                          title="Baixar arquivo original"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                          </svg>
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(att)}
-                          disabled={deletingId === att.id}
-                          className="p-1.5 text-red-400 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-40"
-                          title="Excluir anexo"
-                        >
-                          {deletingId === att.id ? (
-                            <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
-                          )}
-                        </button>
+                      <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                        <p className="text-[8px] font-black text-emerald-500 uppercase">Valor dos CT-Es</p>
+                        <p className="text-sm font-black text-emerald-700 mt-1">{fmtMoney(summary.totalPrestacao)}</p>
+                      </div>
+                      <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl">
+                        <p className="text-[8px] font-black text-indigo-500 uppercase">Valor da Mercadoria</p>
+                        <p className="text-sm font-black text-indigo-700 mt-1">{fmtMoney(summary.totalCarga)}</p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                    {summary.volumeTotals.length > 0 && (
+                      <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                        <p className="text-[8px] font-black text-slate-500 uppercase mb-1">Volume Total</p>
+                        <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+                          {summary.volumeTotals.map((v, i) => (
+                            <p key={i} className="text-[10px] font-black text-slate-700">
+                              {v.tipo}: <span className="text-blue-700">{fmtQty(v.total)}{v.unidade ? ` ${v.unidade}` : ''}</span>
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Por CT-e */}
+                  <div>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Por CT-E</p>
+                    <div className="space-y-1.5">
+                      {summary.withInfo.map(att => {
+                        const info = att.cteInfo!;
+                        return (
+                          <div key={att.id} className="p-3 bg-white border border-slate-200 rounded-2xl">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[10px] font-black text-slate-800">
+                                CT-E {info.numero || '—'}{info.serie ? <span className="text-slate-400 font-bold"> · Série {info.serie}</span> : null}
+                              </p>
+                              <span className="text-[8px] text-slate-400 truncate max-w-[180px]" title={att.fileName}>{att.fileName}</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 mt-2">
+                              <div>
+                                <p className="text-[7px] font-black text-slate-400 uppercase">Valor do CT-E</p>
+                                <p className="text-[10px] font-black text-emerald-700">{fmtMoney(info.valorPrestacao)}</p>
+                              </div>
+                              <div>
+                                <p className="text-[7px] font-black text-slate-400 uppercase">Valor da Mercadoria</p>
+                                <p className="text-[10px] font-black text-indigo-700">{fmtMoney(info.valorCarga)}</p>
+                              </div>
+                              <div>
+                                <p className="text-[7px] font-black text-slate-400 uppercase">Volume</p>
+                                {(info.volumes && info.volumes.length > 0) ? info.volumes.map((v, i) => (
+                                  <p key={i} className="text-[9px] font-black text-slate-700">
+                                    {v.tipo}: {fmtQty(v.quantidade)}{v.unidade ? ` ${v.unidade}` : ''}
+                                  </p>
+                                )) : <p className="text-[10px] font-black text-slate-300">—</p>}
+                              </div>
+                            </div>
+                            {(info.remetente?.nome || info.destinatario?.nome) && (
+                              <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
+                                <span className="text-[8px] font-bold text-slate-500 truncate" title={info.remetente?.nome}>
+                                  {info.remetente?.nome || '—'}
+                                </span>
+                                <svg className="w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                                </svg>
+                                <span className="text-[8px] font-bold text-slate-500 truncate" title={info.destinatario?.nome}>
+                                  {info.destinatario?.nome || '—'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Remetentes */}
+                  {summary.remetentes.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        Remetentes ({summary.remetentes.length})
+                      </p>
+                      <div className="space-y-1.5">
+                        {summary.remetentes.map((r, i) => <PartyCard key={i} party={r.party} ctes={r.ctes} />)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Destinatários */}
+                  {summary.destinatarios.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        Destinatários ({summary.destinatarios.length})
+                      </p>
+                      <div className="space-y-1.5">
+                        {summary.destinatarios.map((d, i) => <PartyCard key={i} party={d.party} ctes={d.ctes} />)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Anexos sem dados extraídos */}
+                  {summary.semInfo.length > 0 && (
+                    <p className="text-[8px] text-slate-400 italic">
+                      {summary.semInfo.length} anexo(s) sem valores extraídos (PDFs ou XMLs não reconhecidos):{' '}
+                      {summary.semInfo.map(a => a.fileName).join(', ')}. Valores são lidos apenas de anexos XML.
+                    </p>
+                  )}
+                </div>
+              )
             )}
           </div>
         </div>

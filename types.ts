@@ -463,6 +463,35 @@ export interface FreightContractDoc extends TripDocument {
   };
 }
 
+export interface CteDocParty {
+  nome?: string;
+  cnpjCpf?: string;
+  ie?: string;
+  endereco?: string;
+  municipio?: string;
+  uf?: string;
+  cep?: string;
+  fone?: string;
+}
+
+export interface CteDocVolume {
+  tipo: string;        // tpMed do XML, ex: PESO BRUTO
+  unidade?: string;    // derivada de cUnid, ex: KG
+  quantidade: number;  // qCarga
+}
+
+export interface CteDocSummary {
+  numero?: string;
+  serie?: string;
+  chave?: string;
+  dataEmissao?: string;
+  valorPrestacao?: number;   // vTPrest — valor do CT-e
+  valorCarga?: number;       // vCarga — valor da mercadoria
+  volumes?: CteDocVolume[];
+  remetente?: CteDocParty;
+  destinatario?: CteDocParty;
+}
+
 export interface EmissaoCteAttachment {
   id: string;
   url: string;              // arquivo original (PDF ou XML)
@@ -470,6 +499,7 @@ export interface EmissaoCteAttachment {
   fileType: 'pdf' | 'xml';
   pdfUrl?: string;          // para XML: DACTE em PDF gerado na hora do upload
   cteNumber?: string;       // nº do CT-e extraído do XML
+  cteInfo?: CteDocSummary;  // resumo extraído do XML (valores, volumes, partes)
   uploadDate: string;
 }
 
