@@ -3,8 +3,9 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Trip, EmissaoCteAttachment, CteDocParty } from '../../../types';
 import { fileStorage } from '../../../utils/fileStorage';
 import { cteXmlToPdfBlob, extractCteSummary } from '../../../utils/cteXmlToPdf';
+import { downloadFile, downloadBlob, fetchFileBlob } from '../../../utils/fileDownloader';
 import CteViewerModal from './CteViewerModal';
-import { fmtMoney, fmtQty, PartyCard } from './cteDisplay';
+import { fmtMoney, fmtQty, copyMoney, copyQty, CopyButton, PartyCard } from './cteDisplay';
 
 interface CteAttachmentsModalProps {
   trip: Trip;
@@ -13,25 +14,6 @@ interface CteAttachmentsModalProps {
 }
 
 const genId = () => `cte-att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-// Baixa um arquivo forçando download; se o fetch falhar (ex: CORS), abre em nova aba
-const downloadFile = async (url: string, fileName: string) => {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const objUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = objUrl;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(objUrl), 5000);
-  } catch {
-    window.open(url, '_blank', 'noopener');
-  }
-};
 
 const DownloadIcon = () => (
   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -49,7 +31,85 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const [bundleLoading, setBundleLoading] = useState<'pdf' | 'xml' | 'all' | null>(null);
+
   const attachments = trip.emissaoCteAttachments || [];
+
+  // Nome base dos arquivos baixados: "OS - CONTAINER"
+  const baseName = useMemo(() => {
+    const os = trip.os?.trim().toUpperCase() || 'OS';
+    const container = trip.container?.trim().toUpperCase();
+    return container ? `${os} - ${container}` : os;
+  }, [trip.os, trip.container]);
+
+  // Nome individual: "OS - CONTAINER - CTE 12345.ext" (nº do CT-e ou nome original)
+  const attFileName = (att: EmissaoCteAttachment, ext: 'pdf' | 'xml') => {
+    const id = att.cteNumber ? `CTE ${att.cteNumber}` : att.fileName.replace(/\.[^.]+$/, '');
+    return `${baseName} - ${id}.${ext}`;
+  };
+
+  // ── Download compilado (PDF unificado / XMLs / tudo) ───────────────────────
+  const handleBundleDownload = async (mode: 'pdf' | 'xml' | 'all') => {
+    setBundleLoading(mode);
+    setErrors([]);
+    const newErrors: string[] = [];
+    try {
+      const pdfAtts = attachments.filter(a => a.fileType === 'pdf' || a.pdfUrl);
+      const xmlAtts = attachments.filter(a => a.fileType === 'xml');
+
+      if (mode === 'pdf') {
+        if (pdfAtts.length === 0) throw new Error('Nenhum PDF disponível.');
+        if (pdfAtts.length === 1) {
+          const a = pdfAtts[0];
+          await downloadFile(a.fileType === 'pdf' ? a.url : a.pdfUrl!, attFileName(a, 'pdf'));
+        } else {
+          const blobs: Blob[] = [];
+          for (const a of pdfAtts) {
+            try {
+              blobs.push(await fetchFileBlob(a.fileType === 'pdf' ? a.url : a.pdfUrl!));
+            } catch { newErrors.push(`"${a.fileName}": falha ao baixar para o compilado.`); }
+          }
+          if (blobs.length === 0) throw new Error('Não foi possível baixar os PDFs.');
+          const { mergePdfBlobs } = await import('../../../utils/pdfMerger');
+          downloadBlob(await mergePdfBlobs(blobs), `${baseName}.pdf`);
+        }
+      } else if (mode === 'xml') {
+        if (xmlAtts.length === 0) throw new Error('Nenhum XML disponível.');
+        if (xmlAtts.length === 1) {
+          await downloadFile(xmlAtts[0].url, attFileName(xmlAtts[0], 'xml'));
+        } else {
+          const JSZip = (await import('jszip')).default;
+          const zip = new JSZip();
+          for (const a of xmlAtts) {
+            try { zip.file(attFileName(a, 'xml'), await fetchFileBlob(a.url)); }
+            catch { newErrors.push(`"${a.fileName}": falha ao baixar para o compilado.`); }
+          }
+          downloadBlob(await zip.generateAsync({ type: 'blob' }), `${baseName} - XML.zip`);
+        }
+      } else {
+        // Tudo: ZIP com PDFs + XMLs
+        const JSZip = (await import('jszip')).default;
+        const zip = new JSZip();
+        let count = 0;
+        for (const a of pdfAtts) {
+          try { zip.file(attFileName(a, 'pdf'), await fetchFileBlob(a.fileType === 'pdf' ? a.url : a.pdfUrl!)); count++; }
+          catch { newErrors.push(`"${a.fileName}": falha ao baixar para o compilado.`); }
+        }
+        for (const a of xmlAtts) {
+          try { zip.file(attFileName(a, 'xml'), await fetchFileBlob(a.url)); count++; }
+          catch { newErrors.push(`"${a.fileName}": falha ao baixar para o compilado.`); }
+        }
+        if (count === 0) throw new Error('Não foi possível baixar os arquivos.');
+        downloadBlob(await zip.generateAsync({ type: 'blob' }), `${baseName}.zip`);
+      }
+    } catch (e: any) {
+      console.error('Erro no download compilado:', e);
+      newErrors.push(`Compilado: ${e?.message || 'erro desconhecido'}.`);
+    } finally {
+      setErrors(newErrors);
+      setBundleLoading(null);
+    }
+  };
 
   // ── Consolidação dos valores do processo ───────────────────────────────────
   const summary = useMemo(() => {
@@ -221,7 +281,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
   return (
     <>
       <div
-        className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[500] p-4 animate-in fade-in duration-200"
+        className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[3000] p-4 animate-in fade-in duration-200"
         onClick={e => { if (e.target === e.currentTarget && !uploading) onClose(); }}
       >
         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[88vh]">
@@ -231,7 +291,9 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
             <div>
               <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">Anexos CT-E</h3>
               <p className="text-[10px] text-slate-500 mt-0.5">
-                OS <span className="font-black text-slate-700">{trip.os}</span> — anexe os CT-Es em PDF ou XML.
+                OS <span className="font-black text-slate-700">{trip.os}</span>
+                {trip.container ? <> — Container <span className="font-black text-indigo-600">{trip.container}</span></> : null}
+                {' '}— anexe os CT-Es em PDF ou XML.
               </p>
             </div>
             <button
@@ -335,6 +397,39 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                   </div>
                 )}
 
+                {/* Download compilado */}
+                {attachments.length > 0 && (() => {
+                  const hasPdf = attachments.some(a => a.fileType === 'pdf' || a.pdfUrl);
+                  const hasXml = attachments.some(a => a.fileType === 'xml');
+                  const btn = (mode: 'pdf' | 'xml' | 'all', label: string, cls: string) => (
+                    <button
+                      type="button"
+                      onClick={() => handleBundleDownload(mode)}
+                      disabled={bundleLoading !== null}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[8px] font-black uppercase border transition-all disabled:opacity-50 ${cls}`}
+                    >
+                      {bundleLoading === mode ? (
+                        <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                      )}
+                      {label}
+                    </button>
+                  );
+                  return (
+                    <div className="flex items-center gap-2 p-2.5 bg-slate-100 rounded-2xl flex-wrap">
+                      <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest mr-1">
+                        Baixar compilado ({baseName}):
+                      </span>
+                      {hasPdf && btn('pdf', attachments.filter(a => a.fileType === 'pdf' || a.pdfUrl).length > 1 ? 'PDF unificado' : 'PDF', 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100')}
+                      {hasXml && btn('xml', attachments.filter(a => a.fileType === 'xml').length > 1 ? 'XML (ZIP)' : 'XML', 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100')}
+                      {hasPdf && hasXml && btn('all', 'Os dois (ZIP)', 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100')}
+                    </div>
+                  );
+                })()}
+
                 {/* Attachment list */}
                 {attachments.length === 0 ? (
                   <p className="text-[10px] text-slate-400 text-center py-3 italic">Nenhum anexo ainda.</p>
@@ -391,7 +486,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                             {isXml && (
                               <button
                                 type="button"
-                                onClick={() => downloadFile(att.url, att.fileName)}
+                                onClick={() => downloadFile(att.url, attFileName(att, 'xml'))}
                                 className="flex items-center gap-1 px-1.5 py-1 text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-[7px] font-black uppercase transition-colors"
                                 title="Baixar XML original"
                               >
@@ -403,10 +498,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                             {(!isXml || att.pdfUrl) && (
                               <button
                                 type="button"
-                                onClick={() => downloadFile(
-                                  isXml ? att.pdfUrl! : att.url,
-                                  isXml ? `dacte_${att.fileName.replace(/\.[^.]+$/, '')}.pdf` : att.fileName
-                                )}
+                                onClick={() => downloadFile(isXml ? att.pdfUrl! : att.url, attFileName(att, 'pdf'))}
                                 className="flex items-center gap-1 px-1.5 py-1 text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg text-[7px] font-black uppercase transition-colors"
                                 title={isXml ? 'Baixar DACTE em PDF' : 'Baixar PDF'}
                               >
@@ -462,11 +554,17 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                       </div>
                       <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl">
                         <p className="text-[8px] font-black text-emerald-500 uppercase">Valor dos CT-Es</p>
-                        <p className="text-sm font-black text-emerald-700 mt-1">{fmtMoney(summary.totalPrestacao)}</p>
+                        <div className="flex items-center gap-0.5 mt-1">
+                          <p className="text-sm font-black text-emerald-700">{fmtMoney(summary.totalPrestacao)}</p>
+                          <CopyButton value={copyMoney(summary.totalPrestacao)} title="Copiar total" />
+                        </div>
                       </div>
                       <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl">
                         <p className="text-[8px] font-black text-indigo-500 uppercase">Valor da Mercadoria</p>
-                        <p className="text-sm font-black text-indigo-700 mt-1">{fmtMoney(summary.totalCarga)}</p>
+                        <div className="flex items-center gap-0.5 mt-1">
+                          <p className="text-sm font-black text-indigo-700">{fmtMoney(summary.totalCarga)}</p>
+                          <CopyButton value={copyMoney(summary.totalCarga)} title="Copiar total" />
+                        </div>
                       </div>
                     </div>
                     {summary.volumeTotals.length > 0 && (
@@ -474,8 +572,9 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                         <p className="text-[8px] font-black text-slate-500 uppercase mb-1">Volume Total</p>
                         <div className="flex flex-wrap gap-x-4 gap-y-0.5">
                           {summary.volumeTotals.map((v, i) => (
-                            <p key={i} className="text-[10px] font-black text-slate-700">
+                            <p key={i} className="text-[10px] font-black text-slate-700 flex items-center gap-0.5">
                               {v.tipo}: <span className="text-blue-700">{fmtQty(v.total)}{v.unidade ? ` ${v.unidade}` : ''}</span>
+                              <CopyButton value={copyQty(v.total)} title={`Copiar total de ${v.tipo.toLowerCase()}`} />
                             </p>
                           ))}
                         </div>
@@ -492,25 +591,45 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                         return (
                           <div key={att.id} className="p-3 bg-white border border-slate-200 rounded-2xl">
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-[10px] font-black text-slate-800">
-                                CT-E {info.numero || '—'}{info.serie ? <span className="text-slate-400 font-bold"> · Série {info.serie}</span> : null}
-                              </p>
-                              <span className="text-[8px] text-slate-400 truncate max-w-[180px]" title={att.fileName}>{att.fileName}</span>
+                              <div className="flex items-center gap-1 min-w-0">
+                                <p className="text-[10px] font-black text-slate-800">
+                                  CT-E {info.numero || '—'}{info.serie ? <span className="text-slate-400 font-bold"> · Série {info.serie}</span> : null}
+                                </p>
+                                <CopyButton value={info.numero} title="Copiar nº do CT-e" />
+                                {info.chave && <CopyButton value={info.chave} title="Copiar chave de acesso (sem espaços)" />}
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {info.dataEmissao && (
+                                  <>
+                                    <span className="text-[8px] text-slate-400">
+                                      {new Date(info.dataEmissao).toLocaleDateString('pt-BR')}
+                                    </span>
+                                    <CopyButton value={new Date(info.dataEmissao).toLocaleDateString('pt-BR')} title="Copiar data de emissão" />
+                                  </>
+                                )}
+                              </div>
                             </div>
                             <div className="grid grid-cols-3 gap-2 mt-2">
                               <div>
                                 <p className="text-[7px] font-black text-slate-400 uppercase">Valor do CT-E</p>
-                                <p className="text-[10px] font-black text-emerald-700">{fmtMoney(info.valorPrestacao)}</p>
+                                <div className="flex items-center gap-0.5">
+                                  <p className="text-[10px] font-black text-emerald-700">{fmtMoney(info.valorPrestacao)}</p>
+                                  <CopyButton value={copyMoney(info.valorPrestacao)} title="Copiar valor" />
+                                </div>
                               </div>
                               <div>
                                 <p className="text-[7px] font-black text-slate-400 uppercase">Valor da Mercadoria</p>
-                                <p className="text-[10px] font-black text-indigo-700">{fmtMoney(info.valorCarga)}</p>
+                                <div className="flex items-center gap-0.5">
+                                  <p className="text-[10px] font-black text-indigo-700">{fmtMoney(info.valorCarga)}</p>
+                                  <CopyButton value={copyMoney(info.valorCarga)} title="Copiar valor" />
+                                </div>
                               </div>
                               <div>
                                 <p className="text-[7px] font-black text-slate-400 uppercase">Volume</p>
                                 {(info.volumes && info.volumes.length > 0) ? info.volumes.map((v, i) => (
-                                  <p key={i} className="text-[9px] font-black text-slate-700">
+                                  <p key={i} className="text-[9px] font-black text-slate-700 flex items-center gap-0.5">
                                     {v.tipo}: {fmtQty(v.quantidade)}{v.unidade ? ` ${v.unidade}` : ''}
+                                    <CopyButton value={copyQty(v.quantidade)} title={`Copiar ${v.tipo.toLowerCase()}`} />
                                   </p>
                                 )) : <p className="text-[10px] font-black text-slate-300">—</p>}
                               </div>

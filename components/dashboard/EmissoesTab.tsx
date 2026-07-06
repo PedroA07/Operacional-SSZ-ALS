@@ -284,7 +284,14 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
       sortValue: (t: Trip) => t.os,
       render: (t: Trip) => (
         <div className="flex flex-col gap-1">
-          <span className="font-black text-[10px] text-slate-900">{t.os}</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-black text-[10px] text-slate-900">{t.os}</span>
+            {t.container && (
+              <span className="text-[8px] px-1.5 py-0.5 rounded font-black border uppercase bg-indigo-50 text-indigo-600 border-indigo-200 whitespace-nowrap">
+                {t.container}
+              </span>
+            )}
+          </div>
           {t.type && (
             <span className="text-[7px] px-1.5 py-0.5 rounded font-black border w-fit uppercase bg-slate-50 text-slate-500 border-slate-200">
               {t.type}

@@ -24,6 +24,7 @@
     "html2canvas": "^1.4.1",
     "jsbarcode": "^3.11.5",
     "jspdf": "^2.5.1",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.577.0",
     "pdfjs-dist": "^4.10.38",
     "qrcode-generator": "^2.0.4",
