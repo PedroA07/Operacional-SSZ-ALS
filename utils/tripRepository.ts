@@ -1,6 +1,6 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Trip, DriverCapturedDoc, FreightContractDoc, User } from '../types';
+import { Trip, DriverCapturedDoc, FreightContractDoc, EmissaoCteAttachment, User } from '../types';
 import { fileStorage } from './fileStorage';
 
 // Gera UUID v4 compatível com qualquer ambiente (HTTP/HTTPS)
@@ -71,6 +71,7 @@ export const tripRepository = {
     is_completed: trip.isCompleted || false,
     emissao_cte_number: trip.emissaoCteNumber || null,
     emissao_observacoes: trip.emissaoObservacoes || null,
+    emissao_cte_attachments: trip.emissaoCteAttachments?.length ? trip.emissaoCteAttachments : null,
   }),
 
   mapFromDb: (d: any): Trip => {
@@ -153,6 +154,13 @@ export const tripRepository = {
       coletaOrderIndex: d.coleta_order_index ?? undefined,
       emissaoCteNumber: d.emissao_cte_number || undefined,
       emissaoObservacoes: d.emissao_observacoes || undefined,
+      emissaoCteAttachments: Array.isArray(safeParse(d.emissao_cte_attachments, null))
+        ? (safeParse(d.emissao_cte_attachments, []) as EmissaoCteAttachment[]).map(att => ({
+            ...att,
+            url: fileStorage.getPublicUrl(att.url),
+            pdfUrl: att.pdfUrl ? fileStorage.getPublicUrl(att.pdfUrl) : undefined,
+          }))
+        : undefined,
     };
   },
 

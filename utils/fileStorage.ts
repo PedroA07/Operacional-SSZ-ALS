@@ -122,6 +122,13 @@ export const fileStorage = {
     return fileStorage.upload(file, `trips/${cleanOS}/contratos_frete/contrato_${index}_${Date.now()}.pdf`);
   },
 
+  uploadEmissaoCte: (file: File, os: string) => {
+    const cleanOS = os.replace(/[^a-z0-9]/gi, '_');
+    const ext = file.name.split('.').pop()?.toLowerCase() === 'xml' ? 'xml' : 'pdf';
+    const baseName = file.name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]/gi, '_').slice(0, 60) || 'cte';
+    return fileStorage.upload(file, `trips/${cleanOS}/emissao_cte/${Date.now()}_${baseName}.${ext}`);
+  },
+
   // Extrai a R2 key de uma URL pública e deleta do bucket
   deleteFile: async (url: string): Promise<void> => {
     // URL formato: https://{domain}/als-transportes/{key}

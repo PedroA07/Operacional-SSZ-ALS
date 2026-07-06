@@ -463,6 +463,16 @@ export interface FreightContractDoc extends TripDocument {
   };
 }
 
+export interface EmissaoCteAttachment {
+  id: string;
+  url: string;              // arquivo original (PDF ou XML)
+  fileName: string;
+  fileType: 'pdf' | 'xml';
+  pdfUrl?: string;          // para XML: DACTE em PDF gerado na hora do upload
+  cteNumber?: string;       // nº do CT-e extraído do XML
+  uploadDate: string;
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -621,6 +631,7 @@ export interface Trip {
   coletaOrderIndex?: number;
   emissaoCteNumber?: string;
   emissaoObservacoes?: string;
+  emissaoCteAttachments?: EmissaoCteAttachment[];
 }
 
 export interface ColetaDocOriginarioRule {

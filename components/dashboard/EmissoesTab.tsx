@@ -3,6 +3,7 @@ import { Trip, User } from '../../types';
 import { db } from '../../utils/storage';
 import { osCategoryService } from '../../utils/osCategoryService';
 import SmartOperationTable from './operations/SmartOperationTable';
+import CteAttachmentsModal from './emissoes/CteAttachmentsModal';
 
 interface Category { id: string; name: string; color?: string; }
 
@@ -99,6 +100,7 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
 
   const [cteEditingId, setCteEditingId] = useState<string | null>(null);
   const [cteInputValue, setCteInputValue] = useState('');
+  const [attachTripId, setAttachTripId] = useState<string | null>(null);
   const [obsEditingId, setObsEditingId] = useState<string | null>(null);
   const [obsInputValue, setObsInputValue] = useState('');
 
@@ -405,6 +407,39 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
       },
     },
     {
+      key: 'cteAnexos',
+      label: 'Anexos CT-E',
+      sortable: false,
+      render: (t: Trip) => {
+        const count = t.emissaoCteAttachments?.length || 0;
+        return count > 0 ? (
+          <button
+            type="button"
+            onClick={() => setAttachTripId(t.id)}
+            className="flex items-center gap-1.5 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[8px] font-black border border-indigo-200 hover:bg-indigo-100 transition-all"
+            title={`${count} anexo(s) — clique para gerenciar`}
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+            </svg>
+            {count} {count === 1 ? 'anexo' : 'anexos'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAttachTripId(t.id)}
+            className="flex items-center gap-1 px-2 py-1 bg-slate-50 text-slate-500 rounded-lg text-[8px] font-black border border-dashed border-slate-300 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-300 transition-all"
+            title="Anexar CT-E (PDF ou XML)"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+            </svg>
+            Anexar
+          </button>
+        );
+      },
+    },
+    {
       key: 'observacoes',
       label: 'Observações',
       sortable: false,
@@ -603,8 +638,21 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
         getRowStyle={getRowStyle}
         noMaxHeight
         stickyHeaderTop={0}
-        defaultVisibleKeys={['dateTime', 'os', 'category', 'coletaDocGenerated', 'cte', 'observacoes']}
+        defaultVisibleKeys={['dateTime', 'os', 'category', 'coletaDocGenerated', 'cte', 'cteAnexos', 'observacoes']}
       />
+
+      {/* CT-E attachments modal */}
+      {attachTripId && (() => {
+        const attachTrip = effectiveTrips.find(t => t.id === attachTripId);
+        if (!attachTrip) return null;
+        return (
+          <CteAttachmentsModal
+            trip={attachTrip}
+            onClose={() => setAttachTripId(null)}
+            onUpdate={handleUpdate}
+          />
+        );
+      })()}
 
       {/* Insert OS modal */}
       {showInsertModal && (
