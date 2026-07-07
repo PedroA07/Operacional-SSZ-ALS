@@ -477,8 +477,10 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                               {att.cteNumber && (
                                 <span className="text-[8px] font-black text-blue-600">CT-E {att.cteNumber}</span>
                               )}
-                              {att.cteInfo?.valorPrestacao !== undefined && (
-                                <span className="text-[8px] font-black text-emerald-600">{fmtMoney(att.cteInfo.valorPrestacao)}</span>
+                              {att.cteInfo?.modal && (
+                                <span className="text-[7px] px-1.5 py-px bg-blue-50 text-blue-600 border border-blue-200 rounded font-black uppercase">
+                                  {att.cteInfo.modal}
+                                </span>
                               )}
                               {isXml && !att.pdfUrl && (
                                 <span className="text-[7px] px-1.5 py-px bg-slate-200 text-slate-500 rounded font-black uppercase" title="XML não reconhecido como CT-e">sem prévia</span>
@@ -622,6 +624,11 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                                 </p>
                                 <CopyButton value={info.numero} title="Copiar nº do CT-e" />
                                 {info.chave && <CopyButton value={info.chave} title="Copiar chave de acesso (sem espaços)" />}
+                                {info.modal && (
+                                  <span className="text-[7px] px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-200 rounded font-black uppercase shrink-0">
+                                    {info.modal}
+                                  </span>
+                                )}
                                 {summary.duplicateIds.has(att.id) && (
                                   <span className="text-[7px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-black uppercase shrink-0" title="CT-e repetido — não é somado nos totais do processo">
                                     Duplicado

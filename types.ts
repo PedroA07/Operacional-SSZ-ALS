@@ -485,6 +485,7 @@ export interface CteDocSummary {
   numero?: string;
   serie?: string;
   chave?: string;
+  modal?: string;            // modal de transporte: RODOVIÁRIO, AÉREO...
   dataEmissao?: string;
   valorPrestacao?: number;   // vTPrest — valor do CT-e
   valorCarga?: number;       // vCarga — valor da mercadoria
