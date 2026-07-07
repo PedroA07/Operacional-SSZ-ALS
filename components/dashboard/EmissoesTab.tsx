@@ -4,6 +4,7 @@ import { db } from '../../utils/storage';
 import { osCategoryService } from '../../utils/osCategoryService';
 import SmartOperationTable from './operations/SmartOperationTable';
 import CteAttachmentsModal from './emissoes/CteAttachmentsModal';
+import ImportOsModal from './emissoes/ImportOsModal';
 
 interface Category { id: string; name: string; color?: string; }
 
@@ -105,6 +106,7 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
   const [obsInputValue, setObsInputValue] = useState('');
 
   const [showInsertModal, setShowInsertModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [insertOs, setInsertOs] = useState('');
   const [insertCategory, setInsertCategory] = useState('');
   const [insertCategoryDetected, setInsertCategoryDetected] = useState<string | null>(null);
@@ -585,6 +587,18 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
             )}
           </div>
 
+          {/* Import OS button */}
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-indigo-700 transition-all shadow-sm"
+            title="Importar OS da Aliança em PDF — extrai os dados automaticamente"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+            Importar OS
+          </button>
+
           {/* Insert OS button */}
           <button
             onClick={() => setShowInsertModal(true)}
@@ -647,6 +661,14 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
         stickyHeaderTop={0}
         defaultVisibleKeys={['dateTime', 'os', 'category', 'coletaDocGenerated', 'cte', 'cteAnexos', 'observacoes']}
       />
+
+      {/* Import OS modal */}
+      {showImportModal && (
+        <ImportOsModal
+          onClose={() => setShowImportModal(false)}
+          onImported={onRefresh}
+        />
+      )}
 
       {/* CT-E attachments modal */}
       {attachTripId && (() => {
