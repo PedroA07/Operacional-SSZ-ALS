@@ -5,7 +5,6 @@ import { fmtMoney, fmtQty, copyMoney, copyQty, CopyButton, PartyCard } from './c
 
 export interface CteProcessTotals {
   count: number;
-  totalPrestacao?: number;
   totalCarga?: number;
   volumeTotals: { tipo: string; unidade?: string; total: number }[];
 }
@@ -173,6 +172,33 @@ const CteViewerModal: React.FC<CteViewerModalProps> = ({ attachment, url, title,
                     <PartyCard party={info.destinatario} compact />
                   </div>
                 )}
+
+                {/* Notas Fiscais */}
+                {info.chavesNfe && info.chavesNfe.length > 0 && (
+                  <div>
+                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                      Notas Fiscais ({info.chavesNfe.length})
+                    </p>
+                    <div className="space-y-1">
+                      {info.chavesNfe.map((nfe, i) => {
+                        const isChave = /^\d{44}$/.test(nfe);
+                        const numero = isChave ? String(parseInt(nfe.substring(25, 34), 10)) : '—';
+                        const serie = isChave ? String(parseInt(nfe.substring(22, 25), 10)) : '—';
+                        return (
+                          <div key={i} className="p-2 bg-white/5 border border-white/10 rounded-xl">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[9px] font-black text-white">NF-e {numero} · Série {serie}</span>
+                              <CopyButton value={nfe} title="Copiar chave da NF-e (sem espaços)" light />
+                            </div>
+                            <p className="text-[7px] text-slate-500 break-all leading-relaxed mt-0.5">
+                              {nfe.replace(/(\d{4})(?=\d)/g, '$1 ')}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
@@ -183,17 +209,19 @@ const CteViewerModal: React.FC<CteViewerModalProps> = ({ attachment, url, title,
                   Totais do Processo ({totals.count} CT-Es)
                 </p>
                 <div className="flex items-center justify-between">
-                  <span className="text-[9px] text-slate-400 font-bold uppercase">CT-Es</span>
-                  <span className="text-[11px] font-black text-emerald-300">{fmtMoney(totals.totalPrestacao)}</span>
-                </div>
-                <div className="flex items-center justify-between">
                   <span className="text-[9px] text-slate-400 font-bold uppercase">Mercadoria</span>
-                  <span className="text-[11px] font-black text-indigo-300">{fmtMoney(totals.totalCarga)}</span>
+                  <span className="flex items-center gap-1">
+                    <span className="text-[11px] font-black text-indigo-300">{fmtMoney(totals.totalCarga)}</span>
+                    <CopyButton value={copyMoney(totals.totalCarga)} title="Copiar total da mercadoria" light />
+                  </span>
                 </div>
                 {totals.volumeTotals.map((v, i) => (
                   <div key={i} className="flex items-center justify-between">
                     <span className="text-[9px] text-slate-400 font-bold uppercase">{v.tipo}</span>
-                    <span className="text-[11px] font-black text-white">{fmtQty(v.total)}{v.unidade ? ` ${v.unidade}` : ''}</span>
+                    <span className="flex items-center gap-1">
+                      <span className="text-[11px] font-black text-white">{fmtQty(v.total)}{v.unidade ? ` ${v.unidade}` : ''}</span>
+                      <CopyButton value={copyQty(v.total)} title={`Copiar total de ${v.tipo.toLowerCase()}`} light />
+                    </span>
                   </div>
                 ))}
               </div>

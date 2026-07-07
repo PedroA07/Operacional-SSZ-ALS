@@ -105,8 +105,14 @@ export async function parseCtePdf(file: File): Promise<CtePdfParseResult> {
   let chave: string | undefined;
   const chaveCandidates: string[] = [];
   for (const it of items) {
+    // Item inteiro (chave agrupada "3526 0712 ...")
     const digits = it.str.replace(/\D/g, '');
     if (digits.length === 44) chaveCandidates.push(digits);
+    // Tokens individuais (chave no meio de outros números: "NF-e 013 0000766241 3526...")
+    for (const token of it.str.split(/\s+/)) {
+      const td = token.replace(/\D/g, '');
+      if (td.length === 44 && td !== digits) chaveCandidates.push(td);
+    }
   }
   // Chaves também podem estar quebradas em vários itens da mesma linha
   if (chaveCandidates.length === 0) {
@@ -122,6 +128,9 @@ export async function parseCtePdf(file: File): Promise<CtePdfParseResult> {
   }
   // Prioriza chave de CT-e (modelo 57); DACTEs também listam chaves de NF-e (55)
   chave = chaveCandidates.find(c => c.substring(20, 22) === '57') || undefined;
+  const chavesNfe = Array.from(new Set(
+    chaveCandidates.filter(c => c.substring(20, 22) === '55')
+  )).slice(0, 50);
 
   let numero: string | undefined;
   let serie: string | undefined;
@@ -224,10 +233,11 @@ export async function parseCtePdf(file: File): Promise<CtePdfParseResult> {
     volumes,
     remetente,
     destinatario,
+    chavesNfe: chavesNfe.length > 0 ? chavesNfe : undefined,
   };
 
   const found = !!(numero || valorPrestacao !== undefined || valorCarga !== undefined
-    || volumes.length > 0 || remetente || destinatario);
+    || volumes.length > 0 || remetente || destinatario || chavesNfe.length > 0);
 
   return { summary, found };
 }
