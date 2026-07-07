@@ -18,6 +18,7 @@ import { tripSyncService } from '../../../utils/tripSyncService';
 import { ocRules } from '../../../utils/ocRules';
 import { db } from '../../../utils/storage';
 import { localDateStr, localDateTimeStr } from '../../../utils/dateHelpers';
+import { parseAliancaOsPdf, matchCustomer, matchByName } from '../../../utils/aliancaOsParser';
 
 interface OrdemColetaFormProps {
   user?: User;
@@ -40,6 +41,10 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
   const [preStackings, setPreStackings] = useState<any[]>([]);
   
   const [pendingAction, setPendingAction] = useState<'download' | 'print' | null>(null);
+  // Importação de OS da Aliança (PDF) — preenche o formulário automaticamente
+  const importOsInputRef = useRef<HTMLInputElement>(null);
+  const [importingOs, setImportingOs] = useState(false);
+  const [importOsNote, setImportOsNote] = useState<string | null>(null);
   const [plateHorse, setPlateHorse] = useState('');
   const [plateTrailer, setPlateTrailer] = useState('');
   const [swapModalOpen, setSwapModalOpen] = useState(false);
@@ -205,6 +210,57 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
 
   const effectiveDriver = selectedDriver ? { ...selectedDriver, plateHorse, plateTrailer } : undefined;
 
+  const handleImportOs = async (file: File | undefined) => {
+    if (!file) return;
+    setImportingOs(true);
+    setImportOsNote(null);
+    try {
+      const p = await parseAliancaOsPdf(file);
+      if (!p || !p.os) {
+        setImportOsNote('PDF não reconhecido como OS da Aliança.');
+        return;
+      }
+      const matchedCustomer = matchCustomer(allCustomers, p);
+      const matchedDest = matchByName(destinatarioOptions as any[], p.entregarCheio);
+      const matchedTipo = matchByName(containerTypes, p.containerTipo);
+      const detected = osCategoryService.detectCategoryFromOS(p.os);
+
+      setFormData((prev: any) => ({
+        ...prev,
+        os: p.os,
+        booking: p.booking || prev.booking,
+        ship: p.ship || prev.ship,
+        tipo: matchedTipo?.name || p.containerTipo || prev.tipo,
+        padrao: p.padraoCarga || prev.padrao,
+        tipoOperacao: p.tipoOperacao || prev.tipoOperacao,
+        autColeta: p.autColeta || prev.autColeta,
+        embarcador: p.embarcador || prev.embarcador,
+        agencia: p.armador || prev.agencia,
+        horarioAgendado: p.dataColeta || prev.horarioAgendado,
+        tara: p.tara ? p.tara.replace(/,\d+$/, '') : prev.tara,
+        category: (detected || prev.category || '').toUpperCase(),
+        remetenteId: matchedCustomer?.id || prev.remetenteId,
+        destinatarioId: matchedDest?.id || prev.destinatarioId,
+      }));
+      if (detected) setUserHasChosenCategory(true);
+
+      const notes: string[] = [`OS ${p.os} importada — confira os campos.`];
+      if (p.shipFromObs) notes.push(`Navio extraído das Demais Observações (campo trazia: ${p.navioViagemCampo || '—'}).`);
+      if (matchedCustomer) notes.push(`Remetente vinculado: ${matchedCustomer.name || matchedCustomer.legalName}.`);
+      else if (p.cliente) notes.push(`Cliente "${p.cliente}" não encontrado no cadastro — selecione ou cadastre.`);
+      if (matchedDest) notes.push(`Destino vinculado: ${(matchedDest as any).name}.`);
+      if (p.senhaOc) notes.push(`Senha da OC aplicada na Autorização de Coleta: ${p.senhaOc}.`);
+      if (p.padraoCarga && p.padraoCarga !== 'CARGA GERAL') notes.push(`Padrão de carga: ${p.padraoCarga}.`);
+      setImportOsNote(notes.join(' '));
+    } catch (err) {
+      console.error('Erro ao importar OS:', err);
+      setImportOsNote('Erro ao ler o PDF da OS.');
+    } finally {
+      setImportingOs(false);
+      if (importOsInputRef.current) importOsInputRef.current.value = '';
+    }
+  };
+
   const startWorkflow = async (mode: 'download' | 'print') => {
     if (!formData.os || !formData.driverId || !formData.remetenteId) {
       alert("Preencha OS, Motorista e Cliente para prosseguir.");
@@ -306,6 +362,37 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
       <div className="w-full lg:min-w-[560px] lg:w-[560px] p-8 overflow-y-auto space-y-6 bg-slate-50 border-r border-slate-100 custom-scrollbar">
 
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6 mt-4">
+           <div className="flex items-center justify-between">
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Preenchimento automático</p>
+              <input
+                ref={importOsInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                className="hidden"
+                onChange={e => handleImportOs(e.target.files?.[0])}
+              />
+              <button
+                type="button"
+                onClick={() => importOsInputRef.current?.click()}
+                disabled={importingOs}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-50"
+                title="Importar OS da Aliança em PDF — preenche o formulário automaticamente"
+              >
+                {importingOs ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                  </svg>
+                )}
+                Importar OS
+              </button>
+           </div>
+           {importOsNote && (
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-[10px] font-bold text-indigo-700">
+                {importOsNote}
+              </div>
+           )}
            <div className="space-y-1">
               <label className={labelBlueClass}>Identificação da Viagem (OS)</label>
               <input 

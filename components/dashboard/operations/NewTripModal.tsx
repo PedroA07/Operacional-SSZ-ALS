@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Trip, Driver, Customer, Category, TripStatus, OperationType } from '../../../types';
 import { db } from '../../../utils/storage';
 import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
 import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
+import { parseAliancaOsPdf, matchCustomer, matchTipoViagem } from '../../../utils/aliancaOsParser';
+import { osCategoryService } from '../../../utils/osCategoryService';
 
 interface NewTripModalProps {
   isOpen: boolean;
@@ -38,6 +40,11 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
     category: '', subCategory: '', container: '', tara: '', seal: '', cva: ''
   });
 
+  // Importação de OS da Aliança (PDF) — preenche os campos automaticamente
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importNote, setImportNote] = useState<string | null>(null);
+
   // Cadastro na hora (motorista/cliente) sem fechar a programação
   const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
   const [extraDrivers, setExtraDrivers] = useState<Driver[]>([]);
@@ -55,6 +62,55 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
       }
     });
   }, []);
+
+  const handleImportOs = async (file: File | undefined) => {
+    if (!file) return;
+    setImporting(true);
+    setImportNote(null);
+    try {
+      const p = await parseAliancaOsPdf(file);
+      if (!p || !p.os) {
+        setImportNote('PDF não reconhecido como OS da Aliança.');
+        return;
+      }
+      const matched = matchCustomer(allCustomers, p);
+      const detectedCategory = osCategoryService.detectCategoryFromOS(p.os);
+      let tipoViagemId: string | undefined;
+      try {
+        const tvs = await db.getColetaTiposViagem();
+        tipoViagemId = matchTipoViagem(tvs || [], p.docReferencia)?.id;
+      } catch { /* tipos de viagem indisponíveis — segue sem */ }
+      setForm(prev => ({
+        ...prev,
+        os: p.os || prev.os,
+        booking: p.booking || prev.booking,
+        ship: p.ship || prev.ship,
+        dateTime: p.dataColeta || prev.dateTime,
+        type: p.tipoOperacao || prev.type,
+        category: detectedCategory || prev.category,
+        containerType: p.containerTipo || prev.containerType,
+        tara: p.tara ? p.tara.replace(/,\d+$/, '') : prev.tara,
+        autColeta: p.autColeta || prev.autColeta,
+        embarcador: p.embarcador || prev.embarcador,
+        agencia: p.armador || prev.agencia,
+        coletaTipoViagem: tipoViagemId || prev.coletaTipoViagem,
+        customer: matched
+          ? { id: matched.id, name: matched.name, legalName: matched.legalName, cnpj: matched.cnpj, city: matched.city, state: matched.state }
+          : prev.customer,
+      }));
+      const notes: string[] = [`OS ${p.os} importada — confira os campos.`];
+      if (p.shipFromObs) notes.push(`Navio extraído das Demais Observações (campo trazia: ${p.navioViagemCampo || '—'}).`);
+      if (!matched && p.cliente) notes.push(`Cliente "${p.cliente}" não encontrado no cadastro — selecione ou cadastre.`);
+      if (p.senhaOc) notes.push(`Senha da OC: ${p.senhaOc}.`);
+      setImportNote(notes.join(' '));
+    } catch (err) {
+      console.error('Erro ao importar OS:', err);
+      setImportNote('Erro ao ler o PDF da OS.');
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) importInputRef.current.value = '';
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,12 +147,42 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
             <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Nova Programação</h3>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Registro de viagem operacional</p>
           </div>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </button>
+          <div className="flex items-center gap-3">
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              className="hidden"
+              onChange={e => handleImportOs(e.target.files?.[0])}
+            />
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              disabled={importing}
+              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-50"
+              title="Importar OS da Aliança em PDF — preenche os campos automaticamente"
+            >
+              {importing ? (
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+              )}
+              Importar OS
+            </button>
+            <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 rounded-full transition-all shadow-sm active:scale-90">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+          </div>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="p-10 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+          {importNote && (
+            <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-[10px] font-bold text-indigo-700">
+              {importNote}
+            </div>
+          )}
           {/* Row 0: Tipo de Programação */}
           <div>
             <label className={labelClass}>Tipo de Programação</label>
