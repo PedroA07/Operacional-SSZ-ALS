@@ -146,6 +146,28 @@ export async function parseCtePdf(file: File): Promise<CtePdfParseResult> {
     ?? labeledCurrency(/VALOR (TOTAL )?A RECEBER/);
   const valorCarga = labeledCurrency(/VALOR (TOTAL )?DA (CARGA|MERCADORIA)/);
 
+  // ── Modal de transporte ────────────────────────────────────────────────────
+  const MODAL_RE = /(RODOVIARIO|AEREO|AQUAVIARIO|FERROVIARIO|DUTOVIARIO|MULTIMODAL)/;
+  let modal: string | undefined;
+  // Inline: "MODAL: RODOVIÁRIO" no mesmo item
+  for (const it of items) {
+    const m = it.norm.match(new RegExp(`MODAL[:\\s]*${MODAL_RE.source}`));
+    if (m) { modal = m[1]; break; }
+  }
+  // Rótulo "MODAL" com o valor ao lado/abaixo
+  if (!modal) {
+    for (const label of findLabels(/^MODAL\b/)) {
+      const raw = valueNear(label, MODAL_RE, 20, 90);
+      const m = raw ? norm(raw).match(MODAL_RE) : null;
+      if (m) { modal = m[1]; break; }
+    }
+  }
+  if (modal) {
+    modal = modal === 'AEREO' ? 'AÉREO' : modal === 'RODOVIARIO' ? 'RODOVIÁRIO'
+      : modal === 'AQUAVIARIO' ? 'AQUAVIÁRIO' : modal === 'FERROVIARIO' ? 'FERROVIÁRIO'
+      : modal === 'DUTOVIARIO' ? 'DUTOVIÁRIO' : modal;
+  }
+
   // ── Data de emissão ────────────────────────────────────────────────────────
   let dataEmissao: string | undefined;
   for (const label of findLabels(/DATA E HORA D[EA] EMISS/)) {
@@ -238,6 +260,7 @@ export async function parseCtePdf(file: File): Promise<CtePdfParseResult> {
     numero,
     serie,
     chave,
+    modal,
     dataEmissao,
     valorPrestacao,
     valorCarga,

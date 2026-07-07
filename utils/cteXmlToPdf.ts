@@ -670,6 +670,7 @@ export const extractCteSummary = (data: CteData): CteDocSummary => {
     numero: data.numero || undefined,
     serie: data.serie || undefined,
     chave: data.chave || undefined,
+    modal: data.modal || undefined,
     dataEmissao: data.dataEmissao || undefined,
     valorPrestacao: num(data.valorTotal),
     valorCarga: num(data.valorCarga),

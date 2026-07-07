@@ -112,6 +112,15 @@ const CteViewerModal: React.FC<CteViewerModalProps> = ({ attachment, url, title,
                     </div>
                     {info.serie && <p className="text-[9px] font-bold text-slate-400">Série {info.serie}</p>}
                   </div>
+                  {info.modal && (
+                    <span className="inline-flex items-center gap-1 text-[8px] px-1.5 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded font-black uppercase">
+                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/>
+                      </svg>
+                      Modal: {info.modal}
+                    </span>
+                  )}
                   {info.dataEmissao && (
                     <p className="text-[9px] text-slate-400 flex items-center gap-1">
                       Emissão: {new Date(info.dataEmissao).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
