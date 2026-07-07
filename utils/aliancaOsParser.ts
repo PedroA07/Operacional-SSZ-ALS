@@ -17,8 +17,11 @@ export interface ParsedAliancaOs {
   pesoCarga?: string;
   tara?: string;
   valorNf?: string;
-  autColeta?: string;           // nº aut. coleta/entrega OU senha do requerimento especial
-  senhaOc?: string;             // senha "INFORMAR SENHA NA OC"
+  autColeta?: string;           // nº aut. coleta/entrega OU campo completo da senha da OC
+  senhaOc?: string;             // campo completo após "INFORMAR SENHA NA OC" (senha + embarque)
+  senhaNumero?: string;         // apenas o número da senha
+  requerimentoTipo?: string;    // Geral | Equipamento
+  requerimentoDescricao?: string; // descrição completa do requerimento especial
   cliente?: string;
   embarcador?: string;          // razão do Local Coleta
   cnpjColeta?: string;
@@ -149,12 +152,23 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
   const mercMatch = full.match(/Mercadoria\s+(.+?)\s+Seguro/i);
   if (mercMatch) result.mercadoria = mercMatch[1].trim().toUpperCase();
 
-  // ── Requerimento especial: senha da OC e padrão do container ─────────────
-  const senhaMatch = full.match(/SENHA NA OC\s*[-:]?\s*(\d{6,})/i);
+  // ── Requerimento especial: descrição completa + senha da OC ──────────────
+  // Ex.: "Geral | INFORMAR SENHA NA OC - 6500152549 // Embarque IN65-02904/26EX"
+  const reqMatch = full.match(/Requerimento Especial\s+Descri[çc][ãa]o\s+(\S+)\s+(.+?)(?:\n|Programa[çc][ãa]o de Servi|$)/i);
+  if (reqMatch) {
+    result.requerimentoTipo = reqMatch[1].trim().toUpperCase();
+    result.requerimentoDescricao = reqMatch[2].replace(/\s+/g, ' ').trim();
+  }
+  // Extrai TODO o campo após "INFORMAR SENHA NA OC" (senha + embarque),
+  // não só o número — ex.: "6500152549 // Embarque IN65-02904/26EX"
+  const senhaMatch = full.match(/SENHA NA OC\s*[-:]?\s*(.+?)(?:\n|Programa[çc][ãa]o de Servi|Retirar Vazio|$)/i);
   if (senhaMatch) {
-    result.senhaOc = senhaMatch[1];
-    // A senha vale como autorização de coleta quando informada
-    result.autColeta = senhaMatch[1];
+    const campo = senhaMatch[1].replace(/\s+/g, ' ').trim().replace(/[-–]\s*$/, '').trim();
+    result.senhaOc = campo;
+    const numMatch = campo.match(/\d{6,}/);
+    if (numMatch) result.senhaNumero = numMatch[0];
+    // O campo completo vale como autorização de coleta quando informado
+    result.autColeta = campo;
   }
 
   const normFull = norm(full);

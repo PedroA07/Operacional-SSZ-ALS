@@ -19,6 +19,7 @@ import { ocRules } from '../../../utils/ocRules';
 import { db } from '../../../utils/storage';
 import { localDateStr, localDateTimeStr } from '../../../utils/dateHelpers';
 import { parseAliancaOsPdf, matchCustomer, matchByName } from '../../../utils/aliancaOsParser';
+import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 
 interface OrdemColetaFormProps {
   user?: User;
@@ -220,7 +221,21 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         setImportOsNote('PDF não reconhecido como OS da Aliança.');
         return;
       }
-      const matchedCustomer = matchCustomer(allCustomers, p);
+      let matchedCustomer: any = matchCustomer(allCustomers, p);
+      let autoRegisteredCustomer = false;
+      // Local de Coleta = remetente. Sem cadastro, cadastra pelo CNPJ.
+      if (!matchedCustomer && p.cnpjColeta) {
+        const ensured = await ensureCustomerByCnpj(allCustomers, p.cnpjColeta, {
+          nome: p.cliente || p.embarcador, cnpj: p.cnpjColeta,
+          endereco: p.enderecoColeta, municipio: p.municipioColeta, uf: p.ufColeta,
+          bairro: p.bairroColeta, cep: p.cepColeta,
+        });
+        if (ensured) {
+          matchedCustomer = ensured.customer;
+          autoRegisteredCustomer = ensured.created;
+          if (ensured.created) setExtraCustomers(prev => [ensured.customer as any, ...prev]);
+        }
+      }
       const matchedDest = matchByName(destinatarioOptions as any[], p.entregarCheio);
       const matchedTipo = matchByName(containerTypes, p.containerTipo);
       const detected = osCategoryService.detectCategoryFromOS(p.os);
@@ -246,10 +261,11 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
 
       const notes: string[] = [`OS ${p.os} importada — confira os campos.`];
       if (p.shipFromObs) notes.push(`Navio extraído das Demais Observações (campo trazia: ${p.navioViagemCampo || '—'}).`);
-      if (matchedCustomer) notes.push(`Remetente vinculado: ${matchedCustomer.name || matchedCustomer.legalName}.`);
+      if (autoRegisteredCustomer) notes.push(`Cliente cadastrado automaticamente pelo CNPJ: ${matchedCustomer.name || matchedCustomer.legalName}.`);
+      else if (matchedCustomer) notes.push(`Remetente vinculado: ${matchedCustomer.name || matchedCustomer.legalName}.`);
       else if (p.cliente) notes.push(`Cliente "${p.cliente}" não encontrado no cadastro — selecione ou cadastre.`);
       if (matchedDest) notes.push(`Destino vinculado: ${(matchedDest as any).name}.`);
-      if (p.senhaOc) notes.push(`Senha da OC aplicada na Autorização de Coleta: ${p.senhaOc}.`);
+      if (p.senhaOc) notes.push(`Autorização de Coleta preenchida: ${p.senhaOc}.`);
       if (p.padraoCarga && p.padraoCarga !== 'CARGA GERAL') notes.push(`Padrão de carga: ${p.padraoCarga}.`);
       setImportOsNote(notes.join(' '));
     } catch (err) {

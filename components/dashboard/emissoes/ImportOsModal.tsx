@@ -4,6 +4,7 @@ import { Trip, Customer, ColetaTipoViagemOption } from '../../../types';
 import { db } from '../../../utils/storage';
 import { osCategoryService } from '../../../utils/osCategoryService';
 import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, ParsedAliancaOs } from '../../../utils/aliancaOsParser';
+import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 
 interface ImportOsModalProps {
   onClose: () => void;
@@ -75,9 +76,23 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
     if (validItems.length === 0) return;
     setSaving(true);
     try {
+      // Cache local para não re-cadastrar o mesmo CNPJ em OS's do mesmo lote
+      let customerPool = [...customers];
       for (let i = 0; i < validItems.length; i++) {
         const it = validItems[i];
         const p = it.parsed!;
+
+        // Local de Coleta = cliente. Se não achou no cadastro, cadastra pelo CNPJ.
+        let customer = it.customer;
+        if (!customer && p.cnpjColeta) {
+          const ensured = await ensureCustomerByCnpj(customerPool, p.cnpjColeta, {
+            nome: p.cliente || p.embarcador, cnpj: p.cnpjColeta,
+            endereco: p.enderecoColeta, municipio: p.municipioColeta, uf: p.ufColeta,
+            bairro: p.bairroColeta, cep: p.cepColeta,
+          });
+          if (ensured) { customer = ensured.customer; if (ensured.created) customerPool = [ensured.customer, ...customerPool]; }
+        }
+
         const trip: Trip = {
           id: `new-${Date.now()}-${i}`,
           os: p.os!.toUpperCase(),
@@ -90,8 +105,8 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
           container: '',
           containerType: p.containerTipo,
           tara: p.tara ? p.tara.replace(/,\d+$/, '') : undefined,
-          customer: it.customer
-            ? { id: it.customer.id, name: it.customer.name, legalName: it.customer.legalName, cnpj: it.customer.cnpj, city: it.customer.city, state: it.customer.state }
+          customer: customer
+            ? { id: customer.id, name: customer.name, legalName: customer.legalName, cnpj: customer.cnpj, city: customer.city, state: customer.state }
             : { id: '', name: p.cliente || '', cnpj: p.cnpjColeta || '', city: p.municipioColeta || '' },
           driver: { id: '', name: '', plateHorse: '', plateTrailer: '', status: '' },
           status: 'Pendente',
@@ -245,7 +260,9 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
                           {it.customer?.name || p.cliente || '—'}
                           {it.customer
                             ? <span className="ml-1 text-[7px] font-black text-emerald-600 uppercase">✓ cadastro</span>
-                            : <span className="ml-1 text-[7px] font-black text-amber-600 uppercase" title="Cliente não encontrado no cadastro — será salvo com os dados da OS">novo</span>}
+                            : p.cnpjColeta
+                              ? <span className="ml-1 text-[7px] font-black text-blue-600 uppercase" title="Não encontrado — será cadastrado automaticamente pelo CNPJ ao importar">+ auto-cadastro</span>
+                              : <span className="ml-1 text-[7px] font-black text-amber-600 uppercase" title="Cliente sem CNPJ na OS — será salvo com os dados da OS">novo</span>}
                         </p>
                       </div>
                       <div>

@@ -5,6 +5,7 @@ import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
 import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
 import { parseAliancaOsPdf, matchCustomer, matchTipoViagem } from '../../../utils/aliancaOsParser';
+import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 import { osCategoryService } from '../../../utils/osCategoryService';
 
 interface NewTripModalProps {
@@ -73,7 +74,21 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
         setImportNote('PDF não reconhecido como OS da Aliança.');
         return;
       }
-      const matched = matchCustomer(allCustomers, p);
+      let matched: any = matchCustomer(allCustomers, p);
+      let autoRegistered = false;
+      // Local de Coleta = cliente. Sem cadastro, cadastra pelo CNPJ.
+      if (!matched && p.cnpjColeta) {
+        const ensured = await ensureCustomerByCnpj(allCustomers, p.cnpjColeta, {
+          nome: p.cliente || p.embarcador, cnpj: p.cnpjColeta,
+          endereco: p.enderecoColeta, municipio: p.municipioColeta, uf: p.ufColeta,
+          bairro: p.bairroColeta, cep: p.cepColeta,
+        });
+        if (ensured) {
+          matched = ensured.customer;
+          autoRegistered = ensured.created;
+          if (ensured.created) setExtraCustomers(prev => [ensured.customer as any, ...prev]);
+        }
+      }
       const detectedCategory = osCategoryService.detectCategoryFromOS(p.os);
       let tipoViagemId: string | undefined;
       try {
@@ -100,8 +115,9 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
       }));
       const notes: string[] = [`OS ${p.os} importada — confira os campos.`];
       if (p.shipFromObs) notes.push(`Navio extraído das Demais Observações (campo trazia: ${p.navioViagemCampo || '—'}).`);
-      if (!matched && p.cliente) notes.push(`Cliente "${p.cliente}" não encontrado no cadastro — selecione ou cadastre.`);
-      if (p.senhaOc) notes.push(`Senha da OC: ${p.senhaOc}.`);
+      if (autoRegistered) notes.push(`Cliente cadastrado automaticamente pelo CNPJ: ${matched.name || matched.legalName}.`);
+      else if (!matched && p.cliente) notes.push(`Cliente "${p.cliente}" não encontrado no cadastro — selecione ou cadastre.`);
+      if (p.senhaOc) notes.push(`Autorização de Coleta: ${p.senhaOc}.`);
       setImportNote(notes.join(' '));
     } catch (err) {
       console.error('Erro ao importar OS:', err);
