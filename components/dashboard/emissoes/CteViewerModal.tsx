@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { EmissaoCteAttachment } from '../../../types';
-import { fmtMoney, fmtQty, copyMoney, copyQty, CopyButton, PartyCard } from './cteDisplay';
+import { fmtMoney, fmtQty, copyMoney, copyQty, sumUnVolumes, CopyButton, PartyCard } from './cteDisplay';
 
 export interface CteProcessTotals {
   count: number;
@@ -132,13 +132,6 @@ const CteViewerModal: React.FC<CteViewerModalProps> = ({ attachment, url, title,
 
                 {/* Valores */}
                 <div className="grid grid-cols-1 gap-2">
-                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
-                    <p className="text-[8px] font-black text-emerald-400 uppercase">Valor do CT-E (Prestação)</p>
-                    <div className="flex items-center gap-1">
-                      <p className="text-base font-black text-emerald-300 mt-0.5">{fmtMoney(info.valorPrestacao)}</p>
-                      <CopyButton value={copyMoney(info.valorPrestacao)} title="Copiar valor" light />
-                    </div>
-                  </div>
                   <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl">
                     <p className="text-[8px] font-black text-indigo-400 uppercase">Valor da Mercadoria</p>
                     <div className="flex items-center gap-1">
@@ -155,6 +148,12 @@ const CteViewerModal: React.FC<CteViewerModalProps> = ({ attachment, url, title,
                           <CopyButton value={copyQty(v.quantidade)} title={`Copiar ${v.tipo.toLowerCase()}`} light />
                         </p>
                       ))}
+                      {sumUnVolumes(info.volumes) > 0 && (
+                        <p className="text-[11px] font-black text-amber-300 flex items-center gap-1 mt-1 pt-1 border-t border-white/10">
+                          QTDE DE VOLUMES: {fmtQty(sumUnVolumes(info.volumes))}
+                          <CopyButton value={copyQty(sumUnVolumes(info.volumes))} title="Copiar quantidade de volumes" light />
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -224,6 +223,18 @@ const CteViewerModal: React.FC<CteViewerModalProps> = ({ attachment, url, title,
                     </span>
                   </div>
                 ))}
+                {(() => {
+                  const totalUn = totals.volumeTotals.filter(v => v.unidade === 'UN').reduce((s, v) => s + v.total, 0);
+                  return totalUn > 0 ? (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] text-amber-400 font-bold uppercase">Qtde de Volumes</span>
+                      <span className="flex items-center gap-1">
+                        <span className="text-[11px] font-black text-amber-300">{fmtQty(totalUn)}</span>
+                        <CopyButton value={copyQty(totalUn)} title="Copiar quantidade total de volumes" light />
+                      </span>
+                    </div>
+                  ) : null;
+                })()}
               </div>
             )}
           </aside>

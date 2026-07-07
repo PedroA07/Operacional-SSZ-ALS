@@ -182,6 +182,17 @@ export async function parseCtePdf(file: File): Promise<CtePdfParseResult> {
     if (un === 'KG' && volumes.some(v => v.unidade === 'KG')) continue;
     volumes.push({ tipo, unidade: un, quantidade });
   }
+  // Layout 3: campo "QUANTIDADE DE VOLUMES" com o número abaixo
+  if (!volumes.some(v => v.unidade === 'UN')) {
+    for (const label of findLabels(/QUANTIDADE DE VOLUMES/)) {
+      const raw = valueNear(label, NUMBER_RE, 20, 90);
+      const quantidade = raw !== undefined ? parseBrNumber(raw) : undefined;
+      if (quantidade !== undefined && quantidade > 0) {
+        volumes.push({ tipo: 'UNIDADE', unidade: 'UN', quantidade });
+        break;
+      }
+    }
+  }
 
   // ── Remetente / Destinatário (apenas nome e CNPJ, best-effort) ─────────────
   const partyNear = (labelRe: RegExp): CteDocParty | undefined => {

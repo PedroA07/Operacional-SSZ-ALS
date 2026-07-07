@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { CteDocParty } from '../../../types';
+import { CteDocParty, CteDocVolume } from '../../../types';
 
 export const fmtMoney = (v?: number): string =>
   v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -13,6 +13,10 @@ export const copyMoney = (v?: number): string =>
   v === undefined ? '' : v.toFixed(2).replace('.', ',');
 
 export const copyQty = (v: number): string => String(v).replace('.', ',');
+
+// Quantidade de volumes = soma das medidas em unidades (UN)
+export const sumUnVolumes = (volumes?: CteDocVolume[]): number =>
+  (volumes || []).filter(v => v.unidade === 'UN').reduce((s, v) => s + v.quantidade, 0);
 
 export const CopyButton: React.FC<{ value?: string; title?: string; light?: boolean }> = ({ value, title, light }) => {
   const [copied, setCopied] = useState(false);
