@@ -615,7 +615,13 @@ export const generateDactePdf = (data: CteData): jsPDF => {
   if (data.observacoes) {
     ensure(4.2 + 6.2);
     sectionTitle('OBSERVAÇÕES');
-    const obsLines: string[] = pdf.splitTextToSize(data.observacoes, W - 4);
+    // A fonte precisa estar ativa ANTES do splitTextToSize — ele mede com a
+    // fonte corrente (sectionTitle deixa 6pt bold e as linhas saíam largas
+    // demais para a caixa). Separadores '|' viram quebras de linha.
+    pdf.setFontSize(6.5);
+    pdf.setFont('helvetica', 'normal');
+    const obsText = data.observacoes.replace(/\s*\|\s*/g, '\n').trim();
+    const obsLines: string[] = pdf.splitTextToSize(obsText, W - 4);
     const LINE_H = 3.2;
     let i = 0;
     while (i < obsLines.length) {
