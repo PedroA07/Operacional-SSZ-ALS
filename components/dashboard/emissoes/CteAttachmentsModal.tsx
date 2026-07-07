@@ -5,7 +5,7 @@ import { fileStorage } from '../../../utils/fileStorage';
 import { cteXmlToPdfBlob, extractCteSummary } from '../../../utils/cteXmlToPdf';
 import { downloadFile, downloadBlob, fetchFileBlob } from '../../../utils/fileDownloader';
 import CteViewerModal from './CteViewerModal';
-import { fmtMoney, fmtQty, copyMoney, copyQty, CopyButton, PartyCard } from './cteDisplay';
+import { fmtMoney, fmtQty, copyMoney, copyQty, sumUnVolumes, CopyButton, PartyCard } from './cteDisplay';
 
 interface CteAttachmentsModalProps {
   trip: Trip;
@@ -593,6 +593,15 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                               <CopyButton value={copyQty(v.total)} title={`Copiar total de ${v.tipo.toLowerCase()}`} />
                             </p>
                           ))}
+                          {(() => {
+                            const totalUn = summary.volumeTotals.filter(v => v.unidade === 'UN').reduce((s, v) => s + v.total, 0);
+                            return totalUn > 0 ? (
+                              <p className="text-[10px] font-black text-amber-700 flex items-center gap-0.5">
+                                Qtde de Volumes: <span>{fmtQty(totalUn)}</span>
+                                <CopyButton value={copyQty(totalUn)} title="Copiar quantidade total de volumes" />
+                              </p>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
                     )}
@@ -640,12 +649,22 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                               </div>
                               <div>
                                 <p className="text-[7px] font-black text-slate-400 uppercase">Volume</p>
-                                {(info.volumes && info.volumes.length > 0) ? info.volumes.map((v, i) => (
-                                  <p key={i} className="text-[9px] font-black text-slate-700 flex items-center gap-0.5">
-                                    {v.tipo}: {fmtQty(v.quantidade)}{v.unidade ? ` ${v.unidade}` : ''}
-                                    <CopyButton value={copyQty(v.quantidade)} title={`Copiar ${v.tipo.toLowerCase()}`} />
-                                  </p>
-                                )) : <p className="text-[10px] font-black text-slate-300">—</p>}
+                                {(info.volumes && info.volumes.length > 0) ? (
+                                  <>
+                                    {info.volumes.map((v, i) => (
+                                      <p key={i} className="text-[9px] font-black text-slate-700 flex items-center gap-0.5">
+                                        {v.tipo}: {fmtQty(v.quantidade)}{v.unidade ? ` ${v.unidade}` : ''}
+                                        <CopyButton value={copyQty(v.quantidade)} title={`Copiar ${v.tipo.toLowerCase()}`} />
+                                      </p>
+                                    ))}
+                                    {sumUnVolumes(info.volumes) > 0 && (
+                                      <p className="text-[9px] font-black text-amber-700 flex items-center gap-0.5">
+                                        Qtde volumes: {fmtQty(sumUnVolumes(info.volumes))}
+                                        <CopyButton value={copyQty(sumUnVolumes(info.volumes))} title="Copiar quantidade de volumes" />
+                                      </p>
+                                    )}
+                                  </>
+                                ) : <p className="text-[10px] font-black text-slate-300">—</p>}
                               </div>
                             </div>
                             {info.chavesNfe && info.chavesNfe.length > 0 && (
