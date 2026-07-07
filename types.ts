@@ -491,6 +491,7 @@ export interface CteDocSummary {
   volumes?: CteDocVolume[];
   remetente?: CteDocParty;
   destinatario?: CteDocParty;
+  chavesNfe?: string[];      // chaves de acesso das NF-e transportadas
 }
 
 export interface EmissaoCteAttachment {

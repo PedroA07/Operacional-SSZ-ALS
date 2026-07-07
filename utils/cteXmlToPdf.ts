@@ -676,5 +676,6 @@ export const extractCteSummary = (data: CteData): CteDocSummary => {
     volumes,
     remetente: data.remetente,
     destinatario: data.destinatario,
+    chavesNfe: data.chavesNfe?.length ? data.chavesNfe : undefined,
   };
 };

@@ -114,13 +114,29 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
   // ── Consolidação dos valores do processo ───────────────────────────────────
   const summary = useMemo(() => {
     const withInfo = attachments.filter(a => a.cteInfo);
+
+    // Detecta CT-e duplicado (mesma chave ou mesmo nº) — só o primeiro entra nos totais
+    const duplicateIds = new Set<string>();
+    const seenKeys = new Set<string>();
+    const uniqueInfo: EmissaoCteAttachment[] = [];
+    withInfo.forEach(a => {
+      const info = a.cteInfo!;
+      const key = info.chave || (info.numero ? `n:${info.numero}` : `id:${a.id}`);
+      if (seenKeys.has(key)) {
+        duplicateIds.add(a.id);
+      } else {
+        seenKeys.add(key);
+        uniqueInfo.push(a);
+      }
+    });
+
     let totalPrestacao: number | undefined;
     let totalCarga: number | undefined;
     const volumeTotals = new Map<string, { tipo: string; unidade?: string; total: number }>();
     const remetentes = new Map<string, { party: CteDocParty; ctes: string[] }>();
     const destinatarios = new Map<string, { party: CteDocParty; ctes: string[] }>();
 
-    withInfo.forEach(a => {
+    uniqueInfo.forEach(a => {
       const info = a.cteInfo!;
       const cteLabel = info.numero || a.fileName;
       if (info.valorPrestacao !== undefined) totalPrestacao = (totalPrestacao || 0) + info.valorPrestacao;
@@ -144,6 +160,8 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
 
     return {
       withInfo,
+      uniqueCount: uniqueInfo.length,
+      duplicateIds,
       semInfo: attachments.filter(a => !a.cteInfo),
       totalPrestacao,
       totalCarga,
@@ -547,17 +565,15 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                   {/* Totais do processo */}
                   <div>
                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Totais do Processo</p>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <div className="p-3 bg-blue-50 border border-blue-100 rounded-2xl">
                         <p className="text-[8px] font-black text-blue-500 uppercase">CT-Es</p>
-                        <p className="text-base font-black text-blue-700 mt-0.5">{summary.withInfo.length}</p>
-                      </div>
-                      <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl">
-                        <p className="text-[8px] font-black text-emerald-500 uppercase">Valor dos CT-Es</p>
-                        <div className="flex items-center gap-0.5 mt-1">
-                          <p className="text-sm font-black text-emerald-700">{fmtMoney(summary.totalPrestacao)}</p>
-                          <CopyButton value={copyMoney(summary.totalPrestacao)} title="Copiar total" />
-                        </div>
+                        <p className="text-base font-black text-blue-700 mt-0.5">{summary.uniqueCount}</p>
+                        {summary.duplicateIds.size > 0 && (
+                          <p className="text-[7px] font-black text-amber-600 uppercase mt-0.5">
+                            +{summary.duplicateIds.size} duplicado(s) fora dos totais
+                          </p>
+                        )}
                       </div>
                       <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl">
                         <p className="text-[8px] font-black text-indigo-500 uppercase">Valor da Mercadoria</p>
@@ -589,7 +605,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                       {summary.withInfo.map(att => {
                         const info = att.cteInfo!;
                         return (
-                          <div key={att.id} className="p-3 bg-white border border-slate-200 rounded-2xl">
+                          <div key={att.id} className={`p-3 bg-white border rounded-2xl ${summary.duplicateIds.has(att.id) ? 'border-amber-300' : 'border-slate-200'}`}>
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-1 min-w-0">
                                 <p className="text-[10px] font-black text-slate-800">
@@ -597,6 +613,11 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                                 </p>
                                 <CopyButton value={info.numero} title="Copiar nº do CT-e" />
                                 {info.chave && <CopyButton value={info.chave} title="Copiar chave de acesso (sem espaços)" />}
+                                {summary.duplicateIds.has(att.id) && (
+                                  <span className="text-[7px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-black uppercase shrink-0" title="CT-e repetido — não é somado nos totais do processo">
+                                    Duplicado
+                                  </span>
+                                )}
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
                                 {info.dataEmissao && (
@@ -609,14 +630,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                                 )}
                               </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-2 mt-2">
-                              <div>
-                                <p className="text-[7px] font-black text-slate-400 uppercase">Valor do CT-E</p>
-                                <div className="flex items-center gap-0.5">
-                                  <p className="text-[10px] font-black text-emerald-700">{fmtMoney(info.valorPrestacao)}</p>
-                                  <CopyButton value={copyMoney(info.valorPrestacao)} title="Copiar valor" />
-                                </div>
-                              </div>
+                            <div className="grid grid-cols-2 gap-2 mt-2">
                               <div>
                                 <p className="text-[7px] font-black text-slate-400 uppercase">Valor da Mercadoria</p>
                                 <div className="flex items-center gap-0.5">
@@ -634,6 +648,31 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                                 )) : <p className="text-[10px] font-black text-slate-300">—</p>}
                               </div>
                             </div>
+                            {info.chavesNfe && info.chavesNfe.length > 0 && (
+                              <div className="mt-2 pt-2 border-t border-slate-100">
+                                <p className="text-[7px] font-black text-slate-400 uppercase mb-1">
+                                  Notas Fiscais ({info.chavesNfe.length})
+                                </p>
+                                <div className="space-y-0.5">
+                                  {info.chavesNfe.map((nfe, i) => {
+                                    const isChave = /^\d{44}$/.test(nfe);
+                                    const numero = isChave ? String(parseInt(nfe.substring(25, 34), 10)) : '—';
+                                    const serie = isChave ? String(parseInt(nfe.substring(22, 25), 10)) : '—';
+                                    return (
+                                      <div key={i} className="flex items-center gap-1.5">
+                                        <span className="text-[8px] px-1.5 py-px bg-slate-100 text-slate-600 rounded font-black shrink-0">
+                                          NF-e {numero} · Série {serie}
+                                        </span>
+                                        <span className="text-[8px] text-slate-400 truncate flex-1" title={nfe}>
+                                          {nfe.replace(/(\d{4})(?=\d)/g, '$1 ')}
+                                        </span>
+                                        <CopyButton value={nfe} title="Copiar chave da NF-e (sem espaços)" />
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                             {(info.remetente?.nome || info.destinatario?.nome) && (
                               <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
                                 <span className="text-[8px] font-bold text-slate-500 truncate" title={info.remetente?.nome}>
@@ -699,8 +738,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
           url={viewer.url}
           title={viewer.title}
           totals={{
-            count: summary.withInfo.length,
-            totalPrestacao: summary.totalPrestacao,
+            count: summary.uniqueCount,
             totalCarga: summary.totalCarga,
             volumeTotals: summary.volumeTotals,
           }}
