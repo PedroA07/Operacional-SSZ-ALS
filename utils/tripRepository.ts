@@ -72,6 +72,7 @@ export const tripRepository = {
     emissao_cte_number: trip.emissaoCteNumber || null,
     emissao_observacoes: trip.emissaoObservacoes || null,
     emissao_cte_attachments: trip.emissaoCteAttachments?.length ? trip.emissaoCteAttachments : null,
+    peso_carga: trip.pesoCarga || null,
   }),
 
   mapFromDb: (d: any): Trip => {
@@ -154,6 +155,7 @@ export const tripRepository = {
       coletaOrderIndex: d.coleta_order_index ?? undefined,
       emissaoCteNumber: d.emissao_cte_number || undefined,
       emissaoObservacoes: d.emissao_observacoes || undefined,
+      pesoCarga: d.peso_carga || undefined,
       emissaoCteAttachments: Array.isArray(safeParse(d.emissao_cte_attachments, null))
         ? (safeParse(d.emissao_cte_attachments, []) as EmissaoCteAttachment[]).map(att => ({
             ...att,
