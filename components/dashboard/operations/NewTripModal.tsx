@@ -4,7 +4,7 @@ import { db } from '../../../utils/storage';
 import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
 import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
-import { parseAliancaOsPdf, matchCustomer, matchTipoViagem } from '../../../utils/aliancaOsParser';
+import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, matchOperationType } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 import { osCategoryService } from '../../../utils/osCategoryService';
 
@@ -90,6 +90,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
         }
       }
       const detectedCategory = osCategoryService.detectCategoryFromOS(p.os);
+      const matchedType = matchOperationType(operationTypes, p.tipoOperacao)?.name;
       let tipoViagemId: string | undefined;
       try {
         const tvs = await db.getColetaTiposViagem();
@@ -101,7 +102,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
         booking: p.booking || prev.booking,
         ship: p.ship || prev.ship,
         dateTime: p.dataColeta || prev.dateTime,
-        type: p.tipoOperacao || prev.type,
+        type: matchedType || p.tipoOperacao || prev.type,
         category: detectedCategory || prev.category,
         containerType: p.containerTipo || prev.containerType,
         tara: p.tara ? p.tara.replace(/,\d+$/, '') : prev.tara,

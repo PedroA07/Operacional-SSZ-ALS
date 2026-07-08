@@ -18,7 +18,7 @@ import { tripSyncService } from '../../../utils/tripSyncService';
 import { ocRules } from '../../../utils/ocRules';
 import { db } from '../../../utils/storage';
 import { localDateStr, localDateTimeStr } from '../../../utils/dateHelpers';
-import { parseAliancaOsPdf, matchCustomer, matchByName } from '../../../utils/aliancaOsParser';
+import { parseAliancaOsPdf, matchCustomer, matchByName, matchOperationType } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 
 interface OrdemColetaFormProps {
@@ -238,6 +238,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
       }
       const matchedDest = matchByName(destinatarioOptions as any[], p.entregarCheio);
       const matchedTipo = matchByName(containerTypes, p.containerTipo);
+      const matchedOpType = matchOperationType(operationTypes, p.tipoOperacao)?.name;
       const detected = osCategoryService.detectCategoryFromOS(p.os);
 
       setFormData((prev: any) => ({
@@ -247,7 +248,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         ship: p.ship || prev.ship,
         tipo: matchedTipo?.name || p.containerTipo || prev.tipo,
         padrao: p.padraoCarga || prev.padrao,
-        tipoOperacao: p.tipoOperacao || prev.tipoOperacao,
+        tipoOperacao: matchedOpType || p.tipoOperacao || prev.tipoOperacao,
         autColeta: p.autColeta || prev.autColeta,
         embarcador: p.embarcador || prev.embarcador,
         agencia: p.armador || prev.agencia,

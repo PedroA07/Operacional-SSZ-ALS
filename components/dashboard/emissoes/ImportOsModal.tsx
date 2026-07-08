@@ -1,9 +1,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Trip, Customer, ColetaTipoViagemOption } from '../../../types';
+import { Trip, Customer, ColetaTipoViagemOption, OperationType } from '../../../types';
 import { db } from '../../../utils/storage';
 import { osCategoryService } from '../../../utils/osCategoryService';
-import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, ParsedAliancaOs } from '../../../utils/aliancaOsParser';
+import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, matchOperationType, ParsedAliancaOs } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 
 interface ImportOsModalProps {
@@ -16,6 +16,7 @@ interface ImportItem {
   parsed?: ParsedAliancaOs;
   customer?: Customer;
   tipoViagem?: ColetaTipoViagemOption;
+  tipoOperacao?: string;
   category?: string;
   error?: string;
 }
@@ -23,6 +24,7 @@ interface ImportItem {
 const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [tiposViagem, setTiposViagem] = useState<ColetaTipoViagemOption[]>([]);
+  const [operationTypes, setOperationTypes] = useState<OperationType[]>([]);
   const [items, setItems] = useState<ImportItem[]>([]);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -32,9 +34,10 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
   useEffect(() => {
     (async () => {
       try {
-        const [c, tv] = await Promise.all([db.getCustomers(), db.getColetaTiposViagem()]);
+        const [c, tv, ot] = await Promise.all([db.getCustomers(), db.getColetaTiposViagem(), db.getOperationTypes()]);
         setCustomers(c || []);
         setTiposViagem(tv || []);
+        setOperationTypes(ot || []);
       } catch (e) { console.error('Erro ao carregar cadastros:', e); }
     })();
   }, []);
@@ -56,6 +59,7 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
           parsed,
           customer: matchCustomer(customers, parsed),
           tipoViagem: matchTipoViagem(tiposViagem, parsed.docReferencia),
+          tipoOperacao: matchOperationType(operationTypes, parsed.tipoOperacao)?.name,
           category: osCategoryService.detectCategoryFromOS(parsed.os) || undefined,
         });
       } catch (e: any) {
@@ -100,7 +104,7 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
           ship: p.ship || '',
           dateTime: p.dataColeta ? `${p.dataColeta}:00` : new Date().toISOString(),
           isLate: false,
-          type: (p.tipoOperacao as any) || 'EXPORTAÇÃO',
+          type: (it.tipoOperacao || p.tipoOperacao || 'EXPORTAÇÃO') as any,
           category: it.category || 'ALIANÇA',
           container: '',
           containerType: p.containerTipo,
@@ -229,8 +233,13 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[11px] font-black text-slate-800">{p.os}</span>
-                        {p.tipoOperacao && (
-                          <span className="text-[7px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-black uppercase">{p.tipoOperacao}</span>
+                        {(it.tipoOperacao || p.tipoOperacao) && (
+                          <span
+                            className={`text-[7px] px-1.5 py-0.5 rounded font-black uppercase ${it.tipoOperacao ? 'bg-slate-100 text-slate-600' : 'bg-amber-50 text-amber-600 border border-amber-200'}`}
+                            title={it.tipoOperacao ? `Tipo de operação: ${it.tipoOperacao}` : `"${p.tipoOperacao}" não encontrado nos tipos cadastrados`}
+                          >
+                            {it.tipoOperacao || `${p.tipoOperacao} ⚠`}
+                          </span>
                         )}
                         {p.containerTipo && (
                           <span className="text-[7px] px-1.5 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded font-black uppercase">{p.containerTipo}</span>
