@@ -13,6 +13,7 @@ export interface ParsedAliancaOs {
   shipFromObs?: boolean;        // true quando o navio veio das Demais Observações
   navioViagemCampo?: string;    // valor bruto do campo "Navio / Viagem"
   dataColeta?: string;          // ISO (Programação de Serviços: data + hora)
+  container?: string;           // nº do container (quando a OS já traz)
   containerTipo?: string;       // 40HC, 20DC...
   pesoCarga?: string;
   tara?: string;
@@ -113,10 +114,16 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
 
   // ── Container / valores (linha da tabela após o cabeçalho) ───────────────
   for (const line of lines) {
-    const m = line.match(/^(\d{2})\s?(HC|DC|RF|RH|OT|FR|TK|GP|DV)\b\s+(.*)$/i);
+    const m = line.match(/^(?:([A-Z]{4}\s?\d{7})\s+)?(\d{2})\s?(HC|DC|RF|RH|OT|FR|TK|GP|DV)\b\s+(.*)$/i);
     if (m) {
-      result.containerTipo = `${m[1]}${m[2].toUpperCase()}`;
-      const tokens = m[3].split(/\s+/);
+      if (m[1]) result.container = m[1].replace(/\s/g, '').toUpperCase();
+      result.containerTipo = `${m[2]}${m[3].toUpperCase()}`;
+      const tokens = m[4].split(/\s+/);
+      // Container também pode vir depois do tipo na mesma linha
+      if (!result.container) {
+        const contTok = tokens.find(t => /^[A-Z]{4}\d{7}$/i.test(t));
+        if (contTok) result.container = contTok.toUpperCase();
+      }
       const nums = tokens.filter(t => /^[\d.]+,\d{2}$/.test(t));
       if (nums[0]) result.pesoCarga = nums[0];
       if (nums[1]) result.tara = nums[1];
@@ -211,6 +218,13 @@ export async function parseAliancaOsPdf(file: File): Promise<ParsedAliancaOs | n
 }
 
 // ── Matching contra cadastros do banco ───────────────────────────────────────
+
+/** "20000,00" / "3.880,50" → "20000" / "3880.5" (kg como string numérica). */
+export const normalizeKg = (v?: string): string | undefined => {
+  if (!v) return undefined;
+  const n = parseFloat(v.replace(/\./g, '').replace(',', '.'));
+  return isNaN(n) ? undefined : String(n);
+};
 
 export const normMatch = (s: string): string =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();

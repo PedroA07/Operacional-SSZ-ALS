@@ -3,6 +3,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Trip, EmissaoCteAttachment, CteDocParty } from '../../../types';
 import { fileStorage } from '../../../utils/fileStorage';
 import { cteXmlToPdfBlob, extractCteSummary } from '../../../utils/cteXmlToPdf';
+import { parseNfeXml } from '../../../utils/nfeXmlParser';
 import { downloadFile, downloadBlob, fetchFileBlob } from '../../../utils/fileDownloader';
 import CteViewerModal from './CteViewerModal';
 import { fmtMoney, fmtQty, copyMoney, copyQty, sumUnVolumes, CopyButton, PartyCard } from './cteDisplay';
@@ -42,9 +43,11 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
     return container ? `${os} - ${container}` : os;
   }, [trip.os, trip.container]);
 
-  // Nome individual: "OS - CONTAINER - CTE 12345.ext" (nº do CT-e ou nome original)
+  // Nome individual: "OS - CONTAINER - CTE 12345.ext" (nº do documento ou nome original)
   const attFileName = (att: EmissaoCteAttachment, ext: 'pdf' | 'xml') => {
-    const id = att.cteNumber ? `CTE ${att.cteNumber}` : att.fileName.replace(/\.[^.]+$/, '');
+    const id = att.cteNumber ? `CTE ${att.cteNumber}`
+      : att.nfeInfo?.numero ? `NF-e ${att.nfeInfo.numero}`
+      : att.fileName.replace(/\.[^.]+$/, '');
     return `${baseName} - ${id}.${ext}`;
   };
 
@@ -162,7 +165,8 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
       withInfo,
       uniqueCount: uniqueInfo.length,
       duplicateIds,
-      semInfo: attachments.filter(a => !a.cteInfo),
+      nfes: attachments.filter(a => a.docType === 'nfe' && a.nfeInfo),
+      semInfo: attachments.filter(a => !a.cteInfo && a.docType !== 'nfe'),
       totalPrestacao,
       totalCarga,
       volumeTotals: Array.from(volumeTotals.values()),
@@ -170,6 +174,20 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
       destinatarios: Array.from(destinatarios.values()),
     };
   }, [attachments]);
+
+  // Pesos vindos da OS importada (tara + peso da carga e a soma)
+  const pesosOs = useMemo(() => {
+    const parse = (v?: string) => {
+      const n = parseFloat((v || '').replace(/\./g, '').replace(',', '.'));
+      return isNaN(n) ? undefined : n;
+    };
+    const tara = parse(trip.tara);
+    const pesoCarga = parse(trip.pesoCarga);
+    const soma = tara !== undefined || pesoCarga !== undefined
+      ? (tara || 0) + (pesoCarga || 0)
+      : undefined;
+    return { tara, pesoCarga, soma };
+  }, [trip.tara, trip.pesoCarga]);
 
   // ── Upload ─────────────────────────────────────────────────────────────────
   const processFiles = async (files: File[]) => {
@@ -207,6 +225,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
             const xmlText = await file.text();
             const result = cteXmlToPdfBlob(xmlText);
             if (result) {
+              att.docType = 'cte';
               const baseName = file.name.replace(/\.[^.]+$/, '');
               const pdfFile = new File([result.blob], `dacte_${baseName}.pdf`, { type: 'application/pdf' });
               att.pdfUrl = await fileStorage.uploadEmissaoCte(pdfFile, trip.os);
@@ -216,7 +235,14 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                 extractedCteNumber = extractedCteNumber || result.data.numero;
               }
             } else {
-              newErrors.push(`"${file.name}": XML anexado, mas não foi reconhecido como CT-e — visualização em PDF indisponível.`);
+              // Não é CT-e — tenta interpretar como NF-e (modelo 55)
+              const nfe = parseNfeXml(xmlText);
+              if (nfe) {
+                att.docType = 'nfe';
+                att.nfeInfo = nfe;
+              } else {
+                newErrors.push(`"${file.name}": XML anexado, mas não foi reconhecido como CT-e nem NF-e.`);
+              }
             }
           } catch (convErr) {
             console.error('Erro na conversão XML→PDF:', convErr);
@@ -477,12 +503,17 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                               {att.cteNumber && (
                                 <span className="text-[8px] font-black text-blue-600">CT-E {att.cteNumber}</span>
                               )}
+                              {att.docType === 'nfe' && (
+                                <span className="text-[7px] px-1.5 py-px bg-emerald-50 text-emerald-700 border border-emerald-200 rounded font-black uppercase">
+                                  NF-e {att.nfeInfo?.numero || ''}
+                                </span>
+                              )}
                               {att.cteInfo?.modal && (
                                 <span className="text-[7px] px-1.5 py-px bg-blue-50 text-blue-600 border border-blue-200 rounded font-black uppercase">
                                   {att.cteInfo.modal}
                                 </span>
                               )}
-                              {isXml && !att.pdfUrl && (
+                              {isXml && !att.pdfUrl && att.docType !== 'nfe' && (
                                 <span className="text-[7px] px-1.5 py-px bg-slate-200 text-slate-500 rounded font-black uppercase" title="XML não reconhecido como CT-e">sem prévia</span>
                               )}
                             </div>
@@ -552,19 +583,55 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
 
             {/* ══ Aba Valores ═════════════════════════════════════════════════ */}
             {activeTab === 'valores' && (
-              summary.withInfo.length === 0 ? (
+              summary.withInfo.length === 0 && summary.nfes.length === 0 && pesosOs.soma === undefined ? (
                 <div className="text-center py-8 space-y-1">
                   <p className="text-[11px] font-black text-slate-500 uppercase">Sem valores para exibir</p>
                   <p className="text-[9px] text-slate-400 max-w-xs mx-auto">
-                    Os valores são extraídos automaticamente dos anexos em <span className="font-bold">XML</span> e,
+                    Os valores são extraídos automaticamente dos anexos em <span className="font-bold">XML</span> (CT-e ou NF-e) e,
                     quando possível, da camada de texto de anexos em <span className="font-bold">PDF</span>.
-                    Para dados completos e confiáveis, prefira anexar o XML do CT-e.
+                    Para dados completos e confiáveis, prefira anexar o XML.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-4">
 
+                  {/* Pesos da OS: tara + peso da carga + soma */}
+                  {pesosOs.soma !== undefined && (
+                    <div>
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Pesos da OS</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                          <p className="text-[8px] font-black text-slate-400 uppercase">Tara</p>
+                          <div className="flex items-center gap-0.5 mt-1">
+                            <p className="text-sm font-black text-slate-700">
+                              {pesosOs.tara !== undefined ? `${fmtQty(pesosOs.tara)} KG` : '—'}
+                            </p>
+                            {pesosOs.tara !== undefined && <CopyButton value={copyQty(pesosOs.tara)} title="Copiar tara" />}
+                          </div>
+                        </div>
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                          <p className="text-[8px] font-black text-slate-400 uppercase">Peso da Carga</p>
+                          <div className="flex items-center gap-0.5 mt-1">
+                            <p className="text-sm font-black text-slate-700">
+                              {pesosOs.pesoCarga !== undefined ? `${fmtQty(pesosOs.pesoCarga)} KG` : '—'}
+                            </p>
+                            {pesosOs.pesoCarga !== undefined && <CopyButton value={copyQty(pesosOs.pesoCarga)} title="Copiar peso da carga" />}
+                          </div>
+                        </div>
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl">
+                          <p className="text-[8px] font-black text-amber-600 uppercase">Peso Total (Soma)</p>
+                          <div className="flex items-center gap-0.5 mt-1">
+                            <p className="text-sm font-black text-amber-700">{fmtQty(pesosOs.soma)} KG</p>
+                            <CopyButton value={copyQty(pesosOs.soma)} title="Copiar peso total (tara + carga)" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Totais do processo */}
+                  {summary.withInfo.length > 0 && (
+                  <>
                   <div>
                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Totais do Processo</p>
                     <div className="grid grid-cols-2 gap-2">
@@ -717,6 +784,100 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                       })}
                     </div>
                   </div>
+                  </>
+                  )}
+
+                  {/* Notas Fiscais anexadas (XML de NF-e) */}
+                  {summary.nfes.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        NF-es Anexadas ({summary.nfes.length})
+                      </p>
+                      <div className="space-y-1.5">
+                        {summary.nfes.map(att => {
+                          const nfe = att.nfeInfo!;
+                          return (
+                            <div key={att.id} className="p-3 bg-white border border-emerald-200 rounded-2xl">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1 min-w-0">
+                                  <p className="text-[10px] font-black text-emerald-800">
+                                    NF-e {nfe.numero || '—'}{nfe.serie ? <span className="text-slate-400 font-bold"> · Série {nfe.serie}</span> : null}
+                                  </p>
+                                  <CopyButton value={nfe.numero} title="Copiar nº da NF-e" />
+                                  {nfe.chave && <CopyButton value={nfe.chave} title="Copiar chave de acesso (sem espaços)" />}
+                                  {nfe.container && (
+                                    <span className="text-[7px] px-1.5 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded font-black uppercase shrink-0 flex items-center gap-0.5">
+                                      {nfe.container}
+                                      <CopyButton value={nfe.container} title="Copiar container" />
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {nfe.dataEmissao && (
+                                    <>
+                                      <span className="text-[8px] text-slate-400">
+                                        {new Date(nfe.dataEmissao).toLocaleDateString('pt-BR')}
+                                      </span>
+                                      <CopyButton value={new Date(nfe.dataEmissao).toLocaleDateString('pt-BR')} title="Copiar data de emissão" />
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-3 gap-2 mt-2">
+                                <div>
+                                  <p className="text-[7px] font-black text-slate-400 uppercase">Valor da NF</p>
+                                  <div className="flex items-center gap-0.5">
+                                    <p className="text-[10px] font-black text-indigo-700">{fmtMoney(nfe.valorNf)}</p>
+                                    <CopyButton value={copyMoney(nfe.valorNf)} title="Copiar valor da NF" />
+                                  </div>
+                                </div>
+                                <div>
+                                  <p className="text-[7px] font-black text-slate-400 uppercase">Pesos</p>
+                                  {nfe.pesoBruto !== undefined && (
+                                    <p className="text-[9px] font-black text-slate-700 flex items-center gap-0.5">
+                                      Bruto: {fmtQty(nfe.pesoBruto)} KG
+                                      <CopyButton value={copyQty(nfe.pesoBruto)} title="Copiar peso bruto" />
+                                    </p>
+                                  )}
+                                  {nfe.pesoLiquido !== undefined && (
+                                    <p className="text-[9px] font-black text-slate-500 flex items-center gap-0.5">
+                                      Líquido: {fmtQty(nfe.pesoLiquido)} KG
+                                      <CopyButton value={copyQty(nfe.pesoLiquido)} title="Copiar peso líquido" />
+                                    </p>
+                                  )}
+                                  {nfe.pesoBruto === undefined && nfe.pesoLiquido === undefined && (
+                                    <p className="text-[10px] font-black text-slate-300">—</p>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="text-[7px] font-black text-slate-400 uppercase">Volumes</p>
+                                  {nfe.qVolumes !== undefined ? (
+                                    <p className="text-[9px] font-black text-slate-700 flex items-center gap-0.5">
+                                      {fmtQty(nfe.qVolumes)}
+                                      <CopyButton value={copyQty(nfe.qVolumes)} title="Copiar quantidade de volumes" />
+                                    </p>
+                                  ) : <p className="text-[10px] font-black text-slate-300">—</p>}
+                                </div>
+                              </div>
+                              {(nfe.emitente?.nome || nfe.destinatario?.nome) && (
+                                <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
+                                  <span className="text-[8px] font-bold text-slate-500 truncate" title={nfe.emitente?.nome}>
+                                    {nfe.emitente?.nome || '—'}
+                                  </span>
+                                  <svg className="w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                                  </svg>
+                                  <span className="text-[8px] font-bold text-slate-500 truncate" title={nfe.destinatario?.nome}>
+                                    {nfe.destinatario?.nome || '—'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Remetentes */}
                   {summary.remetentes.length > 0 && (

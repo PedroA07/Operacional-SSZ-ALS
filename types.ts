@@ -495,14 +495,30 @@ export interface CteDocSummary {
   chavesNfe?: string[];      // chaves de acesso das NF-e transportadas
 }
 
+export interface NfeDocSummary {
+  numero?: string;
+  serie?: string;
+  chave?: string;
+  dataEmissao?: string;
+  valorNf?: number;          // vNF
+  pesoBruto?: number;        // soma de pesoB (kg)
+  pesoLiquido?: number;      // soma de pesoL (kg)
+  qVolumes?: number;         // soma de qVol
+  container?: string;        // extraído das informações complementares
+  emitente?: CteDocParty;
+  destinatario?: CteDocParty;
+}
+
 export interface EmissaoCteAttachment {
   id: string;
   url: string;              // arquivo original (PDF ou XML)
   fileName: string;
   fileType: 'pdf' | 'xml';
+  docType?: 'cte' | 'nfe';  // tipo do documento fiscal (padrão: cte)
   pdfUrl?: string;          // para XML: DACTE em PDF gerado na hora do upload
   cteNumber?: string;       // nº do CT-e extraído do XML
   cteInfo?: CteDocSummary;  // resumo extraído do XML (valores, volumes, partes)
+  nfeInfo?: NfeDocSummary;  // resumo quando o anexo é uma NF-e
   uploadDate: string;
 }
 
@@ -665,6 +681,7 @@ export interface Trip {
   emissaoCteNumber?: string;
   emissaoObservacoes?: string;
   emissaoCteAttachments?: EmissaoCteAttachment[];
+  pesoCarga?: string;        // peso da carga (kg) — vem da OS importada
 }
 
 export interface ColetaDocOriginarioRule {

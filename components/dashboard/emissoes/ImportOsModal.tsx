@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Trip, Customer, ColetaTipoViagemOption, OperationType } from '../../../types';
 import { db } from '../../../utils/storage';
 import { osCategoryService } from '../../../utils/osCategoryService';
-import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, matchOperationType, ParsedAliancaOs } from '../../../utils/aliancaOsParser';
+import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, matchOperationType, normalizeKg, ParsedAliancaOs } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 
 interface ImportOsModalProps {
@@ -106,9 +106,10 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
           isLate: false,
           type: (it.tipoOperacao || p.tipoOperacao || 'EXPORTAÇÃO') as any,
           category: it.category || 'ALIANÇA',
-          container: '',
+          container: p.container || '',
           containerType: p.containerTipo,
-          tara: p.tara ? p.tara.replace(/,\d+$/, '') : undefined,
+          tara: normalizeKg(p.tara),
+          pesoCarga: normalizeKg(p.pesoCarga),
           customer: customer
             ? { id: customer.id, name: customer.name, legalName: customer.legalName, cnpj: customer.cnpj, city: customer.city, state: customer.state }
             : { id: '', name: p.cliente || '', cnpj: p.cnpjColeta || '', city: p.municipioColeta || '' },

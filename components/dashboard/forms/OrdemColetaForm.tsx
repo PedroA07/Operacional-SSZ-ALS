@@ -18,7 +18,7 @@ import { tripSyncService } from '../../../utils/tripSyncService';
 import { ocRules } from '../../../utils/ocRules';
 import { db } from '../../../utils/storage';
 import { localDateStr, localDateTimeStr } from '../../../utils/dateHelpers';
-import { parseAliancaOsPdf, matchCustomer, matchByName, matchOperationType } from '../../../utils/aliancaOsParser';
+import { parseAliancaOsPdf, matchCustomer, matchByName, matchOperationType, normalizeKg } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 
 interface OrdemColetaFormProps {
@@ -246,6 +246,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         os: p.os,
         booking: p.booking || prev.booking,
         ship: p.ship || prev.ship,
+        container: p.container || prev.container,
         tipo: matchedTipo?.name || p.containerTipo || prev.tipo,
         padrao: p.padraoCarga || prev.padrao,
         tipoOperacao: matchedOpType || p.tipoOperacao || prev.tipoOperacao,
@@ -253,7 +254,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         embarcador: p.embarcador || prev.embarcador,
         agencia: p.armador || prev.agencia,
         horarioAgendado: p.dataColeta || prev.horarioAgendado,
-        tara: p.tara ? p.tara.replace(/,\d+$/, '') : prev.tara,
+        tara: normalizeKg(p.tara) || prev.tara,
         category: (detected || prev.category || '').toUpperCase(),
         remetenteId: matchedCustomer?.id || prev.remetenteId,
         destinatarioId: matchedDest?.id || prev.destinatarioId,

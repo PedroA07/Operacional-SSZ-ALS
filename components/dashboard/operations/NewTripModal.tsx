@@ -4,7 +4,7 @@ import { db } from '../../../utils/storage';
 import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
 import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
-import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, matchOperationType } from '../../../utils/aliancaOsParser';
+import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, matchOperationType, normalizeKg } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 import { osCategoryService } from '../../../utils/osCategoryService';
 
@@ -104,8 +104,10 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
         dateTime: p.dataColeta || prev.dateTime,
         type: matchedType || p.tipoOperacao || prev.type,
         category: detectedCategory || prev.category,
+        container: p.container || prev.container,
         containerType: p.containerTipo || prev.containerType,
-        tara: p.tara ? p.tara.replace(/,\d+$/, '') : prev.tara,
+        tara: normalizeKg(p.tara) || prev.tara,
+        pesoCarga: normalizeKg(p.pesoCarga) || prev.pesoCarga,
         autColeta: p.autColeta || prev.autColeta,
         embarcador: p.embarcador || prev.embarcador,
         agencia: p.armador || prev.agencia,
