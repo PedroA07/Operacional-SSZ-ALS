@@ -253,6 +253,34 @@ export function matchTipoViagem<T extends { id: string; name: string }>(
   });
 }
 
+/**
+ * Casa o tipo de operação da OS (Exportação/Coleta/Importação/Entrega) com um
+ * dos tipos de operação cadastrados no banco (ex.: "COLETA CABOTAGEM",
+ * "ENTREGA CABOTAGEM", "EXPORTAÇÃO", "IMPORTAÇÃO"). Retorna o nome cadastrado.
+ */
+export function matchOperationType<T extends { name?: string }>(
+  options: T[],
+  parsedType?: string
+): T | undefined {
+  const t = normMatch(parsedType || '');
+  if (!t || options.length === 0) return undefined;
+  // 1. Match exato
+  const exact = options.find(o => normMatch(o.name || '') === t);
+  if (exact) return exact;
+  // 2. A palavra-chave da OS é a primeira palavra do tipo cadastrado
+  //    ("COLETA" → "COLETA CABOTAGEM", "ENTREGA" → "ENTREGA CABOTAGEM")
+  const byPrefix = options.find(o => {
+    const n = normMatch(o.name || '');
+    return n === t || n.startsWith(t + ' ') || n.split(' ')[0] === t;
+  });
+  if (byPrefix) return byPrefix;
+  // 3. Contém em qualquer direção
+  return options.find(o => {
+    const n = normMatch(o.name || '');
+    return n.includes(t) || t.includes(n);
+  });
+}
+
 /** Match genérico por nome (portos/terminais, tipos de container...). */
 export function matchByName<T extends { name?: string }>(list: T[], target?: string): T | undefined {
   const t = normMatch(target || '');
