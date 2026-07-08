@@ -392,6 +392,22 @@ function diffAuditFields(pairs: { field: string; from?: any; to?: any }[]): { fi
     .map(p => ({ field: p.field, from: String(p.from ?? '').trim(), to: String(p.to ?? '').trim() }));
 }
 
+// Classifica um tipo de operação por palavra-chave para saber a que visão ele
+// pertence por padrão. Reconhece nomes compostos como "COLETA CABOTAGEM" e
+// "ENTREGA CABOTAGEM" — que antes sumiam do painel por não baterem exatamente
+// com os nomes curtos ('COLETA', 'CABOTAGEM', 'EXPORTAÇÃO', 'ENTREGA'...).
+const isColetaViewType = (typeRaw: string): boolean => {
+  const t = (typeRaw || '').toUpperCase();
+  if (t.includes('DEVOLU')) return false;
+  if (/ENTREGA|IMPORTA/.test(t)) return false;
+  return /COLETA|EXPORTA|CABOTAGEM/.test(t);
+};
+const isEntregaViewType = (typeRaw: string): boolean => {
+  const t = (typeRaw || '').toUpperCase();
+  if (t.includes('DEVOLU')) return false;
+  return /ENTREGA|IMPORTA/.test(t);
+};
+
 const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, drivers, customers, onRefresh }) => {
   const [locations, setLocations] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -901,14 +917,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           if (hiddenTripTypesColeta !== null) {
             if (hiddenTripTypesColeta.includes(type)) return false;
           } else {
-            if (!['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(type)) return false;
+            if (!isColetaViewType(type)) return false;
           }
         } else {
           if (type.includes('DEVOLU')) return false;
           if (hiddenTripTypesEntrega !== null) {
             if (hiddenTripTypesEntrega.includes(type)) return false;
           } else {
-            if (!['ENTREGA', 'IMPORTAÇÃO'].includes(type)) return false;
+            if (!isEntregaViewType(type)) return false;
           }
         }
 
@@ -1642,14 +1658,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const toggleTripType = (type: string) => {
     if (activeView === 'COLETA') {
       setHiddenTripTypesColeta(prev => {
-        const currentHidden = prev !== null ? prev : operationTypes.map(t => t.name.toUpperCase()).filter(t => !['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t));
+        const currentHidden = prev !== null ? prev : operationTypes.map(t => t.name.toUpperCase()).filter(t => !isColetaViewType(t));
         const next = currentHidden.includes(type) ? currentHidden.filter(t => t !== type) : [...currentHidden, type];
         localStorage.setItem('orgVisibleTripTypesColeta', JSON.stringify(next));
         return next;
       });
     } else {
       setHiddenTripTypesEntrega(prev => {
-        const currentHidden = prev !== null ? prev : operationTypes.map(t => t.name.toUpperCase()).filter(t => !['ENTREGA', 'IMPORTAÇÃO'].includes(t));
+        const currentHidden = prev !== null ? prev : operationTypes.map(t => t.name.toUpperCase()).filter(t => !isEntregaViewType(t));
         const next = currentHidden.includes(type) ? currentHidden.filter(t => t !== type) : [...currentHidden, type];
         localStorage.setItem('orgVisibleTripTypesEntrega', JSON.stringify(next));
         return next;
@@ -2759,7 +2775,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {operationTypes.map((tv: any) => {
                     const type = tv.name.toUpperCase();
-                    const isVisible = hiddenTripTypesColeta !== null ? !hiddenTripTypesColeta.includes(type) : ['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(type);
+                    const isVisible = hiddenTripTypesColeta !== null ? !hiddenTripTypesColeta.includes(type) : isColetaViewType(type);
                     return (
                       <label key={type} className="flex items-center gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
                         <input
@@ -2767,7 +2783,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                           checked={isVisible}
                           onChange={() => {
                             setHiddenTripTypesColeta(prev => {
-                              const current = prev !== null ? prev : operationTypes.map((t: any) => t.name.toUpperCase()).filter((t: string) => !['COLETA', 'CABOTAGEM', 'EXPORTAÇÃO'].includes(t));
+                              const current = prev !== null ? prev : operationTypes.map((t: any) => t.name.toUpperCase()).filter((t: string) => !isColetaViewType(t));
                               const next = current.includes(type) ? current.filter((t: string) => t !== type) : [...current, type];
                               localStorage.setItem('orgVisibleTripTypesColeta', JSON.stringify(next));
                               return next;
@@ -2791,7 +2807,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {operationTypes.map((tv: any) => {
                     const type = tv.name.toUpperCase();
-                    const isVisible = hiddenTripTypesEntrega !== null ? !hiddenTripTypesEntrega.includes(type) : ['ENTREGA', 'IMPORTAÇÃO'].includes(type);
+                    const isVisible = hiddenTripTypesEntrega !== null ? !hiddenTripTypesEntrega.includes(type) : isEntregaViewType(type);
                     return (
                       <label key={type} className="flex items-center gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
                         <input
@@ -2799,7 +2815,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                           checked={isVisible}
                           onChange={() => {
                             setHiddenTripTypesEntrega(prev => {
-                              const current = prev !== null ? prev : operationTypes.map((t: any) => t.name.toUpperCase()).filter((t: string) => !['ENTREGA', 'IMPORTAÇÃO'].includes(t));
+                              const current = prev !== null ? prev : operationTypes.map((t: any) => t.name.toUpperCase()).filter((t: string) => !isEntregaViewType(t));
                               const next = current.includes(type) ? current.filter((t: string) => t !== type) : [...current, type];
                               localStorage.setItem('orgVisibleTripTypesEntrega', JSON.stringify(next));
                               return next;
