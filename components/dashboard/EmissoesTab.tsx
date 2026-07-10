@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Trip, User } from '../../types';
+import { Trip, User, Driver, Customer } from '../../types';
 import { db } from '../../utils/storage';
-import { osCategoryService } from '../../utils/osCategoryService';
 import SmartOperationTable from './operations/SmartOperationTable';
 import CteAttachmentsModal from './emissoes/CteAttachmentsModal';
 import ImportOsModal from './emissoes/ImportOsModal';
+import NewTripModal from './operations/NewTripModal';
 
 interface Category { id: string; name: string; color?: string; }
 
@@ -17,79 +17,6 @@ interface EmissoesTabProps {
 }
 
 type SubTab = 'TODOS' | 'PEND_DOC' | 'PEND_CTE' | 'CONCLUIDOS';
-
-// ── Smart category picker ─────────────────────────────────────────────────────
-function SmartCategorySelect({ categories, value, onChange }: {
-  categories: Category[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const [q, setQ] = useState('');
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const filtered = categories.filter(c => c.name.toLowerCase().includes(q.toLowerCase()));
-  const selected = categories.find(c => c.name === value);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    if (open) document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-left hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
-      >
-        {selected ? (
-          <>
-            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: selected.color || '#94a3b8' }} />
-            <span className="text-sm font-bold text-slate-700 uppercase flex-1">{selected.name}</span>
-          </>
-        ) : (
-          <span className="text-sm text-slate-400 flex-1">Selecionar vínculo...</span>
-        )}
-        <svg className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/>
-        </svg>
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
-          <div className="p-2 border-b border-slate-100">
-            <input
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              placeholder="Buscar vínculo..."
-              className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-400"
-              autoFocus
-              onClick={e => e.stopPropagation()}
-            />
-          </div>
-          <div className="max-h-44 overflow-y-auto">
-            {filtered.length === 0 && (
-              <p className="text-[10px] text-slate-400 text-center py-4">Nenhum vínculo encontrado</p>
-            )}
-            {filtered.map(c => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => { onChange(c.name); setOpen(false); setQ(''); }}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 transition-colors ${value === c.name ? 'bg-blue-50' : ''}`}
-              >
-                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: c.color || '#94a3b8' }} />
-                <span className="text-sm font-bold text-slate-700 uppercase">{c.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Main component ────────────────────────────────────────────────────────────
 const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrips, onRefresh, categories }) => {
@@ -107,11 +34,24 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
 
   const [showInsertModal, setShowInsertModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [insertOs, setInsertOs] = useState('');
-  const [insertCategory, setInsertCategory] = useState('');
-  const [insertCategoryDetected, setInsertCategoryDetected] = useState<string | null>(null);
-  const [userChoseCategory, setUserChoseCategory] = useState(false);
+  // Cadastros para o formulário completo de Nova Programação (carregados sob demanda)
+  const [insertDrivers, setInsertDrivers] = useState<Driver[]>([]);
+  const [insertCustomers, setInsertCustomers] = useState<Customer[]>([]);
   const [insertLoading, setInsertLoading] = useState(false);
+
+  const openInsertModal = useCallback(async () => {
+    setInsertLoading(true);
+    try {
+      const [d, c] = await Promise.all([db.getDrivers(), db.getCustomers()]);
+      setInsertDrivers(d || []);
+      setInsertCustomers(c || []);
+    } catch (e) {
+      console.error('Erro ao carregar cadastros:', e);
+    } finally {
+      setInsertLoading(false);
+      setShowInsertModal(true);
+    }
+  }, []);
 
   const STABILITY = 30000;
 
@@ -205,60 +145,6 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
     await handleUpdate(t, { emissaoObservacoes: val });
     setObsEditingId(null);
   }, [handleUpdate, obsInputValue]);
-
-  const closeInsertModal = useCallback(() => {
-    setShowInsertModal(false);
-    setInsertOs('');
-    setInsertCategory('');
-    setInsertCategoryDetected(null);
-    setUserChoseCategory(false);
-  }, []);
-
-  const handleInsertOsChange = useCallback((value: string) => {
-    setInsertOs(value);
-    if (!userChoseCategory) {
-      const detected = osCategoryService.detectCategoryFromOS(value);
-      setInsertCategoryDetected(detected);
-      if (detected) {
-        const matched = categories.find(c => c.name.toLowerCase() === detected.toLowerCase());
-        setInsertCategory(matched?.name || detected);
-      } else {
-        setInsertCategory('');
-      }
-    }
-  }, [userChoseCategory, categories]);
-
-  const handleInsertOs = async () => {
-    if (!insertOs.trim() || !insertCategory) return;
-    setInsertLoading(true);
-    try {
-      const newTrip: Trip = {
-        id: `new-${Date.now()}`,
-        os: insertOs.trim().toUpperCase(),
-        booking: '',
-        ship: '',
-        dateTime: new Date().toISOString(),
-        isLate: false,
-        type: 'EXPORTAÇÃO',
-        category: insertCategory,
-        container: '',
-        customer: { id: '', name: '', cnpj: '', city: '' },
-        driver: { id: '', name: '', plateHorse: '', plateTrailer: '', status: '' },
-        status: 'Pendente',
-        statusHistory: [],
-        balancePayment: { status: 'AGUARDANDO_DOCS' } as any,
-        advancePayment: { status: 'BLOQUEADO' } as any,
-        coletaEmissaoSolicitada: true,
-      };
-      await db.saveTrip(newTrip);
-      await onRefresh();
-      closeInsertModal();
-    } catch (e) {
-      console.error('Insert OS error:', e);
-    } finally {
-      setInsertLoading(false);
-    }
-  };
 
   // ── Columns ────────────────────────────────────────────────────────────────
   const columns = useMemo(() => [
@@ -599,14 +485,19 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
             Importar OS
           </button>
 
-          {/* Insert OS button */}
+          {/* Insert OS button — abre o formulário completo de Nova Programação */}
           <button
-            onClick={() => setShowInsertModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-blue-700 transition-all shadow-sm"
+            onClick={openInsertModal}
+            disabled={insertLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-blue-700 transition-all shadow-sm disabled:opacity-60"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/>
-            </svg>
+            {insertLoading ? (
+              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/>
+              </svg>
+            )}
             Inserir OS
           </button>
         </div>
@@ -683,82 +574,15 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
         );
       })()}
 
-      {/* Insert OS modal */}
-      {showInsertModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[500] p-4 animate-in fade-in duration-200" onClick={e => { if (e.target === e.currentTarget) closeInsertModal(); }}>
-          <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">Inserir OS</h3>
-              <button
-                onClick={closeInsertModal}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">
-                  Número da OS <span className="text-red-400">*</span>
-                </label>
-                <input
-                  value={insertOs}
-                  onChange={e => handleInsertOsChange(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && insertCategory) handleInsertOs(); }}
-                  placeholder="Ex: 6ALC123456A"
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">
-                  Vínculo Operacional <span className="text-red-400">*</span>
-                </label>
-                {insertCategoryDetected && !userChoseCategory ? (
-                  <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
-                    <svg className="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    <span className="flex-1 text-sm font-black text-emerald-700 uppercase">{insertCategory}</span>
-                    <button
-                      type="button"
-                      onClick={() => { setUserChoseCategory(true); setInsertCategory(''); }}
-                      className="text-[8px] font-black text-emerald-600 hover:text-emerald-800 uppercase bg-emerald-100 hover:bg-emerald-200 px-2 py-0.5 rounded-lg transition-colors"
-                    >
-                      Alterar
-                    </button>
-                  </div>
-                ) : (
-                  <SmartCategorySelect
-                    categories={categories}
-                    value={insertCategory}
-                    onChange={v => { setInsertCategory(v); setUserChoseCategory(true); }}
-                  />
-                )}
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={closeInsertModal}
-                className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-black uppercase hover:bg-slate-200 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleInsertOs}
-                disabled={!insertOs.trim() || !insertCategory || insertLoading}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black uppercase hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {insertLoading ? 'Salvando...' : 'Inserir'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Insert OS modal — formulário completo (equivalente a Nova Programação) */}
+      <NewTripModal
+        isOpen={showInsertModal}
+        onClose={() => setShowInsertModal(false)}
+        onSuccess={() => { onRefresh(); }}
+        drivers={insertDrivers}
+        customers={insertCustomers}
+        categories={categories as any}
+      />
     </div>
   );
 };
