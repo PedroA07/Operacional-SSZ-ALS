@@ -28,6 +28,7 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
   const [items, setItems] = useState<ImportItem[]>([]);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -128,9 +129,9 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
       }
       await onImported();
       onClose();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Erro ao importar OS:', e);
-      alert('Erro ao salvar uma das OS — veja o console para detalhes.');
+      setSaveError(`Erro ao salvar uma das OS: ${e?.message || 'erro desconhecido'}. Nenhuma alteração adicional foi feita.`);
     } finally {
       setSaving(false);
     }
@@ -315,6 +316,11 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
         </div>
 
         {/* Footer */}
+        {saveError && (
+          <div className="mx-5 mb-2 p-3 bg-red-50 border border-red-200 rounded-2xl text-[10px] font-bold text-red-600 shrink-0">
+            {saveError}
+          </div>
+        )}
         {items.length > 0 && (
           <div className="p-5 pt-3 border-t border-slate-100 shrink-0 flex gap-2">
             <button
