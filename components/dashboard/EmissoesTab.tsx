@@ -34,6 +34,28 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
 
   const [showInsertModal, setShowInsertModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  // Tipos de operação (para colorir o tipo da programação nas linhas)
+  const [operationTypes, setOperationTypes] = useState<{ name: string; color?: string }[]>([]);
+
+  useEffect(() => {
+    db.getOperationTypes().then(types => setOperationTypes(types || [])).catch(() => {});
+  }, []);
+
+  const typeBadge = useCallback((t: Trip) => {
+    const name = (t.type || '').toUpperCase();
+    const op = operationTypes.find(o => o.name?.toUpperCase() === name);
+    const color = op?.color;
+    return (
+      <span
+        className="text-[7px] px-1.5 py-0.5 rounded font-black border w-fit uppercase whitespace-nowrap"
+        style={color
+          ? { backgroundColor: `${color}20`, color, borderColor: `${color}55` }
+          : { backgroundColor: '#f8fafc', color: '#64748b', borderColor: '#e2e8f0' }}
+      >
+        {t.type || 'SEM TIPO'}
+      </span>
+    );
+  }, [operationTypes]);
   // Cadastros para o formulário completo de Nova Programação (carregados sob demanda)
   const [insertDrivers, setInsertDrivers] = useState<Driver[]>([]);
   const [insertCustomers, setInsertCustomers] = useState<Customer[]>([]);
@@ -180,13 +202,16 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
               </span>
             )}
           </div>
-          {t.type && (
-            <span className="text-[7px] px-1.5 py-0.5 rounded font-black border w-fit uppercase bg-slate-50 text-slate-500 border-slate-200">
-              {t.type}
-            </span>
-          )}
+          {/* Tipo da programação — sempre visível */}
+          {typeBadge(t)}
         </div>
       ),
+    },
+    {
+      key: 'type',
+      label: 'Tipo',
+      sortValue: (t: Trip) => t.type || '',
+      render: (t: Trip) => typeBadge(t),
     },
     {
       key: 'category',
@@ -380,7 +405,7 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
         );
       },
     },
-  ], [categories, handleUpdate, cteEditingId, cteInputValue, saveCte, obsEditingId, obsInputValue, saveObs]);
+  ], [categories, handleUpdate, cteEditingId, cteInputValue, saveCte, obsEditingId, obsInputValue, saveObs, typeBadge]);
 
   // ── Row styling ────────────────────────────────────────────────────────────
   const getRowStyle = useCallback((t: Trip): React.CSSProperties => {
@@ -550,7 +575,7 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
         getRowStyle={getRowStyle}
         noMaxHeight
         stickyHeaderTop={0}
-        defaultVisibleKeys={['dateTime', 'os', 'category', 'coletaDocGenerated', 'cte', 'cteAnexos', 'observacoes']}
+        defaultVisibleKeys={['dateTime', 'os', 'type', 'category', 'coletaDocGenerated', 'cte', 'cteAnexos', 'observacoes']}
       />
 
       {/* Import OS modal */}
