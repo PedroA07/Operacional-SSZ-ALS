@@ -4,6 +4,8 @@ import { Trip, EmissaoCteAttachment, CteDocParty } from '../../../types';
 import { fileStorage } from '../../../utils/fileStorage';
 import { cteXmlToPdfBlob, extractCteSummary } from '../../../utils/cteXmlToPdf';
 import { parseNfeXml } from '../../../utils/nfeXmlParser';
+import { nfeXmlToPdfBlob } from '../../../utils/nfeXmlToPdf';
+import ConfirmDialog from '../../shared/ConfirmDialog';
 import { downloadFile, downloadBlob, fetchFileBlob } from '../../../utils/fileDownloader';
 import CteViewerModal from './CteViewerModal';
 import { fmtMoney, fmtQty, copyMoney, copyQty, sumUnVolumes, CopyButton, PartyCard } from './cteDisplay';
@@ -28,6 +30,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
   const [progress, setProgress] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<EmissaoCteAttachment | null>(null);
   const [viewer, setViewer] = useState<{ att: EmissaoCteAttachment; url: string; title: string } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -161,11 +164,38 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
       addParty(destinatarios, info.destinatario);
     });
 
+    // NF-es: totais próprios (separados dos CT-es), com dedupe por chave/nº
+    const nfes = attachments.filter(a => a.docType === 'nfe' && a.nfeInfo);
+    const nfeDuplicateIds = new Set<string>();
+    const nfeSeen = new Set<string>();
+    let nfeUniqueCount = 0;
+    let nfeTotalValor: number | undefined;
+    let nfeTotalPesoBruto: number | undefined;
+    let nfeTotalPesoLiquido: number | undefined;
+    let nfeTotalVolumes: number | undefined;
+    nfes.forEach(a => {
+      const info = a.nfeInfo!;
+      const key = info.chave || (info.numero ? `n:${info.numero}` : `id:${a.id}`);
+      if (nfeSeen.has(key)) { nfeDuplicateIds.add(a.id); return; }
+      nfeSeen.add(key);
+      nfeUniqueCount++;
+      if (info.valorNf !== undefined) nfeTotalValor = (nfeTotalValor || 0) + info.valorNf;
+      if (info.pesoBruto !== undefined) nfeTotalPesoBruto = (nfeTotalPesoBruto || 0) + info.pesoBruto;
+      if (info.pesoLiquido !== undefined) nfeTotalPesoLiquido = (nfeTotalPesoLiquido || 0) + info.pesoLiquido;
+      if (info.qVolumes !== undefined) nfeTotalVolumes = (nfeTotalVolumes || 0) + info.qVolumes;
+    });
+
     return {
       withInfo,
       uniqueCount: uniqueInfo.length,
       duplicateIds,
-      nfes: attachments.filter(a => a.docType === 'nfe' && a.nfeInfo),
+      nfes,
+      nfeDuplicateIds,
+      nfeUniqueCount,
+      nfeTotalValor,
+      nfeTotalPesoBruto,
+      nfeTotalPesoLiquido,
+      nfeTotalVolumes,
       semInfo: attachments.filter(a => !a.cteInfo && a.docType !== 'nfe'),
       totalPrestacao,
       totalCarga,
@@ -240,6 +270,18 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
               if (nfe) {
                 att.docType = 'nfe';
                 att.nfeInfo = nfe;
+                // Gera o DANFE em PDF para visualização nativa
+                try {
+                  const danfe = nfeXmlToPdfBlob(xmlText);
+                  if (danfe) {
+                    const baseName = file.name.replace(/\.[^.]+$/, '');
+                    const pdfFile = new File([danfe.blob], `danfe_${baseName}.pdf`, { type: 'application/pdf' });
+                    att.pdfUrl = await fileStorage.uploadEmissaoCte(pdfFile, trip.os);
+                  }
+                } catch (danfeErr) {
+                  console.error('Erro na conversão NF-e→PDF:', danfeErr);
+                  newErrors.push(`"${file.name}": NF-e anexada, mas houve erro na conversão para PDF.`);
+                }
               } else {
                 newErrors.push(`"${file.name}": XML anexado, mas não foi reconhecido como CT-e nem NF-e.`);
               }
@@ -295,7 +337,6 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
   };
 
   const handleDelete = async (att: EmissaoCteAttachment) => {
-    if (!window.confirm(`Excluir o anexo "${att.fileName}"?`)) return;
     setDeletingId(att.id);
     try {
       // Exclusão do bucket é best-effort — o registro é removido mesmo se falhar
@@ -316,7 +357,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
     if (att.fileType === 'pdf') {
       setViewer({ att, url: att.url, title: `CT-E — ${att.fileName}` });
     } else if (att.pdfUrl) {
-      setViewer({ att, url: att.pdfUrl, title: `DACTE — ${att.fileName}` });
+      setViewer({ att, url: att.pdfUrl, title: `${att.docType === 'nfe' ? 'DANFE' : 'DACTE'} — ${att.fileName}` });
     } else {
       window.open(att.url, '_blank', 'noopener');
     }
@@ -559,7 +600,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
 
                             <button
                               type="button"
-                              onClick={() => handleDelete(att)}
+                              onClick={() => setConfirmDelete(att)}
                               disabled={deletingId === att.id}
                               className="p-1.5 text-red-400 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-40"
                               title="Excluir anexo"
@@ -633,7 +674,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                   {summary.withInfo.length > 0 && (
                   <>
                   <div>
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Totais do Processo</p>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Totais dos CT-Es</p>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="p-3 bg-blue-50 border border-blue-100 rounded-2xl">
                         <p className="text-[8px] font-black text-blue-500 uppercase">CT-Es</p>
@@ -790,6 +831,47 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                   {/* Notas Fiscais anexadas (XML de NF-e) */}
                   {summary.nfes.length > 0 && (
                     <div>
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Totais das NF-es</p>
+                      <div className="grid grid-cols-4 gap-2 mb-1.5">
+                        <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                          <p className="text-[8px] font-black text-emerald-500 uppercase">NF-es</p>
+                          <p className="text-base font-black text-emerald-700 mt-0.5">{summary.nfeUniqueCount}</p>
+                          {summary.nfeDuplicateIds.size > 0 && (
+                            <p className="text-[7px] font-black text-amber-600 uppercase mt-0.5">
+                              +{summary.nfeDuplicateIds.size} dup.
+                            </p>
+                          )}
+                        </div>
+                        <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                          <p className="text-[8px] font-black text-emerald-500 uppercase">Valor das NFs</p>
+                          <div className="flex items-center gap-0.5 mt-1">
+                            <p className="text-[11px] font-black text-emerald-700">{fmtMoney(summary.nfeTotalValor)}</p>
+                            <CopyButton value={copyMoney(summary.nfeTotalValor)} title="Copiar valor total das NFs" />
+                          </div>
+                        </div>
+                        <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                          <p className="text-[8px] font-black text-emerald-500 uppercase">Peso Bruto</p>
+                          <div className="flex items-center gap-0.5 mt-1">
+                            <p className="text-[11px] font-black text-emerald-700">
+                              {summary.nfeTotalPesoBruto !== undefined ? `${fmtQty(summary.nfeTotalPesoBruto)} KG` : '—'}
+                            </p>
+                            {summary.nfeTotalPesoBruto !== undefined && (
+                              <CopyButton value={copyQty(summary.nfeTotalPesoBruto)} title="Copiar peso bruto total das NFs" />
+                            )}
+                          </div>
+                        </div>
+                        <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                          <p className="text-[8px] font-black text-emerald-500 uppercase">Volumes</p>
+                          <div className="flex items-center gap-0.5 mt-1">
+                            <p className="text-[11px] font-black text-emerald-700">
+                              {summary.nfeTotalVolumes !== undefined ? fmtQty(summary.nfeTotalVolumes) : '—'}
+                            </p>
+                            {summary.nfeTotalVolumes !== undefined && (
+                              <CopyButton value={copyQty(summary.nfeTotalVolumes)} title="Copiar total de volumes das NFs" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
                       <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
                         NF-es Anexadas ({summary.nfes.length})
                       </p>
@@ -797,7 +879,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                         {summary.nfes.map(att => {
                           const nfe = att.nfeInfo!;
                           return (
-                            <div key={att.id} className="p-3 bg-white border border-emerald-200 rounded-2xl">
+                            <div key={att.id} className={`p-3 bg-white border rounded-2xl ${summary.nfeDuplicateIds.has(att.id) ? 'border-amber-300' : 'border-emerald-200'}`}>
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1 min-w-0">
                                   <p className="text-[10px] font-black text-emerald-800">
@@ -805,6 +887,11 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                                   </p>
                                   <CopyButton value={nfe.numero} title="Copiar nº da NF-e" />
                                   {nfe.chave && <CopyButton value={nfe.chave} title="Copiar chave de acesso (sem espaços)" />}
+                                  {summary.nfeDuplicateIds.has(att.id) && (
+                                    <span className="text-[7px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-black uppercase shrink-0" title="NF-e repetida — não é somada nos totais">
+                                      Duplicado
+                                    </span>
+                                  )}
                                   {nfe.container && (
                                     <span className="text-[7px] px-1.5 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded font-black uppercase shrink-0 flex items-center gap-0.5">
                                       {nfe.container}
@@ -917,6 +1004,23 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
           </div>
         </div>
       </div>
+
+      {/* Confirmação de exclusão (modal do sistema) */}
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title="Excluir anexo"
+        message={`Excluir o anexo "${confirmDelete?.fileName}"? O arquivo também será removido do armazenamento.`}
+        confirmLabel="Excluir"
+        danger
+        loading={deletingId !== null}
+        onConfirm={async () => {
+          if (confirmDelete) {
+            await handleDelete(confirmDelete);
+            setConfirmDelete(null);
+          }
+        }}
+        onCancel={() => { if (deletingId === null) setConfirmDelete(null); }}
+      />
 
       {/* PDF viewer com painel de valores */}
       {viewer && (

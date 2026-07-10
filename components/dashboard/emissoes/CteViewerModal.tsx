@@ -20,6 +20,7 @@ interface CteViewerModalProps {
 const CteViewerModal: React.FC<CteViewerModalProps> = ({ attachment, url, title, totals, onClose }) => {
   const [showPanel, setShowPanel] = useState(true);
   const info = attachment.cteInfo;
+  const nfe = attachment.docType === 'nfe' ? attachment.nfeInfo : undefined;
 
   const handlePrint = () => {
     const printWindow = window.open(url, '_blank');
@@ -94,9 +95,90 @@ const CteViewerModal: React.FC<CteViewerModalProps> = ({ attachment, url, title,
         {/* Painel lateral de valores */}
         {showPanel && (
           <aside className="w-[300px] sm:w-[340px] shrink-0 bg-slate-900 border-l border-white/10 overflow-y-auto p-4 space-y-4">
-            <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Valores do CT-E</p>
+            <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest">
+              {nfe ? 'Valores da NF-e' : 'Valores do CT-E'}
+            </p>
 
-            {!info ? (
+            {nfe ? (
+              <>
+                {/* Identificação da NF-e */}
+                <div className="p-3 bg-white/5 border border-white/10 rounded-2xl space-y-1">
+                  <div className="flex items-baseline justify-between">
+                    <div className="flex items-center gap-1">
+                      <p className="text-sm font-black text-white">NF-e {nfe.numero || '—'}</p>
+                      <CopyButton value={nfe.numero} title="Copiar nº da NF-e" light />
+                    </div>
+                    {nfe.serie && <p className="text-[9px] font-bold text-slate-400">Série {nfe.serie}</p>}
+                  </div>
+                  {nfe.container && (
+                    <span className="inline-flex items-center gap-1 text-[8px] px-1.5 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded font-black uppercase">
+                      Container: {nfe.container}
+                      <CopyButton value={nfe.container} title="Copiar container" light />
+                    </span>
+                  )}
+                  {nfe.dataEmissao && (
+                    <p className="text-[9px] text-slate-400 flex items-center gap-1">
+                      Emissão: {new Date(nfe.dataEmissao).toLocaleDateString('pt-BR')}
+                      <CopyButton value={new Date(nfe.dataEmissao).toLocaleDateString('pt-BR')} title="Copiar data de emissão" light />
+                    </p>
+                  )}
+                  {nfe.chave && (
+                    <div className="flex items-start gap-1">
+                      <p className="text-[8px] text-slate-500 break-all leading-relaxed flex-1">{nfe.chave.replace(/(\d{4})(?=\d)/g, '$1 ')}</p>
+                      <CopyButton value={nfe.chave} title="Copiar chave de acesso (sem espaços)" light />
+                    </div>
+                  )}
+                </div>
+
+                {/* Valores da NF */}
+                <div className="grid grid-cols-1 gap-2">
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
+                    <p className="text-[8px] font-black text-emerald-400 uppercase">Valor da NF</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-base font-black text-emerald-300 mt-0.5">{fmtMoney(nfe.valorNf)}</p>
+                      <CopyButton value={copyMoney(nfe.valorNf)} title="Copiar valor da NF" light />
+                    </div>
+                  </div>
+                  {(nfe.pesoBruto !== undefined || nfe.pesoLiquido !== undefined || nfe.qVolumes !== undefined) && (
+                    <div className="p-3 bg-white/5 border border-white/10 rounded-2xl space-y-0.5">
+                      <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Pesos e Volumes</p>
+                      {nfe.pesoBruto !== undefined && (
+                        <p className="text-[11px] font-black text-white flex items-center gap-1">
+                          Peso Bruto: {fmtQty(nfe.pesoBruto)} KG
+                          <CopyButton value={copyQty(nfe.pesoBruto)} title="Copiar peso bruto" light />
+                        </p>
+                      )}
+                      {nfe.pesoLiquido !== undefined && (
+                        <p className="text-[11px] font-black text-slate-300 flex items-center gap-1">
+                          Peso Líquido: {fmtQty(nfe.pesoLiquido)} KG
+                          <CopyButton value={copyQty(nfe.pesoLiquido)} title="Copiar peso líquido" light />
+                        </p>
+                      )}
+                      {nfe.qVolumes !== undefined && (
+                        <p className="text-[11px] font-black text-amber-300 flex items-center gap-1">
+                          Volumes: {fmtQty(nfe.qVolumes)}
+                          <CopyButton value={copyQty(nfe.qVolumes)} title="Copiar quantidade de volumes" light />
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Partes */}
+                {nfe.emitente && (nfe.emitente.nome || nfe.emitente.cnpjCpf) && (
+                  <div>
+                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Emitente</p>
+                    <PartyCard party={nfe.emitente} compact />
+                  </div>
+                )}
+                {nfe.destinatario && (nfe.destinatario.nome || nfe.destinatario.cnpjCpf) && (
+                  <div>
+                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Destinatário</p>
+                    <PartyCard party={nfe.destinatario} compact />
+                  </div>
+                )}
+              </>
+            ) : !info ? (
               <p className="text-[10px] text-slate-400 leading-relaxed">
                 Nenhum valor extraído deste anexo. Valores são lidos automaticamente do XML do CT-e
                 ou da camada de texto de PDFs (DACTEs escaneados como imagem não permitem extração).
