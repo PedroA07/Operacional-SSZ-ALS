@@ -38,6 +38,9 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
   const [bundleLoading, setBundleLoading] = useState<'pdf' | 'xml' | 'all' | null>(null);
 
   const attachments = trip.emissaoCteAttachments || [];
+  // Regra visual da Aliança (aba Valores): CT-e de transporte → RODOVIÁRIO;
+  // CT-e referenciado → MULTIMODAL — ajuda no preenchimento de sistemas externos
+  const isAlianca = (trip.category || '').toUpperCase().includes('ALIAN');
 
   // Nome base dos arquivos baixados: "OS - CONTAINER"
   const baseName = useMemo(() => {
@@ -636,6 +639,20 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
               ) : (
                 <div className="space-y-4">
 
+                  {/* Lembrete Aliança para preenchimento em sistema externo */}
+                  {isAlianca && summary.withInfo.length > 0 && (
+                    <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-start gap-2">
+                      <svg className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                      <p className="text-[9px] font-bold text-indigo-700 leading-relaxed">
+                        <span className="font-black uppercase">Aliança:</span> no preenchimento externo, o CT-e de{' '}
+                        <span className="font-black">transporte</span> é sempre <span className="font-black text-blue-700">RODOVIÁRIO</span> e o CT-e{' '}
+                        <span className="font-black">referenciado</span> é sempre <span className="font-black text-purple-700">MULTIMODAL</span>.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Pesos da OS: tara + peso da carga + soma */}
                   {pesosOs.soma !== undefined && (
                     <div>
@@ -733,9 +750,21 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                                 <CopyButton value={info.numero} title="Copiar nº do CT-e" />
                                 {info.chave && <CopyButton value={info.chave} title="Copiar chave de acesso (sem espaços)" />}
                                 {info.modal && (
-                                  <span className="text-[7px] px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-200 rounded font-black uppercase shrink-0">
-                                    {info.modal}
-                                  </span>
+                                  isAlianca ? (
+                                    info.modal === 'RODOVIÁRIO' ? (
+                                      <span className="text-[7px] px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-200 rounded font-black uppercase shrink-0" title="CT-e de transporte — preencher como RODOVIÁRIO no sistema externo">
+                                        TRANSPORTE · RODOVIÁRIO
+                                      </span>
+                                    ) : (
+                                      <span className="text-[7px] px-1.5 py-0.5 bg-purple-50 text-purple-600 border border-purple-200 rounded font-black uppercase shrink-0" title={`CT-e referenciado (modal ${info.modal}) — preencher como MULTIMODAL no sistema externo`}>
+                                        REFERENCIADO · MULTIMODAL
+                                      </span>
+                                    )
+                                  ) : (
+                                    <span className="text-[7px] px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-200 rounded font-black uppercase shrink-0">
+                                      {info.modal}
+                                    </span>
+                                  )
                                 )}
                                 {summary.duplicateIds.has(att.id) && (
                                   <span className="text-[7px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-black uppercase shrink-0" title="CT-e repetido — não é somado nos totais do processo">
