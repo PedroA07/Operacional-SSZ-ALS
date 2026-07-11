@@ -1866,7 +1866,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     const readyTrips = trips.filter(t => isTripReadyToFinalize(t));
 
     if (readyTrips.length === 0) {
-      alert("Nenhuma viagem está pronta para limpar. Certifique-se de que as viagens agendadas têm 'NF' e 'Adiantamento' marcados, ou que viagens em Frete Morto têm 'Adiantamento' marcado.");
+      alert(activeView === 'ENTREGA'
+        ? "Nenhuma viagem está concluída para limpar. Na Entrega/Import a viagem conclui quando a baixa do vazio é confirmada via status, está agendada ou o container foi reutilizado."
+        : "Nenhuma viagem está pronta para limpar. Certifique-se de que as viagens agendadas têm 'NF' e 'Adiantamento' marcados, ou que viagens em Frete Morto têm 'Adiantamento' marcado.");
       return;
     }
 
@@ -1960,10 +1962,30 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return !!t.isScheduled || !!t.preStackingFormData;
   }, []);
 
+  // Baixa do vazio confirmada via status: devolução vinculada à viagem
+  // (mesma OS ou mesmo container) com status Agendado ou Realizado
+  const hasBaixaConfirmada = useCallback((t: Trip) => {
+    const os = (t.os || '').trim().toUpperCase();
+    const cont = (t.container || '').replace(/\s/g, '').toUpperCase();
+    return devolucoes.some(d => {
+      if (d.status !== 'Agendado' && d.status !== 'Realizado') return false;
+      const dOs = (d.os || '').trim().toUpperCase();
+      const dCont = (d.container || '').replace(/\s/g, '').toUpperCase();
+      return (os && dOs === os) || (cont && dCont === cont);
+    });
+  }, [devolucoes]);
+
+  // Entrega/Import: a viagem está concluída quando a baixa do vazio foi
+  // confirmada via status, ou está agendada, ou o container foi reutilizado
+  const isEntregaConcluida = useCallback((t: Trip) =>
+    t.status === 'Reutilização' || isTripScheduled(t) || hasBaixaConfirmada(t),
+  [isTripScheduled, hasBaixaConfirmada]);
+
   const isTripReadyToFinalize = useCallback((t: Trip) => {
     if (t.status === 'Frete Morto') return !!t.hasAdvance;
+    if (activeView === 'ENTREGA') return isEntregaConcluida(t);
     return isTripScheduled(t) && !!t.sentNF && !!t.hasAdvance;
-  }, [isTripScheduled]);
+  }, [isTripScheduled, activeView, isEntregaConcluida]);
 
   const mapTripToMinuta = useCallback((t: Trip) => ({
     os: t.os || '',
@@ -2352,6 +2374,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 NF
               </span>
             )}
+            {activeView === 'ENTREGA' && isEntregaConcluida(t) && (
+              <span
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-600 text-[6px] font-black text-white uppercase tracking-tight"
+                title={`Viagem concluída — ${t.status === 'Reutilização' ? 'container reutilizado' : hasBaixaConfirmada(t) ? 'baixa do vazio confirmada' : 'agendada'}`}
+              >
+                <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/>
+                </svg>
+                Concluída
+              </span>
+            )}
           </div>
         );
       }
@@ -2536,7 +2569,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao, tiposViagem, isColetaSemEmail, handleToggleColetaEmail, handleToggleColetaDoc, retiradaOptions, handleRetiradaCheioChange, handleTripAgendamentoUpload, handleReutComprovanteUpload, uploadingTripDoc]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao, tiposViagem, isColetaSemEmail, handleToggleColetaEmail, handleToggleColetaDoc, retiradaOptions, handleRetiradaCheioChange, handleTripAgendamentoUpload, handleReutComprovanteUpload, uploadingTripDoc, isEntregaConcluida, hasBaixaConfirmada]);
 
   const handleDeleteDevolucao = useCallback((d: Devolucao) => {
     setConfirmModal({
