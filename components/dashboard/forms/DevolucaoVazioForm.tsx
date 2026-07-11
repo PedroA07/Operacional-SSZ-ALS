@@ -13,6 +13,7 @@ import { localDateStr } from '../../../utils/dateHelpers';
 import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
 import { searchService } from '../../../utils/searchService';
+import ConfirmDialog from '../../shared/ConfirmDialog';
 
 interface DevolucaoVazioFormProps {
   user?: User;
@@ -48,6 +49,8 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
   const [isSaving, setIsSaving] = useState(false);
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [showDateError, setShowDateError] = useState(false);
+  // Sem data/hora: pergunta se o terminal dispensa agendamento antes de obrigar
+  const [confirmSemAgendamento, setConfirmSemAgendamento] = useState<null | 'save' | 'pdf'>(null);
 
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
@@ -133,10 +136,11 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
 
   const effectiveDriver = selectedDriver ? { ...selectedDriver, plateHorse, plateTrailer } : undefined;
 
-  const buildUpdatedDevolucao = (): Devolucao | null => {
+  const buildUpdatedDevolucao = (semAgendamento = false): Devolucao | null => {
     if (!devolucao) return null;
     return {
       ...devolucao,
+      semAgendamento: semAgendamento || (devolucao.semAgendamento && !formData.agendamentoDateTime) || false,
       container:         formData.container,
       containerType:     formData.tipo              || undefined,
       booking:           formData.booking           || undefined,
@@ -170,25 +174,27 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
     };
   };
 
-  const saveData = async () => {
+  const saveData = async (semAgendamento = false) => {
     if (!devolucao || !onSave) return;
-    if (!formData.agendamentoDateTime) { setShowDateError(true); return; }
+    // Terminal pode dispensar agendamento — pergunta antes de obrigar a data/hora
+    if (!formData.agendamentoDateTime && !semAgendamento) { setConfirmSemAgendamento('save'); return; }
     setIsSaving(true);
     try {
-      const updated = buildUpdatedDevolucao();
+      const updated = buildUpdatedDevolucao(semAgendamento);
       if (updated) await onSave(updated);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const downloadPDF = async () => {
+  const downloadPDF = async (semAgendamento = false) => {
     if (!effectiveDriver || !formData.container) {
       alert("Preencha Container e Motorista para prosseguir.");
       return;
     }
-    if (!formData.agendamentoDateTime) {
-      setShowDateError(true);
+    // Terminal pode dispensar agendamento — pergunta antes de obrigar a data/hora
+    if (!formData.agendamentoDateTime && !semAgendamento) {
+      setConfirmSemAgendamento('pdf');
       return;
     }
     setIsExporting(true);
@@ -204,7 +210,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
         );
       }
       if (devolucao && onSave) {
-        const updated = buildUpdatedDevolucao();
+        const updated = buildUpdatedDevolucao(semAgendamento);
         if (updated) await onSave(updated);
       } else {
         // Fire-and-forget: registro não deve bloquear a geração do PDF
@@ -228,6 +234,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
             driver: effectiveDriver ? { id: effectiveDriver.id, name: effectiveDriver.name, plateHorse: effectiveDriver.plateHorse, plateTrailer: effectiveDriver.plateTrailer, cpf: (effectiveDriver as any).cpf } : undefined,
             obs: formData.obs || undefined,
             scheduledDateTime: formData.agendamentoDateTime ? new Date(formData.agendamentoDateTime).toISOString() : undefined,
+            semAgendamento: semAgendamento || undefined,
             status: formData.agendamentoDateTime ? 'Agendado' : 'Pendente',
             createdAt: new Date().toISOString(),
             userName: activeUser?.displayName || undefined,
@@ -431,18 +438,20 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
             {showDateError && !formData.agendamentoDateTime ? (
               <p className="text-[8px] text-red-500 font-black mt-1">Campo obrigatório</p>
             ) : (
-              <p className="text-[8px] text-slate-400 font-bold mt-1">Apenas para controle interno — não aparece no PDF.</p>
+              <p className="text-[8px] text-slate-400 font-bold mt-1">
+                Apenas para controle interno — não aparece no PDF. Terminais sem agendamento podem seguir sem data (será perguntado).
+              </p>
             )}
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           {devolucao && onSave && (
-            <button disabled={isSaving} onClick={saveData} className="py-6 bg-white border-2 border-slate-200 text-slate-700 rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-3 active:scale-95 shadow-sm">
+            <button disabled={isSaving} onClick={() => saveData()} className="py-6 bg-white border-2 border-slate-200 text-slate-700 rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-3 active:scale-95 shadow-sm">
               {isSaving ? 'Processando...' : 'Salvar Dados'}
             </button>
           )}
-          <button disabled={isExporting} onClick={downloadPDF} className={`py-6 bg-slate-900 text-white rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${devolucao && onSave ? '' : 'col-span-2'}`}>
+          <button disabled={isExporting} onClick={() => downloadPDF()} className={`py-6 bg-slate-900 text-white rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${devolucao && onSave ? '' : 'col-span-2'}`}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth="2.5"/></svg>
             {isExporting ? 'Gerando PDF...' : 'Baixar Minuta'}
           </button>
@@ -465,6 +474,22 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
           onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}
         />
       )}
+
+      {/* Sem data/hora: confirma se o terminal dispensa agendamento antes de obrigar */}
+      <ConfirmDialog
+        open={confirmSemAgendamento !== null}
+        title="Terminal sem agendamento?"
+        message="Nenhuma data/hora foi informada. Este terminal pré-stacking não exige agendamento nem comprovante? Se confirmar, a devolução segue sem data e não será cobrado comprovante."
+        confirmLabel="Sim, sem agendamento"
+        cancelLabel="Informar data/hora"
+        onConfirm={() => {
+          const action = confirmSemAgendamento;
+          setConfirmSemAgendamento(null);
+          if (action === 'save') saveData(true);
+          else if (action === 'pdf') downloadPDF(true);
+        }}
+        onCancel={() => { setConfirmSemAgendamento(null); setShowDateError(true); }}
+      />
     </div>
   );
 };

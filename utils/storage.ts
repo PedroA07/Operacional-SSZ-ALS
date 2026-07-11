@@ -2131,6 +2131,7 @@ export const db = {
         fileName:   r.agendamento_doc_file_name  ?? '',
         uploadDate: r.agendamento_doc_upload_date ?? '',
       } : undefined,
+      semAgendamento: r.sem_agendamento ?? false,
       obs:         r.obs          ?? undefined,
       status:      (r.status as DevolucaoStatus) ?? 'Pendente',
       isCompleted: r.is_completed ?? false,
@@ -2172,6 +2173,7 @@ export const db = {
       agendamento_doc_url:        d.agendamentoDoc?.url       ?? null,
       agendamento_doc_file_name:  d.agendamentoDoc?.fileName  ?? null,
       agendamento_doc_upload_date:d.agendamentoDoc?.uploadDate?? null,
+      sem_agendamento:            d.semAgendamento            ?? false,
       obs:                        d.obs                       ?? null,
       status:                     d.status,
       is_completed:               d.isCompleted               ?? false,
@@ -2181,6 +2183,12 @@ export const db = {
       updated_at:                 now,
     };
     const { error } = await supabase.from('devolucoes').upsert(payload);
+    if (error && /sem_agendamento/.test(error.message || '')) {
+      // Banco ainda sem a coluna (migração pendente) — salva sem a flag
+      delete payload.sem_agendamento;
+      const { error: retryError } = await supabase.from('devolucoes').upsert(payload);
+      return !retryError;
+    }
     return !error;
   },
 
