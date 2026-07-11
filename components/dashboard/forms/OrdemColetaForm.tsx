@@ -18,8 +18,9 @@ import { tripSyncService } from '../../../utils/tripSyncService';
 import { ocRules } from '../../../utils/ocRules';
 import { db } from '../../../utils/storage';
 import { localDateStr, localDateTimeStr } from '../../../utils/dateHelpers';
-import { parseAliancaOsPdf, matchCustomer, matchByName, matchOperationType, normalizeKg } from '../../../utils/aliancaOsParser';
+import { parseAliancaOsPdf, matchCustomer, matchByName, matchOperationType, normalizeKg, resolveClienteDestino } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
+import { appendPdfToJsPdf } from '../../../utils/pdfMerger';
 
 interface OrdemColetaFormProps {
   user?: User;
@@ -46,6 +47,11 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
   const importOsInputRef = useRef<HTMLInputElement>(null);
   const [importingOs, setImportingOs] = useState(false);
   const [importOsNote, setImportOsNote] = useState<string | null>(null);
+  // OS importada fica anexada: preview junto à OC e páginas incluídas no PDF final
+  const [osFile, setOsFile] = useState<File | null>(null);
+  const [osPreviewUrl, setOsPreviewUrl] = useState<string | null>(null);
+  const [showOsPreview, setShowOsPreview] = useState(true);
+  useEffect(() => () => { if (osPreviewUrl) URL.revokeObjectURL(osPreviewUrl); }, [osPreviewUrl]);
   const [plateHorse, setPlateHorse] = useState('');
   const [plateTrailer, setPlateTrailer] = useState('');
   const [swapModalOpen, setSwapModalOpen] = useState(false);
@@ -221,14 +227,17 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         setImportOsNote('PDF não reconhecido como OS da Aliança.');
         return;
       }
+      // Remetente/destino conforme o tipo da OS: coleta/exportação usa
+      // Local Coleta → Entregar Cheio; entrega/importação usa Local Entrega →
+      // Entregar Vazio. Sem cadastro, cadastra pelo CNPJ.
+      const cd = resolveClienteDestino(p);
       let matchedCustomer: any = matchCustomer(allCustomers, p);
       let autoRegisteredCustomer = false;
-      // Local de Coleta = remetente. Sem cadastro, cadastra pelo CNPJ.
-      if (!matchedCustomer && p.cnpjColeta) {
-        const ensured = await ensureCustomerByCnpj(allCustomers, p.cnpjColeta, {
-          nome: p.cliente || p.embarcador, cnpj: p.cnpjColeta,
-          endereco: p.enderecoColeta, municipio: p.municipioColeta, uf: p.ufColeta,
-          bairro: p.bairroColeta, cep: p.cepColeta,
+      if (!matchedCustomer && cd.clienteCnpj) {
+        const ensured = await ensureCustomerByCnpj(allCustomers, cd.clienteCnpj, {
+          nome: cd.clienteNome, cnpj: cd.clienteCnpj,
+          endereco: cd.clienteEndereco, municipio: cd.clienteMunicipio, uf: cd.clienteUf,
+          bairro: cd.clienteBairro, cep: cd.clienteCep,
         });
         if (ensured) {
           matchedCustomer = ensured.customer;
@@ -236,7 +245,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
           if (ensured.created) setExtraCustomers(prev => [ensured.customer as any, ...prev]);
         }
       }
-      const matchedDest = matchByName(destinatarioOptions as any[], p.entregarCheio);
+      const matchedDest = matchByName(destinatarioOptions as any[], cd.destinoNome);
       const matchedTipo = matchByName(containerTypes, p.containerTipo);
       const matchedOpType = matchOperationType(operationTypes, p.tipoOperacao)?.name;
       const detected = osCategoryService.detectCategoryFromOS(p.os);
@@ -255,17 +264,23 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         agencia: p.armador || prev.agencia,
         horarioAgendado: p.dataColeta || prev.horarioAgendado,
         tara: normalizeKg(p.tara) || prev.tara,
+        seal: p.lacre ? maskSeal(p.lacre.toUpperCase()) : prev.seal,
         category: (detected || prev.category || '').toUpperCase(),
         remetenteId: matchedCustomer?.id || prev.remetenteId,
         destinatarioId: matchedDest?.id || prev.destinatarioId,
       }));
       if (detected) setUserHasChosenCategory(true);
+      // Mantém a OS anexada: preview ao lado e páginas no PDF final da OC
+      setOsFile(file);
+      setOsPreviewUrl(URL.createObjectURL(file));
+      setShowOsPreview(true);
 
       const notes: string[] = [`OS ${p.os} importada — confira os campos.`];
+      notes.push(`Remetente pelo ${cd.clienteOrigem === 'LOCAL ENTREGA' ? 'Local de Entrega' : 'Local de Coleta'} e destino pelo ${cd.destinoOrigem === 'ENTREGAR VAZIO' ? 'Entregar Vazio' : 'Entregar Cheio'} (tipo ${p.tipoOperacao || '—'}).`);
       if (p.shipFromObs) notes.push(`Navio extraído das Demais Observações (campo trazia: ${p.navioViagemCampo || '—'}).`);
       if (autoRegisteredCustomer) notes.push(`Cliente cadastrado automaticamente pelo CNPJ: ${matchedCustomer.name || matchedCustomer.legalName}.`);
       else if (matchedCustomer) notes.push(`Remetente vinculado: ${matchedCustomer.name || matchedCustomer.legalName}.`);
-      else if (p.cliente) notes.push(`Cliente "${p.cliente}" não encontrado no cadastro — selecione ou cadastre.`);
+      else if (cd.clienteNome) notes.push(`Cliente "${cd.clienteNome}" não encontrado no cadastro — selecione ou cadastre.`);
       if (matchedDest) notes.push(`Destino vinculado: ${(matchedDest as any).name}.`);
       if (p.senhaOc) notes.push(`Autorização de Coleta preenchida: ${p.senhaOc}.`);
       if (p.padraoCarga && p.padraoCarga !== 'CARGA GERAL') notes.push(`Padrão de carga: ${p.padraoCarga}.`);
@@ -328,10 +343,16 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         logging: false
       });
       
-      const imgData = canvas.toDataURL('image/jpeg', 1.0); 
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      
+
+      // Anexa a OS importada ao PDF final — baixa/imprime OC + OS juntas
+      if (osFile) {
+        try { await appendPdfToJsPdf(pdf, osFile); }
+        catch (err) { console.error('Não foi possível anexar a OS ao PDF da OC:', err); }
+      }
+
       const fileName = `OC - ${effectiveDriver!.name} - ${formData.os}`;
 
       if (pendingAction === 'print') {
@@ -382,6 +403,16 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6 mt-4">
            <div className="flex items-center justify-between">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Preenchimento automático</p>
+              {osPreviewUrl && !showOsPreview && (
+                <button
+                  type="button"
+                  onClick={() => setShowOsPreview(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-700 transition-all shadow-sm"
+                  title="Mostrar a OS importada ao lado da OC"
+                >
+                  Ver OS
+                </button>
+              )}
               <input
                 ref={importOsInputRef}
                 type="file"
@@ -631,15 +662,33 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         </div>
       </div>
 
-      <div className="flex-1 bg-slate-200 flex justify-center overflow-auto p-12 custom-scrollbar">
-        <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
-          <OrdemColetaTemplate
-            formData={formData}
-            selectedDriver={effectiveDriver}
-            selectedRemetente={selectedRemetente}
-            selectedDestinatario={selectedDestinatario}
-          />
+      <div className="flex-1 bg-slate-200 flex overflow-hidden">
+        <div className={`${osPreviewUrl && showOsPreview ? 'w-1/2' : 'flex-1'} flex justify-center overflow-auto p-12 custom-scrollbar`}>
+          <div className="origin-top transform scale-75 xl:scale-90 shadow-2xl">
+            <OrdemColetaTemplate
+              formData={formData}
+              selectedDriver={effectiveDriver}
+              selectedRemetente={selectedRemetente}
+              selectedDestinatario={selectedDestinatario}
+            />
+          </div>
         </div>
+        {osPreviewUrl && showOsPreview && (
+          <div className="w-1/2 border-l border-slate-300 bg-slate-100 flex flex-col">
+            <div className="px-4 py-2 bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-between shrink-0">
+              <span>OS importada — sai junto no PDF da OC</span>
+              <button
+                type="button"
+                onClick={() => setShowOsPreview(false)}
+                className="text-white/70 hover:text-white text-[9px] font-black uppercase"
+                title="Ocultar a OS (continua anexada ao PDF)"
+              >
+                Ocultar
+              </button>
+            </div>
+            <iframe src={osPreviewUrl} title="OS importada" className="flex-1 w-full" />
+          </div>
+        )}
       </div>
 
       {quickAdd && (

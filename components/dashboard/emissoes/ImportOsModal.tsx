@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Trip, Customer, ColetaTipoViagemOption, OperationType } from '../../../types';
 import { db } from '../../../utils/storage';
 import { osCategoryService } from '../../../utils/osCategoryService';
-import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, matchOperationType, normalizeKg, ParsedAliancaOs } from '../../../utils/aliancaOsParser';
+import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, matchOperationType, normalizeKg, resolveClienteDestino, ParsedAliancaOs } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 
 interface ImportOsModalProps {
@@ -87,13 +87,15 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
         const it = validItems[i];
         const p = it.parsed!;
 
-        // Local de Coleta = cliente. Se não achou no cadastro, cadastra pelo CNPJ.
+        // Cliente conforme o tipo: coleta/exportação = Local Coleta;
+        // entrega/importação = Local Entrega. Se não achou, cadastra pelo CNPJ.
+        const cd = resolveClienteDestino(p);
         let customer = it.customer;
-        if (!customer && p.cnpjColeta) {
-          const ensured = await ensureCustomerByCnpj(customerPool, p.cnpjColeta, {
-            nome: p.cliente || p.embarcador, cnpj: p.cnpjColeta,
-            endereco: p.enderecoColeta, municipio: p.municipioColeta, uf: p.ufColeta,
-            bairro: p.bairroColeta, cep: p.cepColeta,
+        if (!customer && cd.clienteCnpj) {
+          const ensured = await ensureCustomerByCnpj(customerPool, cd.clienteCnpj, {
+            nome: cd.clienteNome, cnpj: cd.clienteCnpj,
+            endereco: cd.clienteEndereco, municipio: cd.clienteMunicipio, uf: cd.clienteUf,
+            bairro: cd.clienteBairro, cep: cd.clienteCep,
           });
           if (ensured) { customer = ensured.customer; if (ensured.created) customerPool = [ensured.customer, ...customerPool]; }
         }
@@ -111,9 +113,10 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
           containerType: p.containerTipo,
           tara: normalizeKg(p.tara),
           pesoCarga: normalizeKg(p.pesoCarga),
+          seal: p.lacre,
           customer: customer
             ? { id: customer.id, name: customer.name, legalName: customer.legalName, cnpj: customer.cnpj, city: customer.city, state: customer.state }
-            : { id: '', name: p.cliente || '', cnpj: p.cnpjColeta || '', city: p.municipioColeta || '' },
+            : { id: '', name: cd.clienteNome || '', cnpj: cd.clienteCnpj || '', city: cd.clienteMunicipio || '' },
           driver: { id: '', name: '', plateHorse: '', plateTrailer: '', status: '' },
           status: 'Pendente',
           statusHistory: [],
@@ -124,6 +127,7 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
           autColeta: p.autColeta,
           embarcador: p.embarcador,
           agencia: p.armador,
+          osImportData: p,
         };
         await db.saveTrip(trip);
       }
@@ -230,6 +234,7 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
                 </div>
               ) : (() => {
                 const p = it.parsed!;
+                const cd = resolveClienteDestino(p);
                 return (
                   <>
                     <div className="flex items-center justify-between gap-2">
@@ -266,15 +271,19 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
 
                     <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
                       <div>
-                        <p className="text-[7px] font-black text-slate-400 uppercase">Cliente</p>
-                        <p className="text-[9px] font-bold text-slate-700 truncate" title={it.customer?.name || p.cliente}>
-                          {it.customer?.name || p.cliente || '—'}
+                        <p className="text-[7px] font-black text-slate-400 uppercase">Cliente <span className="text-indigo-400">({cd.clienteOrigem})</span></p>
+                        <p className="text-[9px] font-bold text-slate-700 truncate" title={it.customer?.name || cd.clienteNome}>
+                          {it.customer?.name || cd.clienteNome || '—'}
                           {it.customer
                             ? <span className="ml-1 text-[7px] font-black text-emerald-600 uppercase">✓ cadastro</span>
-                            : p.cnpjColeta
+                            : cd.clienteCnpj
                               ? <span className="ml-1 text-[7px] font-black text-blue-600 uppercase" title="Não encontrado — será cadastrado automaticamente pelo CNPJ ao importar">+ auto-cadastro</span>
                               : <span className="ml-1 text-[7px] font-black text-amber-600 uppercase" title="Cliente sem CNPJ na OS — será salvo com os dados da OS">novo</span>}
                         </p>
+                      </div>
+                      <div>
+                        <p className="text-[7px] font-black text-slate-400 uppercase">Destino <span className="text-indigo-400">({cd.destinoOrigem})</span></p>
+                        <p className="text-[9px] font-bold text-slate-700 truncate" title={cd.destinoNome}>{cd.destinoNome || '—'}</p>
                       </div>
                       <div>
                         <p className="text-[7px] font-black text-slate-400 uppercase">Data/Hora Coleta</p>

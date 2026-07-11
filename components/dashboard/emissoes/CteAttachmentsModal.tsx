@@ -8,7 +8,8 @@ import { nfeXmlToPdfBlob } from '../../../utils/nfeXmlToPdf';
 import ConfirmDialog from '../../shared/ConfirmDialog';
 import { downloadFile, downloadBlob, fetchFileBlob } from '../../../utils/fileDownloader';
 import CteViewerModal from './CteViewerModal';
-import { fmtMoney, fmtQty, copyMoney, copyQty, sumUnVolumes, CopyButton, PartyCard } from './cteDisplay';
+import { fmtMoney, fmtQty, copyMoney, copyQty, fmtCnpjCpf, sumUnVolumes, CopyButton, PartyCard } from './cteDisplay';
+import { resolveClienteDestino, ParsedAliancaOs } from '../../../utils/aliancaOsParser';
 
 interface CteAttachmentsModalProps {
   trip: Trip;
@@ -221,6 +222,13 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
       : undefined;
     return { tara, pesoCarga, soma };
   }, [trip.tara, trip.pesoCarga]);
+
+  // Dados completos da OS importada (PDF Aliança) — exibidos no topo da aba Valores
+  const osData = useMemo(() => {
+    const p = trip.osImportData as ParsedAliancaOs | undefined;
+    if (!p || !p.os) return null;
+    return { p, cd: resolveClienteDestino(p) };
+  }, [trip.osImportData]);
 
   // ── Upload ─────────────────────────────────────────────────────────────────
   const processFiles = async (files: File[]) => {
@@ -627,7 +635,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
 
             {/* ══ Aba Valores ═════════════════════════════════════════════════ */}
             {activeTab === 'valores' && (
-              summary.withInfo.length === 0 && summary.nfes.length === 0 && pesosOs.soma === undefined ? (
+              summary.withInfo.length === 0 && summary.nfes.length === 0 && pesosOs.soma === undefined && !osData ? (
                 <div className="text-center py-8 space-y-1">
                   <p className="text-[11px] font-black text-slate-500 uppercase">Sem valores para exibir</p>
                   <p className="text-[9px] text-slate-400 max-w-xs mx-auto">
@@ -639,19 +647,65 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
               ) : (
                 <div className="space-y-4">
 
-                  {/* Lembrete Aliança para preenchimento em sistema externo */}
-                  {isAlianca && summary.withInfo.length > 0 && (
-                    <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-start gap-2">
-                      <svg className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                      </svg>
-                      <p className="text-[9px] font-bold text-indigo-700 leading-relaxed">
-                        <span className="font-black uppercase">Aliança:</span> no preenchimento externo, o CT-e de{' '}
-                        <span className="font-black">transporte</span> é sempre <span className="font-black text-blue-700">RODOVIÁRIO</span> e o CT-e{' '}
-                        <span className="font-black">referenciado</span> é sempre <span className="font-black text-purple-700">MULTIMODAL</span>.
-                      </p>
-                    </div>
-                  )}
+                  {/* ── 1. DADOS DA OS (sempre no topo) ─────────────────────── */}
+                  {osData && (() => {
+                    const { p, cd } = osData;
+                    const field = (label: string, value?: string, copyValue?: string) => value ? (
+                      <div>
+                        <p className="text-[7px] font-black text-slate-400 uppercase">{label}</p>
+                        <p className="text-[9px] font-black text-slate-700 flex items-center gap-0.5 break-words">
+                          {value}
+                          {copyValue !== undefined && <CopyButton value={copyValue} title={`Copiar ${label.toLowerCase()}`} />}
+                        </p>
+                      </div>
+                    ) : null;
+                    return (
+                      <div>
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Dados da OS</p>
+                        <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <p className="text-[7px] font-black text-amber-600 uppercase">Cliente · {cd.clienteOrigem}</p>
+                              <p className="text-[9px] font-black text-slate-800 flex items-center gap-0.5 break-words">
+                                {cd.clienteNome || '—'}
+                                {cd.clienteNome && <CopyButton value={cd.clienteNome} title="Copiar cliente" />}
+                              </p>
+                              {cd.clienteCnpj && (
+                                <p className="text-[8px] font-bold text-slate-500 flex items-center gap-0.5">
+                                  {fmtCnpjCpf(cd.clienteCnpj)}
+                                  <CopyButton value={cd.clienteCnpj.replace(/\D/g, '')} title="Copiar CNPJ (só números)" />
+                                </p>
+                              )}
+                              {(cd.clienteMunicipio || cd.clienteUf) && (
+                                <p className="text-[8px] text-slate-500">{cd.clienteMunicipio}{cd.clienteUf ? ` - ${cd.clienteUf}` : ''}</p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-[7px] font-black text-amber-600 uppercase">Destino · {cd.destinoOrigem}</p>
+                              <p className="text-[9px] font-black text-slate-800 flex items-center gap-0.5 break-words">
+                                {cd.destinoNome || '—'}
+                                {cd.destinoNome && <CopyButton value={cd.destinoNome} title="Copiar destino" />}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-x-2 gap-y-1.5 pt-1.5 border-t border-amber-200/70">
+                            {field('OS', p.os, p.os)}
+                            {field('Tipo de Operação', p.tipoOperacao)}
+                            {field('Booking', p.booking, p.booking)}
+                            {field('Navio', p.ship)}
+                            {field('Data Coleta', p.dataColeta ? new Date(p.dataColeta).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : undefined)}
+                            {field('Container', p.container ? `${p.container}${p.containerTipo ? ` · ${p.containerTipo}` : ''}` : undefined, p.container)}
+                            {field('Lacre', p.lacre, p.lacre)}
+                            {field('Aut. Coleta', p.autColeta, p.autColeta)}
+                            {field('Padrão de Carga', p.padraoCarga)}
+                            {field('Doc Referência', p.docReferencia)}
+                            {field('Armador', p.armador)}
+                            {field('Mercadoria', p.mercadoria)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Pesos da OS: tara + peso da carga + soma */}
                   {pesosOs.soma !== undefined && (
@@ -687,9 +741,22 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                     </div>
                   )}
 
-                  {/* Totais do processo */}
+                  {/* ── 2. DADOS DOS CT-ES ──────────────────────────────────── */}
                   {summary.withInfo.length > 0 && (
                   <>
+                  {/* Lembrete Aliança para preenchimento em sistema externo */}
+                  {isAlianca && (
+                    <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-start gap-2">
+                      <svg className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                      <p className="text-[9px] font-bold text-indigo-700 leading-relaxed">
+                        <span className="font-black uppercase">Aliança:</span> no preenchimento externo, o CT-e de{' '}
+                        <span className="font-black">transporte</span> é sempre <span className="font-black text-blue-700">RODOVIÁRIO</span> e o CT-e{' '}
+                        <span className="font-black">referenciado</span> é sempre <span className="font-black text-purple-700">MULTIMODAL</span>.
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Totais dos CT-Es</p>
                     <div className="grid grid-cols-2 gap-2">
@@ -857,7 +924,31 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                   </>
                   )}
 
-                  {/* Notas Fiscais anexadas (XML de NF-e) */}
+                  {/* Remetentes (dos CT-es) */}
+                  {summary.remetentes.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        Remetentes ({summary.remetentes.length})
+                      </p>
+                      <div className="space-y-1.5">
+                        {summary.remetentes.map((r, i) => <PartyCard key={i} party={r.party} ctes={r.ctes} />)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Destinatários (dos CT-es) */}
+                  {summary.destinatarios.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        Destinatários ({summary.destinatarios.length})
+                      </p>
+                      <div className="space-y-1.5">
+                        {summary.destinatarios.map((d, i) => <PartyCard key={i} party={d.party} ctes={d.ctes} />)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── 3. DADOS DAS NF-ES (sempre por último) ──────────────── */}
                   {summary.nfes.length > 0 && (
                     <div>
                       <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Totais das NF-es</p>
@@ -991,30 +1082,6 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                             </div>
                           );
                         })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Remetentes */}
-                  {summary.remetentes.length > 0 && (
-                    <div>
-                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                        Remetentes ({summary.remetentes.length})
-                      </p>
-                      <div className="space-y-1.5">
-                        {summary.remetentes.map((r, i) => <PartyCard key={i} party={r.party} ctes={r.ctes} />)}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Destinatários */}
-                  {summary.destinatarios.length > 0 && (
-                    <div>
-                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                        Destinatários ({summary.destinatarios.length})
-                      </p>
-                      <div className="space-y-1.5">
-                        {summary.destinatarios.map((d, i) => <PartyCard key={i} party={d.party} ctes={d.ctes} />)}
                       </div>
                     </div>
                   )}

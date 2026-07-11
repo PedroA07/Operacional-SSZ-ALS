@@ -33,6 +33,19 @@ export interface ParsedAliancaOs {
   cepColeta?: string;
   contato?: string;
   foneColeta?: string;
+  lacre?: string;               // lacre da tabela de container (OS de entrega)
+  ctacBl?: string;              // CTAC/BL da tabela
+  // Local Entrega (OS de entrega/importação)
+  localEntregaNome?: string;
+  localEntregaCnpj?: string;
+  localEntregaEndereco?: string;
+  localEntregaMunicipio?: string;
+  localEntregaUf?: string;
+  localEntregaBairro?: string;
+  localEntregaCep?: string;
+  localEntregaContato?: string;
+  localEntregaFone?: string;
+  entregarVazio?: string;       // depósito de devolução do vazio (OS de entrega)
   mercadoria?: string;
   padraoCarga?: string;         // CARGA GERAL | CARGO PREMIUM | PADRÃO ALIMENTO | REEFER
   docReferencia?: string;       // "CTe Rodoviário" | "CTe Longo Curso" → tipo de viagem
@@ -113,6 +126,9 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
   }
 
   // ── Container / valores (linha da tabela após o cabeçalho) ───────────────
+  // Colunas: Container | Tipo | Lacre | Peso Carga | Tara | CTAC/BL | NF |
+  // Valor NF | IMO | Aut Coleta/Entrega | Reut. — parsing posicional pelos
+  // números com vírgula (peso, tara, valor NF)
   for (const line of lines) {
     const m = line.match(/^(?:([A-Z]{4}\s?\d{7})\s+)?(\d{2})\s?(HC|DC|RF|RH|OT|FR|TK|GP|DV)\b\s+(.*)$/i);
     if (m) {
@@ -124,37 +140,79 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
         const contTok = tokens.find(t => /^[A-Z]{4}\d{7}$/i.test(t));
         if (contTok) result.container = contTok.toUpperCase();
       }
-      const nums = tokens.filter(t => /^[\d.]+,\d{2}$/.test(t));
-      if (nums[0]) result.pesoCarga = nums[0];
-      if (nums[1]) result.tara = nums[1];
-      if (nums[2]) result.valorNf = nums[2];
-      const aut = tokens.find(t => /^\d{4,}$/.test(t));
-      if (aut) result.autColeta = aut;
+      const numIdx = tokens
+        .map((t, i) => (/^[\d.]+,\d{2}$/.test(t) ? i : -1))
+        .filter(i => i >= 0);
+      if (numIdx.length >= 1) result.pesoCarga = tokens[numIdx[0]];
+      if (numIdx.length >= 2) result.tara = tokens[numIdx[1]];
+      if (numIdx.length >= 3) result.valorNf = tokens[numIdx[2]];
+      // Lacre: entre o tipo e o peso da carga
+      if (numIdx.length >= 1 && numIdx[0] > 0) {
+        const lacreTok = tokens.slice(0, numIdx[0]).find(t => /^[A-Z0-9]{4,}$/i.test(t) && t.toUpperCase() !== result.container);
+        if (lacreTok) result.lacre = lacreTok.toUpperCase();
+      }
+      // CTAC/BL: entre a tara e o valor NF
+      if (numIdx.length >= 3 && numIdx[2] > numIdx[1] + 1) {
+        const ctacTok = tokens.slice(numIdx[1] + 1, numIdx[2]).find(t => /^[A-Z0-9]{5,}$/i.test(t));
+        if (ctacTok) result.ctacBl = ctacTok.toUpperCase();
+      }
+      // Aut. coleta/entrega: após o valor NF (numérica ou alfanumérica, ex.: MSKF000485)
+      const tail = numIdx.length >= 3 ? tokens.slice(numIdx[2] + 1) : tokens;
+      const aut = tail.find(t => /^[A-Z0-9]{4,}$/i.test(t) && !/^[NS]$/i.test(t));
+      if (aut) result.autColeta = aut.toUpperCase();
       break;
     }
   }
 
-  // ── Local Coleta ─────────────────────────────────────────────────────────
-  const embMatch = full.match(/Embarcador\s+(.+?)\s+CNPJ\s+(\d{11,14})/);
+  // ── Local Coleta (escopo da seção; OS de coleta/exportação) ──────────────
+  const coletaScope = full.split(/Local Coleta/i)[1]?.split(/Informa[çc][õo]es Sobre a Carga|Local Entrega/i)[0] || full;
+  const embMatch = coletaScope.match(/Embarcador\s+(.+?)\s+CNPJ\s+(\d{11,14})/)
+    || full.match(/Embarcador\s+(.+?)\s+CNPJ\s+(\d{11,14})/);
   if (embMatch) {
     result.embarcador = embMatch[1].trim().toUpperCase();
     result.cnpjColeta = embMatch[2];
   }
   if (!result.cliente && result.embarcador) result.cliente = result.embarcador;
 
-  const endMatch = full.match(/Endere[çc]o\s+([^\n]+)/i);
+  const endMatch = coletaScope.match(/Endere[çc]o\s+([^\n]+)/i);
   if (endMatch) result.enderecoColeta = endMatch[1].trim().toUpperCase();
-  const munMatch = full.match(/Munic[íi]pio\s+(.+?)\s+Uf\s+([A-Z]{2})/i);
+  const munMatch = coletaScope.match(/Munic[íi]pio\s+(.+?)\s+Uf\s+([A-Z]{2})/i);
   if (munMatch) { result.municipioColeta = munMatch[1].trim().toUpperCase(); result.ufColeta = munMatch[2]; }
-  const bairroMatch = full.match(/Bairro\s+(.+?)\s+Cep\s+(\d{7,8})/i);
+  const bairroMatch = coletaScope.match(/Bairro\s+(.+?)\s+Cep\s+(\d{7,8})/i);
   if (bairroMatch) { result.bairroColeta = bairroMatch[1].trim().toUpperCase(); result.cepColeta = bairroMatch[2]; }
-  const contatoMatch = full.match(/Contato\s+([^\n]*?)\s*Fone\s*([\d ()\-.]*)/i);
+  const contatoMatch = coletaScope.match(/Contato\s+([^\n]*?)\s*Fone\s*([\d ()\-.]*)/i);
   if (contatoMatch) {
     const c = contatoMatch[1].trim();
     if (c) result.contato = c.toUpperCase();
     const f = contatoMatch[2].trim();
     if (f) result.foneColeta = f;
   }
+
+  // ── Local Entrega (OS de entrega/importação) ─────────────────────────────
+  const entregaSplit = full.split(/Local Entrega/i);
+  if (entregaSplit.length > 1) {
+    const sec = entregaSplit[1].split(/Informa[çc][õo]es Sobre a Carga|Programa[çc][ãa]o de Servi/i)[0] || '';
+    const dMatch = sec.match(/Destinat[áa]rio\s+(.+?)\s+CNPJ\s+(\d{11,14})/);
+    if (dMatch) {
+      result.localEntregaNome = dMatch[1].trim().toUpperCase();
+      result.localEntregaCnpj = dMatch[2];
+    }
+    const eMatch = sec.match(/Endere[çc]o\s+([^\n]+)/i);
+    if (eMatch) result.localEntregaEndereco = eMatch[1].trim().toUpperCase();
+    const mMatch = sec.match(/Munic[íi]pio\s+(.+?)\s+Uf\s+([A-Z]{2})/i);
+    if (mMatch) { result.localEntregaMunicipio = mMatch[1].trim().toUpperCase(); result.localEntregaUf = mMatch[2]; }
+    const bMatch = sec.match(/Bairro\s+(.+?)\s+Cep\s+(\d{7,8})/i);
+    if (bMatch) { result.localEntregaBairro = bMatch[1].trim().toUpperCase(); result.localEntregaCep = bMatch[2]; }
+    const cMatch = sec.match(/Contato\s+([^\n]*?)\s*Fone\s*([\d ()\-.]*)/i);
+    if (cMatch) {
+      if (cMatch[1].trim()) result.localEntregaContato = cMatch[1].trim().toUpperCase();
+      if (cMatch[2].trim()) result.localEntregaFone = cMatch[2].trim();
+    }
+  }
+
+  // ── Entregar Vazio (depósito de devolução — OS de entrega/importação) ────
+  const vazioMatch = full.match(/Entregar Vazio\s+(.+?)(?:\s+Retirar Cheio.*)?$/im);
+  if (vazioMatch) result.entregarVazio = vazioMatch[1].trim().toUpperCase();
 
   const mercMatch = full.match(/Mercadoria\s+(.+?)\s+Seguro/i);
   if (mercMatch) result.mercadoria = mercMatch[1].trim().toUpperCase();
@@ -219,6 +277,65 @@ export async function parseAliancaOsPdf(file: File): Promise<ParsedAliancaOs | n
 
 // ── Matching contra cadastros do banco ───────────────────────────────────────
 
+/** Entrega/Importação (vs. Coleta/Exportação) — muda as regras de cliente/destino. */
+export function isEntregaImportacao(tipoOperacao?: string): boolean {
+  const t = normMatch(tipoOperacao || '');
+  return /ENTREGA|IMPORTA/.test(t);
+}
+
+export interface OsClienteDestino {
+  clienteNome?: string;
+  clienteOrigem: 'LOCAL COLETA' | 'LOCAL ENTREGA';
+  clienteCnpj?: string;
+  clienteEndereco?: string;
+  clienteMunicipio?: string;
+  clienteUf?: string;
+  clienteBairro?: string;
+  clienteCep?: string;
+  clienteContato?: string;
+  clienteFone?: string;
+  destinoNome?: string;
+  destinoOrigem: 'ENTREGAR CHEIO' | 'ENTREGAR VAZIO';
+}
+
+/**
+ * Regras de preenchimento por tipo de operação:
+ * - Coleta cabotagem / Exportação → cliente = Local Coleta; destino = Entregar Cheio
+ * - Entrega cabotagem / Importação → cliente = Local Entrega; destino = Entregar Vazio
+ */
+export function resolveClienteDestino(p: ParsedAliancaOs): OsClienteDestino {
+  if (isEntregaImportacao(p.tipoOperacao)) {
+    return {
+      clienteNome: p.localEntregaNome,
+      clienteOrigem: 'LOCAL ENTREGA',
+      clienteCnpj: p.localEntregaCnpj,
+      clienteEndereco: p.localEntregaEndereco,
+      clienteMunicipio: p.localEntregaMunicipio,
+      clienteUf: p.localEntregaUf,
+      clienteBairro: p.localEntregaBairro,
+      clienteCep: p.localEntregaCep,
+      clienteContato: p.localEntregaContato,
+      clienteFone: p.localEntregaFone,
+      destinoNome: p.entregarVazio,
+      destinoOrigem: 'ENTREGAR VAZIO',
+    };
+  }
+  return {
+    clienteNome: p.cliente || p.embarcador,
+    clienteOrigem: 'LOCAL COLETA',
+    clienteCnpj: p.cnpjColeta,
+    clienteEndereco: p.enderecoColeta,
+    clienteMunicipio: p.municipioColeta,
+    clienteUf: p.ufColeta,
+    clienteBairro: p.bairroColeta,
+    clienteCep: p.cepColeta,
+    clienteContato: p.contato,
+    clienteFone: p.foneColeta,
+    destinoNome: p.entregarCheio,
+    destinoOrigem: 'ENTREGAR CHEIO',
+  };
+}
+
 /** "20000,00" / "3.880,50" → "20000" / "3880.5" (kg como string numérica). */
 export const normalizeKg = (v?: string): string | undefined => {
   if (!v) return undefined;
@@ -234,14 +351,17 @@ export function matchCustomer<T extends { cnpj?: string; name?: string; legalNam
   customers: T[],
   parsed: ParsedAliancaOs
 ): T | undefined {
-  const cnpj = parsed.cnpjColeta?.replace(/\D/g, '') || '';
+  // Cliente conforme o tipo de operação: coleta/exportação = Local Coleta;
+  // entrega/importação = Local Entrega.
+  const cd = resolveClienteDestino(parsed);
+  const cnpj = cd.clienteCnpj?.replace(/\D/g, '') || '';
   if (cnpj.length >= 8) {
     const exact = customers.find(c => (c.cnpj || '').replace(/\D/g, '') === cnpj);
     if (exact) return exact;
     const root = customers.find(c => (c.cnpj || '').replace(/\D/g, '').slice(0, 8) === cnpj.slice(0, 8));
     if (root) return root;
   }
-  const target = normMatch(parsed.cliente || parsed.embarcador || '');
+  const target = normMatch(cd.clienteNome || '');
   if (!target) return undefined;
   return customers.find(c => {
     const n = normMatch(c.name || '');

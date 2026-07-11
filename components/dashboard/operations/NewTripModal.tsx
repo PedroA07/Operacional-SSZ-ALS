@@ -4,7 +4,7 @@ import { db } from '../../../utils/storage';
 import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
 import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
-import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, matchOperationType, normalizeKg } from '../../../utils/aliancaOsParser';
+import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, matchOperationType, normalizeKg, resolveClienteDestino } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 import { osCategoryService } from '../../../utils/osCategoryService';
 
@@ -45,6 +45,10 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
   const [importNote, setImportNote] = useState<string | null>(null);
+  // Preview da OS importada ao lado do formulário enquanto preenche
+  const [osPreviewUrl, setOsPreviewUrl] = useState<string | null>(null);
+  const [showOsPreview, setShowOsPreview] = useState(true);
+  useEffect(() => () => { if (osPreviewUrl) URL.revokeObjectURL(osPreviewUrl); }, [osPreviewUrl]);
 
   // Cadastro na hora (motorista/cliente) sem fechar a programação
   const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
@@ -74,14 +78,16 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
         setImportNote('PDF não reconhecido como OS da Aliança.');
         return;
       }
+      // Cliente conforme o tipo: coleta/exportação = Local Coleta;
+      // entrega/importação = Local Entrega. Sem cadastro, cadastra pelo CNPJ.
+      const cd = resolveClienteDestino(p);
       let matched: any = matchCustomer(allCustomers, p);
       let autoRegistered = false;
-      // Local de Coleta = cliente. Sem cadastro, cadastra pelo CNPJ.
-      if (!matched && p.cnpjColeta) {
-        const ensured = await ensureCustomerByCnpj(allCustomers, p.cnpjColeta, {
-          nome: p.cliente || p.embarcador, cnpj: p.cnpjColeta,
-          endereco: p.enderecoColeta, municipio: p.municipioColeta, uf: p.ufColeta,
-          bairro: p.bairroColeta, cep: p.cepColeta,
+      if (!matched && cd.clienteCnpj) {
+        const ensured = await ensureCustomerByCnpj(allCustomers, cd.clienteCnpj, {
+          nome: cd.clienteNome, cnpj: cd.clienteCnpj,
+          endereco: cd.clienteEndereco, municipio: cd.clienteMunicipio, uf: cd.clienteUf,
+          bairro: cd.clienteBairro, cep: cd.clienteCep,
         });
         if (ensured) {
           matched = ensured.customer;
@@ -108,6 +114,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
         containerType: p.containerTipo || prev.containerType,
         tara: normalizeKg(p.tara) || prev.tara,
         pesoCarga: normalizeKg(p.pesoCarga) || prev.pesoCarga,
+        seal: p.lacre || prev.seal,
         autColeta: p.autColeta || prev.autColeta,
         embarcador: p.embarcador || prev.embarcador,
         agencia: p.armador || prev.agencia,
@@ -115,11 +122,16 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
         customer: matched
           ? { id: matched.id, name: matched.name, legalName: matched.legalName, cnpj: matched.cnpj, city: matched.city, state: matched.state }
           : prev.customer,
-      }));
+        osImportData: p,
+      } as any));
+      // Preview do PDF da OS ao lado do formulário (o useEffect revoga a URL anterior)
+      setOsPreviewUrl(URL.createObjectURL(file));
+      setShowOsPreview(true);
       const notes: string[] = [`OS ${p.os} importada — confira os campos.`];
+      notes.push(`Cliente preenchido pelo ${cd.clienteOrigem === 'LOCAL ENTREGA' ? 'Local de Entrega' : 'Local de Coleta'} (tipo ${p.tipoOperacao || '—'}).`);
       if (p.shipFromObs) notes.push(`Navio extraído das Demais Observações (campo trazia: ${p.navioViagemCampo || '—'}).`);
       if (autoRegistered) notes.push(`Cliente cadastrado automaticamente pelo CNPJ: ${matched.name || matched.legalName}.`);
-      else if (!matched && p.cliente) notes.push(`Cliente "${p.cliente}" não encontrado no cadastro — selecione ou cadastre.`);
+      else if (!matched && cd.clienteNome) notes.push(`Cliente "${cd.clienteNome}" não encontrado no cadastro — selecione ou cadastre.`);
       if (p.senhaOc) notes.push(`Autorização de Coleta: ${p.senhaOc}.`);
       setImportNote(notes.join(' '));
     } catch (err) {
@@ -159,7 +171,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
 
   return (
     <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[92vh] flex flex-col">
+      <div className={`bg-white w-full rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 h-[92vh] flex flex-col transition-all ${osPreviewUrl && showOsPreview ? 'max-w-[110rem]' : 'max-w-4xl'}`}>
         {/* Header */}
         <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
           <div>
@@ -167,6 +179,20 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Registro de viagem operacional</p>
           </div>
           <div className="flex items-center gap-3">
+            {osPreviewUrl && (
+              <button
+                type="button"
+                onClick={() => setShowOsPreview(v => !v)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm ${showOsPreview ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-700'}`}
+                title="Mostrar/ocultar a OS importada ao lado do formulário"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+                {showOsPreview ? 'Ocultar OS' : 'Ver OS'}
+              </button>
+            )}
             <input
               ref={importInputRef}
               type="file"
@@ -196,6 +222,15 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
           </div>
         </div>
 
+        <div className="flex flex-1 min-h-0">
+        {osPreviewUrl && showOsPreview && (
+          <div className="w-1/2 border-r border-slate-200 bg-slate-100 flex flex-col shrink-0">
+            <div className="px-4 py-2 bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest shrink-0">
+              OS importada (PDF)
+            </div>
+            <iframe src={osPreviewUrl} title="OS importada" className="flex-1 w-full" />
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="p-10 space-y-6 overflow-y-auto custom-scrollbar flex-1">
           {importNote && (
             <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-[10px] font-bold text-indigo-700">
@@ -378,6 +413,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
             Salvar Programação
           </button>
         </form>
+        </div>
       </div>
 
       {quickAdd && (
