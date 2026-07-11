@@ -16,6 +16,33 @@ async function getPdfjsLib() {
   return pdfjsLib;
 }
 
+/**
+ * Anexa as páginas de um PDF (blob) ao final de um documento jsPDF já
+ * existente — usado para juntar a OS importada à Ordem de Coleta gerada.
+ */
+export async function appendPdfToJsPdf(doc: any, blob: Blob): Promise<void> {
+  const pdfjsLib = await getPdfjsLib();
+  const data = new Uint8Array(await blob.arrayBuffer());
+  const pdf = await pdfjsLib.getDocument({ data }).promise;
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const viewport = page.getViewport({ scale: RENDER_SCALE });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d')!;
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    const imgData = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+    const wMM = (viewport.width / RENDER_SCALE) * (25.4 / 72);
+    const hMM = (viewport.height / RENDER_SCALE) * (25.4 / 72);
+    doc.addPage([wMM, hMM], wMM > hMM ? 'l' : 'p');
+    doc.addImage(imgData, 'JPEG', 0, 0, wMM, hMM);
+  }
+}
+
 export async function mergePdfBlobs(blobs: Blob[]): Promise<Blob> {
   if (blobs.length === 0) throw new Error('Nenhum PDF para unir.');
 

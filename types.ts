@@ -682,6 +682,7 @@ export interface Trip {
   emissaoObservacoes?: string;
   emissaoCteAttachments?: EmissaoCteAttachment[];
   pesoCarga?: string;        // peso da carga (kg) — vem da OS importada
+  osImportData?: any;        // dados completos extraídos da OS importada (PDF Aliança)
 }
 
 export interface ColetaDocOriginarioRule {
