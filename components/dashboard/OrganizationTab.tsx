@@ -474,6 +474,8 @@ const RetiradaCheioSelect: React.FC<{
 type DevScheduleStatus = 'critico' | 'pendente' | 'agendado' | 'normal';
 
 function getDevScheduleStatus(d: Devolucao): DevScheduleStatus {
+  // Terminal sem agendamento não exige data nem comprovante — nunca alerta
+  if (d.semAgendamento) return 'normal';
   if (d.status === 'Cancelado' || d.status === 'Realizado') return 'normal';
   if (!d.scheduledDateTime) return 'normal';
   const now = new Date();
@@ -1527,6 +1529,29 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       },
     });
   }, [activeView, logAudit]);
+
+  // Marca/desmarca "terminal sem agendamento" — pergunta antes de mudar a cobrança
+  const handleToggleDevSemAgendamento = useCallback((dev: Devolucao) => {
+    const ativar = !dev.semAgendamento;
+    setConfirmModal({
+      isOpen: true,
+      title: ativar ? 'Terminal sem agendamento?' : 'Voltar a exigir comprovante?',
+      message: ativar
+        ? `O terminal "${dev.local || '—'}" não exige agendamento nem comprovante para a baixa do vazio do container ${dev.container || dev.os}? Os alertas de comprovante serão desativados para esta devolução.`
+        : `Voltar a exigir agendamento e comprovante para a devolução do container ${dev.container || dev.os}?`,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        const u = getAuditUser();
+        const ok = await db.saveDevolucao({ ...dev, semAgendamento: ativar, userName: u.name, userId: u.id });
+        if (ok) {
+          await loadDevolucoes();
+          logAudit('DEVOLUCAO', 'AGENDAMENTO', ativar ? 'Marcada como terminal sem agendamento (comprovante não exigido)' : 'Voltou a exigir agendamento/comprovante', dev.container || dev.os, undefined, dev.id);
+        } else {
+          window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar', type: 'error' } }));
+        }
+      }
+    });
+  }, [loadDevolucoes, logAudit, getAuditUser]);
 
   const handleSaveDevAgendamento = useCallback(async (devId: string, dateTime: string) => {
     const dev = devolucoes.find(d => d.id === devId);
@@ -2649,6 +2674,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         return (
           <div className="flex flex-col gap-1">
             <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border w-fit ${styles[d.status] || styles.Pendente}`}>{d.status}</span>
+            {d.semAgendamento && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-black uppercase border bg-slate-100 text-slate-600 border-slate-300 w-fit" title="Terminal pré-stacking sem agendamento — comprovante não exigido">
+                Sem agendamento (terminal)
+              </span>
+            )}
             {sched === 'critico' && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-black uppercase border bg-red-600 text-white border-red-700 animate-pulse w-fit">
                 <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
@@ -2688,6 +2718,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 Visualizar
               </button>
             )}
+            {d.semAgendamento && !d.agendamentoDoc && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-black uppercase border bg-slate-100 text-slate-500 border-slate-300" title="Terminal sem agendamento — comprovante não exigido">
+                Não exigido
+              </span>
+            )}
             <label className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[8px] font-black cursor-pointer transition-colors ${isUploading ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700'}`}>
               {isUploading
                 ? <><div className="w-3 h-3 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"/><span>Enviando...</span></>
@@ -2695,6 +2730,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               }
               <input type="file" accept=".pdf,image/*" className="hidden" disabled={isUploading} onChange={e => { const file = e.target.files?.[0]; if (file) { handleDevComprovanteUpload(d, file); e.target.value = ''; } }} />
             </label>
+            <button
+              onClick={() => handleToggleDevSemAgendamento(d)}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[7px] font-black uppercase transition-colors ${d.semAgendamento ? 'bg-slate-200 border-slate-400 text-slate-700 hover:bg-slate-300' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-600'}`}
+              title={d.semAgendamento ? 'Voltar a exigir agendamento/comprovante' : 'Marcar como terminal sem agendamento (não exige comprovante) — será pedida confirmação'}
+            >
+              {d.semAgendamento ? 'Sem agendamento ✓' : 'Terminal sem agend.?'}
+            </button>
           </div>
         );
       },
@@ -2715,7 +2757,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       ),
     },
-  ], [handleSaveDevAgendamento, handleDevComprovanteUpload, setDevMinutaDev, handleDeleteDevolucao, uploadingDevId]);
+  ], [handleSaveDevAgendamento, handleDevComprovanteUpload, setDevMinutaDev, handleDeleteDevolucao, uploadingDevId, handleToggleDevSemAgendamento]);
 
   // Reutilizações: viagens de entrega/import marcadas como Reutilização, com o
   // comprovante anexado — visíveis na aba Devoluções/Reut

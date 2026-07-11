@@ -1080,6 +1080,8 @@ export interface Devolucao {
     fileName: string;
     uploadDate: string;
   };
+  /** Terminal pré-stacking sem agendamento — não exige data/hora nem comprovante */
+  semAgendamento?: boolean;
   obs?: string;
   status: DevolucaoStatus;
   isCompleted?: boolean;
