@@ -74,6 +74,9 @@ export const tripRepository = {
     emissao_cte_attachments: trip.emissaoCteAttachments?.length ? trip.emissaoCteAttachments : null,
     peso_carga: trip.pesoCarga || null,
     os_import_data: trip.osImportData || null,
+    retirada_cheio: trip.retiradaCheio || null,
+    agendamento_anexo: trip.agendamentoAnexo || null,
+    reutilizacao_comprovante: trip.reutilizacaoComprovante || null,
   }),
 
   mapFromDb: (d: any): Trip => {
@@ -158,6 +161,9 @@ export const tripRepository = {
       emissaoObservacoes: d.emissao_observacoes || undefined,
       pesoCarga: d.peso_carga || undefined,
       osImportData: safeParse(d.os_import_data, null) || undefined,
+      retiradaCheio: safeParse(d.retirada_cheio, null) || undefined,
+      agendamentoAnexo: safeParse(d.agendamento_anexo, null) || undefined,
+      reutilizacaoComprovante: safeParse(d.reutilizacao_comprovante, null) || undefined,
       emissaoCteAttachments: Array.isArray(safeParse(d.emissao_cte_attachments, null))
         ? (safeParse(d.emissao_cte_attachments, []) as EmissaoCteAttachment[]).map(att => ({
             ...att,

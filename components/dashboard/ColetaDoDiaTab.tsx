@@ -784,7 +784,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     },
     {
       key: 'customerInfo',
-      label: 'Local Atendimento / Cidade',
+      label: 'Local de Coleta / Cidade',
       sortValue: (t: Trip) => t.customer?.name || '',
       render: (t: Trip) => (
         <div className="flex flex-col gap-0.5">
