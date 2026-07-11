@@ -683,6 +683,28 @@ export interface Trip {
   emissaoCteAttachments?: EmissaoCteAttachment[];
   pesoCarga?: string;        // peso da carga (kg) — vem da OS importada
   osImportData?: any;        // dados completos extraídos da OS importada (PDF Aliança)
+  // Organização — fluxo de Entrega/Importação
+  retiradaCheio?: {          // onde o cheio é retirado (terminal pré-stacking, porto ou cliente)
+    id?: string;
+    name: string;
+    legalName?: string;
+    cnpj?: string;
+    city?: string;
+    state?: string;
+    kind?: string;           // PORTO | PRÉ-STACKING | CLIENTE
+  };
+  agendamentoAnexo?: {       // comprovante de agendamento anexado (quando não há minuta)
+    id: string;
+    url: string;
+    fileName: string;
+    uploadDate: string;
+  };
+  reutilizacaoComprovante?: { // comprovante de reutilização do container (visível em Devoluções/Reut)
+    id: string;
+    url: string;
+    fileName: string;
+    uploadDate: string;
+  };
 }
 
 export interface ColetaDocOriginarioRule {

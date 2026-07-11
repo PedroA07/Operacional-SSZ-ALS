@@ -27,13 +27,15 @@ interface DevolucaoVazioFormProps {
   initialFormData?: any;
   /** @deprecated use devolucao + onSave */
   tripId?: string;
+  /** OS da viagem vinculada — registrada na devolução criada pela minuta */
+  tripOs?: string;
   /** @deprecated use devolucao + onSave */
   onAgendamentoSave?: (id: string, dateTime: string) => void;
 }
 
 const commonPODs = ['SANTOS', 'PARANAGUÁ', 'ITAGUAÍ', 'RIO DE JANEIRO', 'NAVEGANTES', 'ITAJAÍ', 'MONTEVIDEO', 'BUENOS AIRES'];
 
-const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, customers, ports, preStackings = [], onClose, devolucao, onSave, initialFormData, tripId, onAgendamentoSave }) => {
+const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, customers, ports, preStackings = [], onClose, devolucao, onSave, initialFormData, tripId, tripOs, onAgendamentoSave }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -212,7 +214,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
             : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
           db.saveDevolucao({
             id: newId,
-            os: '',
+            os: tripOs || '',
             container: formData.container,
             containerType: formData.tipo || undefined,
             booking: formData.booking || undefined,
@@ -225,7 +227,8 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
             customer: selectedRemetente ? { id: selectedRemetente.id, name: selectedRemetente.name, legalName: selectedRemetente.legalName, cnpj: selectedRemetente.cnpj, city: selectedRemetente.city, state: selectedRemetente.state } : undefined,
             driver: effectiveDriver ? { id: effectiveDriver.id, name: effectiveDriver.name, plateHorse: effectiveDriver.plateHorse, plateTrailer: effectiveDriver.plateTrailer, cpf: (effectiveDriver as any).cpf } : undefined,
             obs: formData.obs || undefined,
-            status: 'Pendente',
+            scheduledDateTime: formData.agendamentoDateTime ? new Date(formData.agendamentoDateTime).toISOString() : undefined,
+            status: formData.agendamentoDateTime ? 'Agendado' : 'Pendente',
             createdAt: new Date().toISOString(),
             userName: activeUser?.displayName || undefined,
             userId:   activeUser?.id           || undefined,

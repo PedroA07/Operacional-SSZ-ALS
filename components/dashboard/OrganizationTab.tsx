@@ -370,6 +370,107 @@ const ToggleIconBtn: React.FC<{
   </button>
 );
 
+// Seleção da Retirada do Cheio (Entrega/Import): terminal pré-stacking, porto ou cliente
+interface RetiradaCheioOption {
+  id: string;
+  name: string;
+  legalName?: string;
+  cnpj?: string;
+  city?: string;
+  state?: string;
+  kind: string;
+}
+
+const RetiradaCheioSelect: React.FC<{
+  trip: Trip;
+  options: RetiradaCheioOption[];
+  onSelect: (trip: Trip, option: RetiradaCheioOption | null) => void;
+}> = ({ trip, options, onSelect }) => {
+  const [isSearching, setIsSearching] = useState(false);
+  const [search, setSearch] = useState('');
+  const value = trip.retiradaCheio;
+
+  const filtered = useMemo(() => {
+    if (!search) return options;
+    const s = search.toLowerCase();
+    return options.filter(o =>
+      o.name?.toLowerCase().includes(s) ||
+      o.legalName?.toLowerCase().includes(s) ||
+      o.cnpj?.includes(s) ||
+      o.city?.toLowerCase().includes(s)
+    );
+  }, [search, options]);
+
+  // Sugestão: na OS de entrega/importação, o cheio sai do Local Coleta (terminal)
+  const sugestao = trip.osImportData?.embarcador || trip.osImportData?.cliente || '';
+
+  return (
+    <div className="relative min-w-[170px]">
+      {!isSearching ? (
+        <div
+          onClick={() => setIsSearching(true)}
+          className={`w-full border rounded-lg px-2 py-1.5 cursor-pointer transition-all ${value ? 'bg-cyan-50 border-cyan-300 shadow-sm hover:border-cyan-500' : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-sm'}`}
+        >
+          {value ? (
+            <div className="space-y-0.5">
+              <div className="flex justify-between items-start gap-1">
+                <p className="text-[9px] font-black text-slate-800 uppercase break-words flex-1 leading-tight">{value.name}</p>
+                {value.kind && <span className="text-[6px] px-1 py-0.5 bg-cyan-100 text-cyan-700 border border-cyan-200 rounded font-black uppercase whitespace-nowrap">{value.kind}</span>}
+              </div>
+              {value.legalName && <p className="text-[7px] text-slate-400 font-bold uppercase break-words leading-tight">{value.legalName}</p>}
+              {(value.city || value.state) && (
+                <p className="text-[7px] text-slate-400 font-bold uppercase">{[value.city, value.state].filter(Boolean).join('/')}</p>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[7px] font-black text-cyan-500 uppercase tracking-tighter">Retirada do Cheio:</span>
+              <p className="text-[8px] font-black text-slate-400 uppercase break-words leading-tight">
+                {sugestao ? `Sugestão (OS): ${sugestao}` : 'Selecionar local...'}
+              </p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="absolute top-0 left-0 w-full z-50 bg-white border-2 border-cyan-500 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <input
+            autoFocus
+            type="text"
+            placeholder="TERMINAL, PORTO OU CLIENTE..."
+            className="w-full px-2 py-2 text-[9px] font-black uppercase border-b border-slate-100 outline-none bg-slate-50/50 focus:bg-white transition-colors"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onBlur={() => setTimeout(() => setIsSearching(false), 200)}
+          />
+          <div className="max-h-48 overflow-y-auto custom-scrollbar">
+            <div
+              onClick={() => { onSelect(trip, null); setIsSearching(false); }}
+              className="px-2 py-1.5 hover:bg-red-50 cursor-pointer text-[8px] font-black text-red-500 border-b border-slate-50 transition-colors"
+            >
+              LIMPAR SELEÇÃO
+            </div>
+            {filtered.length > 0 ? filtered.map(o => (
+              <div
+                key={`${o.kind}-${o.id}`}
+                onMouseDown={() => { onSelect(trip, o); setIsSearching(false); }}
+                className="px-2 py-1.5 hover:bg-cyan-50 cursor-pointer border-b border-slate-50 transition-colors"
+              >
+                <div className="flex justify-between items-start gap-1">
+                  <p className="text-[8px] font-black text-slate-700 uppercase leading-tight flex-1">{o.name}</p>
+                  <span className="text-[6px] px-1 py-0.5 bg-slate-100 text-slate-500 border border-slate-200 rounded font-black uppercase whitespace-nowrap">{o.kind}</span>
+                </div>
+                {(o.city || o.state) && <p className="text-[6px] text-slate-400 font-bold uppercase">{[o.city, o.state].filter(Boolean).join('/')}</p>}
+              </div>
+            )) : (
+              <p className="px-2 py-2 text-[8px] text-slate-400 font-bold uppercase">Nenhum local encontrado</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 type DevScheduleStatus = 'critico' | 'pendente' | 'agendado' | 'normal';
 
 function getDevScheduleStatus(d: Devolucao): DevScheduleStatus {
@@ -420,7 +521,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA' | 'DEVOLUÇÕES' | 'LIBERAÇÕES'>('COLETA');
   const [devolucoes, setDevolucoes] = useState<Devolucao[]>([]);
   const [devMinutaDev, setDevMinutaDev] = useState<Devolucao | null>(null);
+  // Minuta de Devolução aberta a partir de uma viagem de Entrega/Import
+  const [devMinutaTrip, setDevMinutaTrip] = useState<Trip | null>(null);
   const [uploadingDevId, setUploadingDevId] = useState<string | null>(null);
+  const [uploadingTripDoc, setUploadingTripDoc] = useState<string | null>(null); // `${tripId}:agend` | `${tripId}:reut`
   const [viewingDoc, setViewingDoc] = useState<{ url: string; fileName: string } | null>(null);
 
   const handleDownloadDoc = async (url: string, fileName: string) => {
@@ -1456,6 +1560,66 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, [loadDevolucoes, logAudit, getAuditUser]);
 
+  // ── Fluxo de Entrega/Import: Retirada do Cheio, anexo de agendamento e reutilização ──
+  const handleRetiradaCheioChange = useCallback(async (trip: Trip, option: RetiradaCheioOption | null) => {
+    const data: Partial<Trip> = {
+      retiradaCheio: option ? {
+        id: option.id, name: option.name, legalName: option.legalName,
+        cnpj: option.cnpj, city: option.city, state: option.state, kind: option.kind,
+      } : undefined,
+    };
+    const now = Date.now();
+    setPendingUpdates(prev => ({ ...prev, [trip.id]: { data: { ...(prev[trip.id]?.data || {}), ...data }, timestamp: now } }));
+    try {
+      await db.saveTrip({ ...trip, retiradaCheio: data.retiradaCheio || null } as any);
+      logAudit(activeView, 'RETIRADA', `Retirada do cheio ${option ? `definida: ${option.name} (${option.kind})` : 'removida'}`, trip.os, [{ field: 'Retirada do Cheio', from: trip.retiradaCheio?.name || '', to: option?.name || '' }], trip.id);
+    } catch {
+      setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar retirada do cheio', type: 'error' } }));
+    }
+  }, [activeView, logAudit]);
+
+  const handleTripAgendamentoUpload = useCallback(async (trip: Trip, file: File) => {
+    // Data/hora do agendamento é obrigatória antes de anexar o comprovante
+    if (!trip.scheduledDateTime && !trip.scheduling?.dateTime) {
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Defina a data/hora do agendamento antes de anexar o comprovante', type: 'error' } }));
+      return;
+    }
+    setUploadingTripDoc(`${trip.id}:agend`);
+    try {
+      const ext = file.name.split('.').pop() || 'pdf';
+      const fileName = `agendamento-${trip.os || trip.id}-${Date.now()}.${ext}`;
+      const url = await r2Service.upload(file, fileName, `agendamentos/${trip.os || trip.id}`);
+      const doc = { id: `agd-${Date.now()}`, url, fileName: file.name, uploadDate: new Date().toISOString() };
+      await db.saveTrip({ ...trip, agendamentoAnexo: doc, isScheduled: true } as any);
+      logAudit(activeView, 'COMPROVANTE', `Comprovante de agendamento anexado (${file.name})`, trip.os, undefined, trip.id);
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Agendamento anexado com sucesso', type: 'success' } }));
+      onRefresh();
+    } catch {
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao anexar agendamento', type: 'error' } }));
+    } finally {
+      setUploadingTripDoc(null);
+    }
+  }, [activeView, logAudit, onRefresh]);
+
+  const handleReutComprovanteUpload = useCallback(async (trip: Trip, file: File) => {
+    setUploadingTripDoc(`${trip.id}:reut`);
+    try {
+      const ext = file.name.split('.').pop() || 'pdf';
+      const fileName = `reutilizacao-${trip.os || trip.id}-${Date.now()}.${ext}`;
+      const url = await r2Service.upload(file, fileName, `reutilizacoes/${trip.os || trip.id}`);
+      const doc = { id: `reut-${Date.now()}`, url, fileName: file.name, uploadDate: new Date().toISOString() };
+      await db.saveTrip({ ...trip, reutilizacaoComprovante: doc } as any);
+      logAudit(activeView, 'COMPROVANTE', `Comprovante de reutilização anexado (${file.name})`, trip.os, undefined, trip.id);
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Comprovante de reutilização anexado', type: 'success' } }));
+      onRefresh();
+    } catch {
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao anexar comprovante de reutilização', type: 'error' } }));
+    } finally {
+      setUploadingTripDoc(null);
+    }
+  }, [activeView, logAudit, onRefresh]);
+
   const handleSaveDevolucaoFromForm = useCallback(async (updated: Devolucao) => {
     const old = devMinutaDev;
     await db.saveDevolucao(updated);
@@ -1817,7 +1981,23 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     </button>
   );
 
+  // Locais possíveis para a retirada do cheio: terminais pré-stacking, portos e clientes
+  const retiradaOptions = useMemo<RetiradaCheioOption[]>(() => [
+    ...preStacking.map((p: any) => ({ id: p.id, name: p.name, legalName: p.legalName, cnpj: p.cnpj, city: p.city, state: p.state, kind: 'PRÉ-STACKING' })),
+    ...ports.map((p: any) => ({ id: p.id, name: p.name, legalName: p.legalName, cnpj: p.cnpj, city: p.city, state: p.state, kind: 'PORTO' })),
+    ...customers.map((c: any) => ({ id: c.id, name: c.name, legalName: c.legalName, cnpj: c.cnpj, city: c.city, state: c.state, kind: 'CLIENTE' })),
+  ], [ports, preStacking, customers]);
+
   const columns = useMemo(() => [
+    // Entrega/Import: primeira coluna é a retirada do cheio (terminal, porto ou cliente)
+    ...(activeView === 'ENTREGA' ? [{
+      key: 'retiradaCheio',
+      label: 'Retirada do Cheio',
+      sortValue: (t: Trip) => t.retiradaCheio?.name || '',
+      render: (t: Trip) => (
+        <RetiradaCheioSelect trip={t} options={retiradaOptions} onSelect={handleRetiradaCheioChange} />
+      )
+    }] : []),
     {
       key: 'dateTime',
       label: 'Data',
@@ -1995,7 +2175,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     },
     {
       key: 'customer',
-      label: 'Local de Atendimento',
+      // Cliente conforme o tipo: coleta/export = Local de Coleta; entrega/import = Local de Entrega
+      label: activeView === 'ENTREGA' ? 'Local de Entrega' : 'Local de Coleta',
       sortValue: (t: Trip) => t.customer?.name || '',
       render: (t: Trip) => (
         <div className="flex flex-col gap-0.5">
@@ -2152,7 +2333,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     },
     {
       key: 'scheduledLocationId',
-      label: 'Local Agendamento',
+      // Entrega/Import: ao finalizar a entrega, o vazio é devolvido em um
+      // terminal pré-stacking (Baixa Vazio) ou o container é reutilizado
+      label: activeView === 'ENTREGA' ? 'Baixa Vazio' : 'Local Agendamento',
       render: (t: Trip) => {
         const isFreteMorto = t.status === 'Frete Morto';
         const isReutilizacao = t.status === 'Reutilização';
@@ -2188,6 +2371,30 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 {isReutilizacao ? 'Reutilização ✓' : 'Reutilização'}
               </button>
             )}
+            {activeView === 'ENTREGA' && isReutilizacao && (
+              <div className="flex flex-col gap-1">
+                {t.reutilizacaoComprovante && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setViewingDoc({ url: t.reutilizacaoComprovante!.url, fileName: t.reutilizacaoComprovante!.fileName }); }}
+                    className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100 transition-all"
+                    title={`Ver comprovante de reutilização (${t.reutilizacaoComprovante.fileName})`}
+                  >
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Ver Comprovante
+                  </button>
+                )}
+                <label
+                  onClick={(e) => e.stopPropagation()}
+                  className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border cursor-pointer transition-all ${uploadingTripDoc === `${t.id}:reut` ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-400'}`}
+                  title="Anexar comprovante de reutilização — fica visível em Devoluções/Reut"
+                >
+                  {uploadingTripDoc === `${t.id}:reut`
+                    ? <><div className="w-2.5 h-2.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"/>Enviando...</>
+                    : <><svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>{t.reutilizacaoComprovante ? 'Substituir' : 'Anexar Comprov. Reut.'}</>}
+                  <input type="file" accept=".pdf,image/*" className="hidden" disabled={uploadingTripDoc === `${t.id}:reut`} onChange={e => { const f = e.target.files?.[0]; if (f) { handleReutComprovanteUpload(t, f); e.target.value = ''; } }} />
+                </label>
+              </div>
+            )}
           </div>
         );
       }
@@ -2209,14 +2416,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             />
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); setMinutaTrip(t); }}
+              onClick={(e) => { e.stopPropagation(); activeView === 'ENTREGA' ? setDevMinutaTrip(t) : setMinutaTrip(t); }}
               className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${hasMinuta ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
-              title={hasMinuta ? 'Minuta gerada — clique para reeditar' : 'Gerar Minuta de Pré-Stacking'}
+              title={activeView === 'ENTREGA' ? 'Gerar Minuta de Devolução de Vazio (data/hora obrigatória)' : (hasMinuta ? 'Minuta gerada — clique para reeditar' : 'Gerar Minuta de Pré-Stacking')}
             >
               <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
               </svg>
-              {hasMinuta ? 'Minuta ✓' : 'Gerar Minuta'}
+              {activeView === 'ENTREGA' ? 'Minuta Devolução' : (hasMinuta ? 'Minuta ✓' : 'Gerar Minuta')}
             </button>
             {hasMinuta && (
               <button
@@ -2230,6 +2437,33 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 </svg>
                 Cancelar Agend.
               </button>
+            )}
+            {/* Entrega/Import sem minuta de devolução: anexa o comprovante do
+                agendamento (a data/hora acima é obrigatória antes de anexar) */}
+            {activeView === 'ENTREGA' && !hasMinuta && (
+              <>
+                {t.agendamentoAnexo && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setViewingDoc({ url: t.agendamentoAnexo!.url, fileName: t.agendamentoAnexo!.fileName }); }}
+                    className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 transition-all"
+                    title={`Ver agendamento anexado (${t.agendamentoAnexo.fileName})`}
+                  >
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Ver Agendamento
+                  </button>
+                )}
+                <label
+                  onClick={(e) => e.stopPropagation()}
+                  className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border cursor-pointer transition-all ${uploadingTripDoc === `${t.id}:agend` ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50 hover:border-blue-400'}`}
+                  title="Anexar comprovante de agendamento (quando não há minuta de devolução) — exige data/hora preenchida"
+                >
+                  {uploadingTripDoc === `${t.id}:agend`
+                    ? <><div className="w-2.5 h-2.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"/>Enviando...</>
+                    : <><svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>{t.agendamentoAnexo ? 'Substituir Anexo' : 'Anexar Agendamento'}</>}
+                  <input type="file" accept=".pdf,image/*" className="hidden" disabled={uploadingTripDoc === `${t.id}:agend`} onChange={e => { const f = e.target.files?.[0]; if (f) { handleTripAgendamentoUpload(t, f); e.target.value = ''; } }} />
+                </label>
+              </>
             )}
           </div>
         );
@@ -2277,7 +2511,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao, tiposViagem, isColetaSemEmail, handleToggleColetaEmail, handleToggleColetaDoc]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao, tiposViagem, isColetaSemEmail, handleToggleColetaEmail, handleToggleColetaDoc, retiradaOptions, handleRetiradaCheioChange, handleTripAgendamentoUpload, handleReutComprovanteUpload, uploadingTripDoc]);
 
   const handleDeleteDevolucao = useCallback((d: Devolucao) => {
     setConfirmModal({
@@ -2482,6 +2716,107 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       ),
     },
   ], [handleSaveDevAgendamento, handleDevComprovanteUpload, setDevMinutaDev, handleDeleteDevolucao, uploadingDevId]);
+
+  // Reutilizações: viagens de entrega/import marcadas como Reutilização, com o
+  // comprovante anexado — visíveis na aba Devoluções/Reut
+  const reutTrips = useMemo(
+    () => propTrips.filter(t => t.status === 'Reutilização'),
+    [propTrips]
+  );
+
+  const reutColumns = useMemo(() => [
+    {
+      key: 'container',
+      label: 'Container / OS',
+      sortable: true,
+      sortValue: (t: Trip) => t.container || t.os,
+      render: (t: Trip) => (
+        <div className="flex flex-col gap-0.5 py-0.5">
+          <span className="text-[10px] font-black text-slate-800 uppercase">{t.container || '---'}</span>
+          <span className="text-[8px] font-bold text-slate-400 uppercase">{t.os}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'type',
+      label: 'Tipo',
+      sortable: true,
+      sortValue: (t: Trip) => t.type || '',
+      render: (t: Trip) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[8px] font-black text-slate-600 uppercase">{t.type || '---'}</span>
+          {t.containerType && <span className="text-[8px] font-bold text-slate-400 uppercase">{t.containerType}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'customer',
+      label: 'Cliente',
+      sortable: true,
+      sortValue: (t: Trip) => t.customer?.name || '',
+      render: (t: Trip) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{t.customer?.name || '---'}</span>
+          {t.customer?.city && <span className="text-[8px] font-bold text-slate-400 uppercase">{t.customer.city}{t.customer.state ? `/${t.customer.state}` : ''}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'driver',
+      label: 'Motorista',
+      sortable: true,
+      sortValue: (t: Trip) => t.driver?.name || '',
+      render: (t: Trip) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-700 uppercase">{t.driver?.name || '---'}</span>
+          <div className="flex items-center gap-1">
+            {t.driver?.plateHorse && <span className="text-[8px] font-bold text-blue-600 uppercase">{t.driver.plateHorse}</span>}
+            {t.driver?.plateTrailer && <span className="text-[8px] font-bold text-slate-400 uppercase">{t.driver.plateTrailer}</span>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'dateTime',
+      label: 'Data da Viagem',
+      sortable: true,
+      sortValue: (t: Trip) => t.dateTime || '',
+      render: (t: Trip) => (
+        <span className="text-[9px] font-bold text-slate-600">{formatDateTimePtBR(t.dateTime) || '---'}</span>
+      ),
+    },
+    {
+      key: 'reutComprovante',
+      label: 'Comprovante Reutilização',
+      sortable: false,
+      render: (t: Trip) => {
+        const isUploading = uploadingTripDoc === `${t.id}:reut`;
+        return (
+          <div className="flex flex-col gap-1 items-start">
+            {t.reutilizacaoComprovante ? (
+              <button
+                onClick={() => setViewingDoc({ url: t.reutilizacaoComprovante!.url, fileName: t.reutilizacaoComprovante!.fileName })}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[8px] font-black text-emerald-700 hover:bg-emerald-100 transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Visualizar
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[7px] font-black uppercase border bg-orange-100 text-orange-700 border-orange-300">
+                Sem comprovante
+              </span>
+            )}
+            <label className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[8px] font-black cursor-pointer transition-colors ${isUploading ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-slate-200 text-slate-600 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700'}`}>
+              {isUploading
+                ? <><div className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"/><span>Enviando...</span></>
+                : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg><span>{t.reutilizacaoComprovante ? 'Substituir' : 'Anexar'}</span></>}
+              <input type="file" accept=".pdf,image/*" className="hidden" disabled={isUploading} onChange={e => { const f = e.target.files?.[0]; if (f) { handleReutComprovanteUpload(t, f); e.target.value = ''; } }} />
+            </label>
+          </div>
+        );
+      },
+    },
+  ], [uploadingTripDoc, handleReutComprovanteUpload]);
 
   const liberacoesColumns = useMemo(() => [
     {
@@ -2698,7 +3033,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 onClick={() => setActiveView('DEVOLUÇÕES')}
                 className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'DEVOLUÇÕES' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
               >
-                Devoluções
+                Devoluções/Reut
               </button>
               <button
                 onClick={() => setActiveView('LIBERAÇÕES')}
@@ -2928,6 +3263,38 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 return {};
               }}
             />
+
+            {/* Reutilizações — containers reutilizados (sem devolução de vazio) */}
+            <div className="flex items-center gap-3 ml-4 pt-4 flex-wrap">
+              <div className="w-2 h-8 bg-emerald-600 rounded-full"></div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Reutilizações</h3>
+              <span className="ml-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-black rounded-full border border-emerald-200">{reutTrips.length}</span>
+              {reutTrips.filter(t => !t.reutilizacaoComprovante).length > 0 && (
+                <span className="flex items-center gap-1 px-2.5 py-1 bg-orange-100 text-orange-700 text-[8px] font-black rounded-full border border-orange-300">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  {reutTrips.filter(t => !t.reutilizacaoComprovante).length} SEM COMPROVANTE
+                </span>
+              )}
+            </div>
+            {reutTrips.length > 0 ? (
+              <SmartOperationTable
+                userId={userId}
+                componentId="org-reutilizacoes"
+                columns={reutColumns}
+                data={reutTrips}
+                hideInternalSearch={false}
+                noMaxHeight
+                stickyHeaderTop={0}
+                getRowStyle={(t: Trip) => {
+                  if (!t.reutilizacaoComprovante) return { backgroundColor: '#fff7ed', boxShadow: 'inset 4px 0 0 #f97316' };
+                  return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #059669' };
+                }}
+              />
+            ) : (
+              <p className="ml-4 text-[10px] text-slate-400 font-bold uppercase">
+                Nenhuma reutilização — marque "Reutilização" na visão Entrega/Import para listar aqui.
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -2986,6 +3353,53 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 onClose={() => setDevMinutaDev(null)}
                 devolucao={devMinutaDev}
                 onSave={handleSaveDevolucaoFromForm}
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {devMinutaTrip && createPortal(
+        <div className="fixed inset-0 z-[9000] animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-400">
+            <div className="px-8 py-5 bg-amber-600 flex items-center justify-between shrink-0 shadow-lg">
+              <div>
+                <p className="text-[8px] font-black text-white/60 uppercase tracking-widest mb-0.5">Organização Operacional</p>
+                <h3 className="font-black text-white text-sm uppercase tracking-widest">Minuta de Devolução</h3>
+                <p className="text-[9px] text-white/60 font-bold uppercase tracking-widest mt-0.5">OS: {devMinutaTrip.os}</p>
+              </div>
+              <button onClick={() => { setDevMinutaTrip(null); loadDevolucoes(); onRefresh(); }} className="w-10 h-10 flex items-center justify-center bg-white/15 border border-white/20 text-white/80 hover:text-white hover:bg-white/30 rounded-full transition-all active:scale-90">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <DevolucaoVazioForm
+                drivers={drivers}
+                customers={customers}
+                ports={ports}
+                preStackings={preStacking}
+                onClose={() => { setDevMinutaTrip(null); loadDevolucoes(); onRefresh(); }}
+                tripId={devMinutaTrip.id}
+                tripOs={devMinutaTrip.os}
+                onAgendamentoSave={(_, dateTime) => handleDateTimeChange(devMinutaTrip, dateTime)}
+                initialFormData={{
+                  date: localDateStr(),
+                  driverId: devMinutaTrip.driver?.id || '',
+                  remetenteId: devMinutaTrip.customer?.id || '',
+                  destinatarioId: '',
+                  container: devMinutaTrip.container || '',
+                  booking: devMinutaTrip.booking || '',
+                  ship: devMinutaTrip.ship || '',
+                  agencia: devMinutaTrip.agencia || '',
+                  pod: 'SANTOS',
+                  qtdContainer: '01',
+                  tipo: devMinutaTrip.containerType || '40HC',
+                  padrao: 'CARGA GERAL',
+                  obs: '',
+                  manualLocal: '',
+                  agendamentoDateTime: formatToLocalInput(devMinutaTrip.scheduledDateTime || devMinutaTrip.scheduling?.dateTime || ''),
+                }}
               />
             </div>
           </div>
