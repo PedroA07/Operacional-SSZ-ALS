@@ -156,6 +156,29 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
     }
   }, []);
 
+  // Doc Originário: marca também nas demais programações da mesma OS
+  // (ex.: a linha correspondente na Coleta do Dia) e força o refresh global
+  const handleToggleDocOriginario = useCallback(async (trip: Trip, checked: boolean) => {
+    const os = (trip.os || '').trim().toUpperCase();
+    const sameOs = os ? propTrips.filter(t => (t.os || '').trim().toUpperCase() === os) : [];
+    const targets = sameOs.length ? sameOs : [trip];
+    const now = Date.now();
+    setPendingUpdates(prev => {
+      const n = { ...prev };
+      targets.forEach(t => { n[t.id] = { data: { ...(n[t.id]?.data || {}), coletaDocGenerated: checked }, timestamp: now }; });
+      return n;
+    });
+    try {
+      for (const t of targets) {
+        await db.saveTrip({ ...t, coletaDocGenerated: checked });
+      }
+      onRefresh();
+    } catch (e) {
+      setPendingUpdates(prev => { const n = { ...prev }; targets.forEach(t => delete n[t.id]); return n; });
+      console.error('Erro ao marcar Doc Originário:', e);
+    }
+  }, [propTrips, onRefresh]);
+
   const saveCte = useCallback(async (t: Trip) => {
     const val = cteInputValue.trim() || undefined;
     await handleUpdate(t, { emissaoCteNumber: val });
@@ -241,8 +264,8 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
         return (
           <button
             type="button"
-            onClick={() => handleUpdate(t, { coletaDocGenerated: !checked })}
-            title={checked ? 'Doc gerado — clique para desmarcar' : 'Marcar como gerado'}
+            onClick={() => handleToggleDocOriginario(t, !checked)}
+            title={checked ? 'Doc gerado — clique para desmarcar (reflete na Coleta do Dia)' : 'Marcar como gerado (reflete na Coleta do Dia)'}
             className={`relative flex items-center justify-center w-9 h-9 rounded-xl border-2 transition-all duration-150 cursor-pointer active:scale-90 hover:scale-105 ${
               checked ? 'bg-emerald-50 border-emerald-400 text-emerald-600' : 'bg-white border-slate-200 text-slate-300'
             }`}
@@ -405,7 +428,7 @@ const EmissoesTab: React.FC<EmissoesTabProps> = ({ userId, user, trips: propTrip
         );
       },
     },
-  ], [categories, handleUpdate, cteEditingId, cteInputValue, saveCte, obsEditingId, obsInputValue, saveObs, typeBadge]);
+  ], [categories, handleUpdate, handleToggleDocOriginario, cteEditingId, cteInputValue, saveCte, obsEditingId, obsInputValue, saveObs, typeBadge]);
 
   // ── Row styling ────────────────────────────────────────────────────────────
   const getRowStyle = useCallback((t: Trip): React.CSSProperties => {
