@@ -19,6 +19,8 @@ interface SmartOperationTableProps {
   data: any[];
   title?: string;
   defaultVisibleKeys?: string[];
+  /** Colunas novas garantidas na tela mesmo com preferência salva antiga */
+  forceVisibleKeys?: string[];
   onRowClick?: (row: any) => void;
   hideInternalSearch?: boolean;
   getRowClassName?: (row: any) => string;
@@ -44,6 +46,7 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
   data,
   title,
   defaultVisibleKeys,
+  forceVisibleKeys,
   onRowClick,
   hideInternalSearch = false,
   getRowClassName,
@@ -69,11 +72,13 @@ const SmartOperationTable: React.FC<SmartOperationTableProps> = ({
     const prefs = db.getPreferences(userId);
     const saved = prefs.visibleColumns[componentId];
     if (saved && saved.length > 0) {
-      setVisibleColumns(saved);
+      // Colunas novas não constam na preferência antiga — garante que apareçam
+      const missing = (forceVisibleKeys || []).filter(k => !saved.includes(k));
+      setVisibleColumns(missing.length ? [...saved, ...missing] : saved);
     } else {
       setVisibleColumns(defaultVisibleKeys || columns.map(c => c.key));
     }
-  }, [userId, componentId, defaultVisibleKeys, columns]);
+  }, [userId, componentId, defaultVisibleKeys, forceVisibleKeys, columns]);
 
   const toggleColumn = (key: string) => {
     const newCols = visibleColumns.includes(key)
