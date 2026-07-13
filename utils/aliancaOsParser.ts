@@ -47,6 +47,8 @@ export interface ParsedAliancaOs {
   localEntregaFone?: string;
   entregarVazio?: string;       // depósito de devolução do vazio (OS de entrega)
   mercadoria?: string;
+  faturarNome?: string;         // tomador do serviço (campo "FATURAR A" da OS)
+  faturarCnpj?: string;
   padraoCarga?: string;         // CARGA GERAL | CARGO PREMIUM | PADRÃO ALIMENTO | REEFER
   docReferencia?: string;       // "CTe Rodoviário" | "CTe Longo Curso" → tipo de viagem
   armador?: string;
@@ -217,6 +219,15 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
   const mercMatch = full.match(/Mercadoria\s+(.+?)\s+Seguro/i);
   if (mercMatch) result.mercadoria = mercMatch[1].trim().toUpperCase();
 
+  // ── Tomador do serviço ("FATURAR A" nas observações de faturamento) ──────
+  const fatMatch = full.match(/FATURAR A\s*:?\s*([^\n]+)/i);
+  if (fatMatch) {
+    result.faturarNome = fatMatch[1].trim().toUpperCase();
+    const after = full.slice((fatMatch.index || 0) + fatMatch[0].length, (fatMatch.index || 0) + fatMatch[0].length + 200);
+    const fatCnpj = after.match(/CNPJ\s*:?\s*(\d{11,14})/i);
+    if (fatCnpj) result.faturarCnpj = fatCnpj[1];
+  }
+
   // ── Requerimento especial: descrição completa + senha da OC ──────────────
   // Ex.: "Geral | INFORMAR SENHA NA OC - 6500152549 // Embarque IN65-02904/26EX"
   const reqMatch = full.match(/Requerimento Especial\s+Descri[çc][ãa]o\s+(\S+)\s+(.+?)(?:\n|Programa[çc][ãa]o de Servi|$)/i);
@@ -283,6 +294,23 @@ export function isEntregaImportacao(tipoOperacao?: string): boolean {
   return /ENTREGA|IMPORTA/.test(t);
 }
 
+/**
+ * Identifica o lado da operação pelas PARTES da OS (remetentes/destinatários):
+ * - Com Destinatário (seção Local Entrega) → entrega/importação
+ * - Só com Embarcador (seção Local Coleta) → coleta/exportação
+ * O título da OS entra apenas como fallback quando nenhuma parte foi extraída.
+ */
+export function isEntregaImportacaoOs(p: ParsedAliancaOs): boolean {
+  if (p.localEntregaNome || p.localEntregaCnpj) return true;
+  if (p.embarcador || p.cnpjColeta) return false;
+  return isEntregaImportacao(p.tipoOperacao);
+}
+
+/** Rótulo do tipo identificado pelas partes, para exibição. */
+export function tipoOperacaoIdentificado(p: ParsedAliancaOs): string {
+  return isEntregaImportacaoOs(p) ? 'ENTREGA / IMPORTAÇÃO' : 'COLETA / EXPORTAÇÃO';
+}
+
 export interface OsClienteDestino {
   clienteNome?: string;
   clienteOrigem: 'LOCAL COLETA' | 'LOCAL ENTREGA';
@@ -299,12 +327,12 @@ export interface OsClienteDestino {
 }
 
 /**
- * Regras de preenchimento por tipo de operação:
+ * Regras de preenchimento por tipo de operação (identificado pelas partes):
  * - Coleta cabotagem / Exportação → cliente = Local Coleta; destino = Entregar Cheio
  * - Entrega cabotagem / Importação → cliente = Local Entrega; destino = Entregar Vazio
  */
 export function resolveClienteDestino(p: ParsedAliancaOs): OsClienteDestino {
-  if (isEntregaImportacao(p.tipoOperacao)) {
+  if (isEntregaImportacaoOs(p)) {
     return {
       clienteNome: p.localEntregaNome,
       clienteOrigem: 'LOCAL ENTREGA',

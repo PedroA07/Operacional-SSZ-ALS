@@ -9,7 +9,7 @@ import ConfirmDialog from '../../shared/ConfirmDialog';
 import { downloadFile, downloadBlob, fetchFileBlob } from '../../../utils/fileDownloader';
 import CteViewerModal from './CteViewerModal';
 import { fmtMoney, fmtQty, copyMoney, copyQty, fmtCnpjCpf, sumUnVolumes, CopyButton, PartyCard } from './cteDisplay';
-import { resolveClienteDestino, ParsedAliancaOs } from '../../../utils/aliancaOsParser';
+import { resolveClienteDestino, tipoOperacaoIdentificado, ParsedAliancaOs } from '../../../utils/aliancaOsParser';
 
 interface CteAttachmentsModalProps {
   trip: Trip;
@@ -647,23 +647,40 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
               ) : (
                 <div className="space-y-4">
 
-                  {/* ── 1. DADOS DA OS (sempre no topo) ─────────────────────── */}
+                  {/* ── 1. DADOS DA OS (sempre no topo): OS, tomador, cliente e
+                        destino — tipo identificado pelos remetentes/destinatários */}
                   {osData && (() => {
                     const { p, cd } = osData;
-                    const field = (label: string, value?: string, copyValue?: string) => value ? (
-                      <div>
-                        <p className="text-[7px] font-black text-slate-400 uppercase">{label}</p>
-                        <p className="text-[9px] font-black text-slate-700 flex items-center gap-0.5 break-words">
-                          {value}
-                          {copyValue !== undefined && <CopyButton value={copyValue} title={`Copiar ${label.toLowerCase()}`} />}
-                        </p>
-                      </div>
-                    ) : null;
                     return (
                       <div>
                         <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Dados da OS</p>
                         <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-2">
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <p className="text-[10px] font-black text-slate-800 flex items-center gap-0.5">
+                              OS {p.os}
+                              <CopyButton value={p.os || ''} title="Copiar OS" />
+                            </p>
+                            <span
+                              className="text-[7px] px-1.5 py-0.5 bg-amber-100 text-amber-700 border border-amber-300 rounded font-black uppercase"
+                              title={`Tipo identificado pelas partes da OS (remetente/destinatário)${p.tipoOperacao ? ` — título da OS: ${p.tipoOperacao}` : ''}`}
+                            >
+                              {tipoOperacaoIdentificado(p)}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 pt-1.5 border-t border-amber-200/70">
+                            <div>
+                              <p className="text-[7px] font-black text-amber-600 uppercase">Tomador · A Faturar</p>
+                              <p className="text-[9px] font-black text-slate-800 flex items-center gap-0.5 break-words">
+                                {p.faturarNome || '—'}
+                                {p.faturarNome && <CopyButton value={p.faturarNome} title="Copiar tomador" />}
+                              </p>
+                              {p.faturarCnpj && (
+                                <p className="text-[8px] font-bold text-slate-500 flex items-center gap-0.5">
+                                  {fmtCnpjCpf(p.faturarCnpj)}
+                                  <CopyButton value={p.faturarCnpj.replace(/\D/g, '')} title="Copiar CNPJ do tomador (só números)" />
+                                </p>
+                              )}
+                            </div>
                             <div>
                               <p className="text-[7px] font-black text-amber-600 uppercase">Cliente · {cd.clienteOrigem}</p>
                               <p className="text-[9px] font-black text-slate-800 flex items-center gap-0.5 break-words">
@@ -687,20 +704,6 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                                 {cd.destinoNome && <CopyButton value={cd.destinoNome} title="Copiar destino" />}
                               </p>
                             </div>
-                          </div>
-                          <div className="grid grid-cols-3 gap-x-2 gap-y-1.5 pt-1.5 border-t border-amber-200/70">
-                            {field('OS', p.os, p.os)}
-                            {field('Tipo de Operação', p.tipoOperacao)}
-                            {field('Booking', p.booking, p.booking)}
-                            {field('Navio', p.ship)}
-                            {field('Data Coleta', p.dataColeta ? new Date(p.dataColeta).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : undefined)}
-                            {field('Container', p.container ? `${p.container}${p.containerTipo ? ` · ${p.containerTipo}` : ''}` : undefined, p.container)}
-                            {field('Lacre', p.lacre, p.lacre)}
-                            {field('Aut. Coleta', p.autColeta, p.autColeta)}
-                            {field('Padrão de Carga', p.padraoCarga)}
-                            {field('Doc Referência', p.docReferencia)}
-                            {field('Armador', p.armador)}
-                            {field('Mercadoria', p.mercadoria)}
                           </div>
                         </div>
                       </div>
