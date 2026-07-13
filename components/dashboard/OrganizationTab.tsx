@@ -1645,6 +1645,54 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, [activeView, logAudit, onRefresh]);
 
+  // ── CT-e Emitido (Coleta/Export e Entrega/Import) ───────────────────────
+  const handleToggleCteEmitido = useCallback(async (trip: Trip, checked: boolean) => {
+    const now = Date.now();
+    setPendingUpdates(prev => ({ ...prev, [trip.id]: { data: { ...(prev[trip.id]?.data || {}), cteEmitido: checked }, timestamp: now } }));
+    try {
+      await db.saveTrip({ ...trip, cteEmitido: checked } as any);
+      logAudit(activeView, 'CTE', checked ? 'CT-e marcado como emitido' : 'CT-e emitido desmarcado', trip.os, undefined, trip.id);
+    } catch {
+      setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar CT-e emitido', type: 'error' } }));
+    }
+  }, [activeView, logAudit]);
+
+  const handleCteEmitidoUpload = useCallback(async (trip: Trip, files: File[]) => {
+    if (files.length === 0) return;
+    setUploadingTripDoc(`${trip.id}:cte`);
+    try {
+      const novos: NonNullable<Trip['cteEmitidoAnexos']> = [];
+      for (const file of files) {
+        const ext = file.name.split('.').pop() || 'pdf';
+        const fileName = `cte-emitido-${trip.os || trip.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+        const url = await r2Service.upload(file, fileName, `cte-emitido/${trip.os || trip.id}`);
+        novos.push({ id: `cte-anx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, url, fileName: file.name, uploadDate: new Date().toISOString() });
+      }
+      // Anexar já marca o CT-e como emitido (o anexo continua opcional)
+      const anexos = [...(trip.cteEmitidoAnexos || []), ...novos];
+      await db.saveTrip({ ...trip, cteEmitidoAnexos: anexos, cteEmitido: true } as any);
+      logAudit(activeView, 'CTE', `${novos.length} PDF(s) do CT-e emitido anexado(s)`, trip.os, undefined, trip.id);
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'PDF(s) do CT-e anexado(s)', type: 'success' } }));
+      onRefresh();
+    } catch {
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao anexar PDF do CT-e', type: 'error' } }));
+    } finally {
+      setUploadingTripDoc(null);
+    }
+  }, [activeView, logAudit, onRefresh]);
+
+  const handleRemoveCteEmitidoAnexo = useCallback(async (trip: Trip, anexoId: string) => {
+    try {
+      const anexos = (trip.cteEmitidoAnexos || []).filter(a => a.id !== anexoId);
+      await db.saveTrip({ ...trip, cteEmitidoAnexos: anexos } as any);
+      logAudit(activeView, 'CTE', 'PDF do CT-e emitido removido', trip.os, undefined, trip.id);
+      onRefresh();
+    } catch {
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao remover PDF do CT-e', type: 'error' } }));
+    }
+  }, [activeView, logAudit, onRefresh]);
+
   const handleSaveDevolucaoFromForm = useCallback(async (updated: Devolucao) => {
     const old = devMinutaDev;
     await db.saveDevolucao(updated);
@@ -2343,6 +2391,61 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       }
     }] : []),
     {
+      key: 'cteEmitido',
+      label: 'CT-e Emitido',
+      render: (t: Trip) => {
+        const checked = !!t.cteEmitido;
+        const anexos = t.cteEmitidoAnexos || [];
+        const isUploading = uploadingTripDoc === `${t.id}:cte`;
+        return (
+          <div className="flex flex-col items-center gap-1 min-w-[110px]">
+            <ToggleIconBtn
+              checked={checked}
+              onClick={() => handleToggleCteEmitido(t, !checked)}
+              loading={'cteEmitido' in (pendingUpdates[t.id]?.data || {})}
+              activeClass="bg-indigo-50 border-indigo-400 text-indigo-600"
+              inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-indigo-300 hover:text-indigo-400"
+              badgeColor="bg-indigo-500"
+              title={checked ? 'CT-e emitido — clique para desmarcar' : 'Marcar CT-e como emitido'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+            </ToggleIconBtn>
+            {anexos.map(a => (
+              <div key={a.id} className="w-full flex items-center gap-0.5">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setViewingDoc({ url: a.url, fileName: a.fileName }); }}
+                  className="flex-1 flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase tracking-tight border bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-all min-w-0"
+                  title={`Ver ${a.fileName}`}
+                >
+                  <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  <span className="truncate">{a.fileName}</span>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleRemoveCteEmitidoAnexo(t, a.id); }}
+                  className="p-0.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-all shrink-0"
+                  title="Remover este PDF"
+                >
+                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+            ))}
+            <label
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border cursor-pointer transition-all ${isUploading ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-indigo-200 text-indigo-500 hover:bg-indigo-50 hover:border-indigo-400'}`}
+              title="Anexar um ou mais PDFs do CT-e (opcional)"
+            >
+              {isUploading
+                ? <><div className="w-2.5 h-2.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"/>Enviando...</>
+                : <><svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>{anexos.length > 0 ? 'Anexar Mais' : 'Anexar PDF'}</>}
+              <input type="file" accept=".pdf,application/pdf" multiple className="hidden" disabled={isUploading} onChange={e => { const fs = Array.from(e.target.files || []); if (fs.length) { handleCteEmitidoUpload(t, fs); e.target.value = ''; } }} />
+            </label>
+          </div>
+        );
+      }
+    },
+    {
       key: 'isScheduled',
       label: 'Agendado',
       render: (t: Trip) => {
@@ -2569,7 +2672,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao, tiposViagem, isColetaSemEmail, handleToggleColetaEmail, handleToggleColetaDoc, retiradaOptions, handleRetiradaCheioChange, handleTripAgendamentoUpload, handleReutComprovanteUpload, uploadingTripDoc, isEntregaConcluida, hasBaixaConfirmada]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao, tiposViagem, isColetaSemEmail, handleToggleColetaEmail, handleToggleColetaDoc, retiradaOptions, handleRetiradaCheioChange, handleTripAgendamentoUpload, handleReutComprovanteUpload, uploadingTripDoc, isEntregaConcluida, hasBaixaConfirmada, handleToggleCteEmitido, handleCteEmitidoUpload, handleRemoveCteEmitidoAnexo]);
 
   const handleDeleteDevolucao = useCallback((d: Devolucao) => {
     setConfirmModal({
@@ -3264,6 +3367,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               componentId="org-coleta-export"
               columns={columns}
               data={trips}
+              forceVisibleKeys={['cteEmitido']}
               hideInternalSearch={false}
               getRowStyle={(t: Trip) => {
                 if (isTripReadyToFinalize(t)) return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #10b981' };
@@ -3284,6 +3388,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               componentId="org-entrega-import"
               columns={columns}
               data={trips}
+              forceVisibleKeys={['retiradaCheio', 'cteEmitido']}
               hideInternalSearch={false}
               getRowStyle={(t: Trip) => {
                 if (t.status === 'Reutilização') return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #059669' };

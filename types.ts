@@ -705,6 +705,13 @@ export interface Trip {
     fileName: string;
     uploadDate: string;
   };
+  cteEmitido?: boolean;       // CT-e emitido (painel Organização)
+  cteEmitidoAnexos?: {        // PDFs do CT-e emitido (anexo opcional, um ou mais)
+    id: string;
+    url: string;
+    fileName: string;
+    uploadDate: string;
+  }[];
 }
 
 export interface ColetaDocOriginarioRule {
