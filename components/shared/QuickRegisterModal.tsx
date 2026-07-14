@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Driver, Customer, Port, PreStacking, AuthorizedPerson } from '../../types';
 import { db } from '../../utils/storage';
+import { fileStorage } from '../../utils/fileStorage';
 import { maskCEP, maskCNPJ, maskCPF, maskRG, maskPhone, maskPlate } from '../../utils/masks';
 
 export type QuickRegisterType = 'driver' | 'customer' | 'port' | 'preStacking' | 'authorizedPerson';
@@ -40,6 +41,8 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
   const [isCnpjLoading, setIsCnpjLoading] = useState(false);
   const [error, setError] = useState('');
   const lastSearchedCnpj = useRef<string>('');
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const cnhInputRef = useRef<HTMLInputElement>(null);
 
   // Tipo efetivo para locais: respeita a escolha Porto/Pré-Stacking do seletor.
   const effectiveType: QuickRegisterType = isLocation ? locationKind : type;
@@ -53,7 +56,16 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
     if (isLocation) setLocationKind(type === 'preStacking' ? 'preStacking' : 'port');
     const nameHint = (initialName || '').toUpperCase();
     if (type === 'driver') {
-      setForm({ name: nameHint, cpf: '', cnh: '', phone: '', plateHorse: '', plateTrailer: '', driverType: 'Externo', status: 'Ativo' });
+      setForm({
+        name: nameHint, cpf: '', rg: '', cnh: '', phone: '', email: '',
+        photo: '', cnhPdfUrl: '',
+        plateHorse: '', yearHorse: '', plateTrailer: '', yearTrailer: '',
+        driverType: 'Externo', status: 'Ativo',
+        beneficiaryIsDriver: true,
+        beneficiaryName: '', beneficiaryCnpj: '', beneficiaryPhone: '', beneficiaryEmail: '',
+        paymentPreference: 'PIX',
+        whatsappGroupName: '', whatsappGroupLink: '',
+      });
     } else if (type === 'authorizedPerson') {
       setForm({ name: nameHint, cpf: '', rg: '', veiculo: '' });
     } else {
@@ -123,6 +135,25 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
     }
   };
 
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setForm((prev: any) => ({ ...prev, photo: reader.result as string }));
+    reader.readAsDataURL(file);
+  };
+
+  const handleCnhUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setForm((prev: any) => ({ ...prev, cnhPdfUrl: reader.result as string }));
+    reader.readAsDataURL(file);
+  };
+
+  // CPF (até 11 dígitos) ou CNPJ (mais que isso) — usado no documento do favorecido.
+  const maskDoc = (v: string) => (v.replace(/\D/g, '').length <= 11 ? maskCPF(v) : maskCNPJ(v));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return;
@@ -140,23 +171,41 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
       let entity: any = null;
 
       if (type === 'driver') {
+        let finalPhoto = (form.photo || '').trim();
+        let finalCnh = (form.cnhPdfUrl || '').trim();
+        if (finalPhoto.startsWith('data:')) finalPhoto = await fileStorage.uploadDriverProfile(finalPhoto, id);
+        if (finalCnh.startsWith('data:')) finalCnh = await fileStorage.uploadDriverCNH(finalCnh, id);
+
+        const isSelfBenef = !!form.beneficiaryIsDriver;
         entity = {
           id,
           name: form.name.trim().toUpperCase(),
           cpf: (form.cpf || '').trim(),
-          rg: '',
+          rg: (form.rg || '').trim(),
           cnh: (form.cnh || '').trim().toUpperCase(),
+          cnhPdfUrl: finalCnh,
+          photo: finalPhoto,
           phone: (form.phone || '').trim(),
-          email: '',
+          email: (form.email || '').trim().toLowerCase(),
           plateHorse: (form.plateHorse || '').trim().toUpperCase(),
           plateTrailer: (form.plateTrailer || '').trim().toUpperCase(),
-          yearHorse: '',
-          yearTrailer: '',
-          platesHorse: form.plateHorse ? [{ id: `ph-${id}`, plate: form.plateHorse.trim().toUpperCase(), year: '', isPrimary: true }] : [],
-          platesTrailer: form.plateTrailer ? [{ id: `pt-${id}`, plate: form.plateTrailer.trim().toUpperCase(), year: '', isPrimary: true }] : [],
+          yearHorse: (form.yearHorse || '').trim(),
+          yearTrailer: (form.yearTrailer || '').trim(),
+          platesHorse: form.plateHorse ? [{ id: `ph-${id}`, plate: form.plateHorse.trim().toUpperCase(), year: (form.yearHorse || '').trim(), isPrimary: true }] : [],
+          platesTrailer: form.plateTrailer ? [{ id: `pt-${id}`, plate: form.plateTrailer.trim().toUpperCase(), year: (form.yearTrailer || '').trim(), isPrimary: true }] : [],
           driverType: form.driverType || 'Externo',
-          status: 'Ativo',
+          status: form.status || 'Ativo',
+          statusLastChangeDate: new Date().toISOString(),
+          beneficiaryIsDriver: isSelfBenef,
+          beneficiaryName: isSelfBenef ? '' : (form.beneficiaryName || '').trim().toUpperCase(),
+          beneficiaryCnpj: isSelfBenef ? '' : (form.beneficiaryCnpj || '').trim(),
+          beneficiaryPhone: isSelfBenef ? '' : (form.beneficiaryPhone || '').trim(),
+          beneficiaryEmail: isSelfBenef ? '' : (form.beneficiaryEmail || '').trim().toLowerCase(),
+          paymentPreference: form.paymentPreference || 'PIX',
+          whatsappGroupName: (form.whatsappGroupName || '').trim().toUpperCase(),
+          whatsappGroupLink: (form.whatsappGroupLink || '').trim(),
           operations: [],
+          hasAccess: true,
           registrationDate: new Date().toISOString(),
         } as Driver;
         ok = await db.saveDriver(entity as Driver);
@@ -208,6 +257,7 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
 
   const inputClasses =
     'w-full px-4 py-3 rounded-xl border-2 border-slate-100 bg-slate-50 text-slate-800 text-[12px] font-bold uppercase focus:bg-white outline-none transition-all placeholder:text-slate-300';
+  const inputClassesLower = inputClasses.replace('uppercase', 'lowercase');
   const labelClass = 'text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block';
   const focusStyle = { outlineColor: accent } as React.CSSProperties;
 
@@ -329,35 +379,150 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
           {/* ── MOTORISTA ── */}
           {type === 'driver' && (
             <>
+              {/* Foto + CNH PDF */}
+              <div className="grid grid-cols-[80px_1fr] gap-3">
+                <div className="space-y-1">
+                  <label className={labelClass}>Foto</label>
+                  <div
+                    onClick={() => photoInputRef.current?.click()}
+                    className="w-20 h-24 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer overflow-hidden hover:border-blue-400 transition-all"
+                  >
+                    {form.photo
+                      ? <img src={form.photo} className="w-full h-full object-cover" alt="" />
+                      : <span className="text-[7px] font-black text-slate-400 uppercase text-center px-1">Anexar</span>}
+                  </div>
+                  <input type="file" ref={photoInputRef} className="hidden" accept="image/*" onChange={handlePhotoUpload} />
+                </div>
+                <div className="space-y-1 flex flex-col">
+                  <label className={labelClass}>CNH PDF (Digitalizada)</label>
+                  <div
+                    onClick={() => cnhInputRef.current?.click()}
+                    className="flex-1 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer hover:border-blue-400 transition-all"
+                  >
+                    <span className="text-[9px] font-black text-slate-400 uppercase">
+                      {form.cnhPdfUrl ? 'PDF Anexado ✓' : 'Subir Arquivo PDF'}
+                    </span>
+                  </div>
+                  <input type="file" ref={cnhInputRef} className="hidden" accept="application/pdf" onChange={handleCnhUpload} />
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <label className={labelClass}>Nome Completo <span className="text-red-500">*</span></label>
                 <input required className={inputClasses} style={focusStyle} value={form.name || ''} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value.toUpperCase() }))} placeholder="NOME DO MOTORISTA" />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className={labelClass}>Vínculo / Tipo</label>
+                  <select className={inputClasses} style={focusStyle} value={form.driverType || 'Externo'} onChange={e => setForm((f: any) => ({ ...f, driverType: e.target.value }))}>
+                    <option value="Externo">EXTERNO / TERCEIRO</option>
+                    <option value="Frota">FROTA ALS</option>
+                    <option value="Motoboy">MOTOBOY</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className={labelClass}>Status</label>
+                  <select className={inputClasses} style={focusStyle} value={form.status || 'Ativo'} onChange={e => setForm((f: any) => ({ ...f, status: e.target.value }))}>
+                    <option value="Ativo">ATIVO</option>
+                    <option value="Inativo">INATIVO</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className={labelClass}>CPF</label>
                   <input className={inputClasses} style={focusStyle} value={form.cpf || ''} onChange={e => setForm((f: any) => ({ ...f, cpf: maskCPF(e.target.value) }))} placeholder="000.000.000-00" />
                 </div>
                 <div className="space-y-1">
+                  <label className={labelClass}>RG</label>
+                  <input className={inputClasses} style={focusStyle} value={form.rg || ''} onChange={e => setForm((f: any) => ({ ...f, rg: maskRG(e.target.value) }))} placeholder="00.000.000-0" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
                   <label className={labelClass}>Registro CNH</label>
                   <input className={inputClasses} style={focusStyle} value={form.cnh || ''} onChange={e => setForm((f: any) => ({ ...f, cnh: e.target.value.toUpperCase() }))} placeholder="Nº DA CNH" />
                 </div>
+                <div className="space-y-1">
+                  <label className={labelClass}>Celular / Whatsapp</label>
+                  <input className={inputClasses} style={focusStyle} value={form.phone || ''} onChange={e => setForm((f: any) => ({ ...f, phone: maskPhone(e.target.value) }))} placeholder="(00) 00000-0000" />
+                </div>
               </div>
+
               <div className="space-y-1">
-                <label className={labelClass}>Celular / Whatsapp</label>
-                <input className={inputClasses} style={focusStyle} value={form.phone || ''} onChange={e => setForm((f: any) => ({ ...f, phone: maskPhone(e.target.value) }))} placeholder="(00) 00000-0000" />
+                <label className={labelClass}>E-mail de Contato</label>
+                <input type="email" className={inputClassesLower} style={focusStyle} value={form.email || ''} onChange={e => setForm((f: any) => ({ ...f, email: e.target.value.toLowerCase() }))} placeholder="email@exemplo.com" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              <div className="grid grid-cols-[1fr_84px] gap-3">
                 <div className="space-y-1">
                   <label className={labelClass}>Placa Cavalo</label>
                   <input className={`${inputClasses} font-mono tracking-widest`} style={focusStyle} value={form.plateHorse || ''} onChange={e => setForm((f: any) => ({ ...f, plateHorse: maskPlate(e.target.value) }))} placeholder="ABC-1234" />
                 </div>
                 <div className="space-y-1">
+                  <label className={labelClass}>Ano</label>
+                  <input className={inputClasses} style={focusStyle} maxLength={4} value={form.yearHorse || ''} onChange={e => setForm((f: any) => ({ ...f, yearHorse: e.target.value.replace(/\D/g, '') }))} placeholder="20XX" />
+                </div>
+              </div>
+              <div className="grid grid-cols-[1fr_84px] gap-3">
+                <div className="space-y-1">
                   <label className={labelClass}>Placa Carreta</label>
                   <input className={`${inputClasses} font-mono tracking-widest`} style={focusStyle} value={form.plateTrailer || ''} onChange={e => setForm((f: any) => ({ ...f, plateTrailer: maskPlate(e.target.value) }))} placeholder="ABC-1234" />
                 </div>
+                <div className="space-y-1">
+                  <label className={labelClass}>Ano</label>
+                  <input className={inputClasses} style={focusStyle} maxLength={4} value={form.yearTrailer || ''} onChange={e => setForm((f: any) => ({ ...f, yearTrailer: e.target.value.replace(/\D/g, '') }))} placeholder="20XX" />
+                </div>
               </div>
-              <p className="text-[8px] font-bold text-slate-400 uppercase italic">Ficha completa depois em Motoristas.</p>
+
+              {/* Favorecido (Pagamentos) */}
+              <div className="rounded-2xl border-2 border-slate-100 bg-slate-50 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Favorecido (Pagamentos)</label>
+                  <button
+                    type="button"
+                    onClick={() => setForm((f: any) => ({ ...f, beneficiaryIsDriver: !f.beneficiaryIsDriver }))}
+                    className="flex items-center gap-2 shrink-0"
+                  >
+                    <span className="text-[8px] font-black text-slate-400 uppercase">É o próprio motorista</span>
+                    <span className={`relative w-9 h-5 rounded-full transition-all ${form.beneficiaryIsDriver ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${form.beneficiaryIsDriver ? 'left-[18px]' : 'left-0.5'}`} />
+                    </span>
+                  </button>
+                </div>
+
+                {!form.beneficiaryIsDriver && (
+                  <div className="space-y-3">
+                    <input className={inputClasses} style={focusStyle} value={form.beneficiaryName || ''} onChange={e => setForm((f: any) => ({ ...f, beneficiaryName: e.target.value.toUpperCase() }))} placeholder="NOME DO FAVORECIDO" />
+                    <div className="grid grid-cols-2 gap-3">
+                      <input className={inputClasses} style={focusStyle} value={form.beneficiaryCnpj || ''} onChange={e => setForm((f: any) => ({ ...f, beneficiaryCnpj: maskDoc(e.target.value) }))} placeholder="CPF / CNPJ" />
+                      <input className={inputClasses} style={focusStyle} value={form.beneficiaryPhone || ''} onChange={e => setForm((f: any) => ({ ...f, beneficiaryPhone: maskPhone(e.target.value) }))} placeholder="(00) 00000-0000" />
+                    </div>
+                    <div className="grid grid-cols-[1fr_100px] gap-3">
+                      <input type="email" className={inputClassesLower} style={focusStyle} value={form.beneficiaryEmail || ''} onChange={e => setForm((f: any) => ({ ...f, beneficiaryEmail: e.target.value.toLowerCase() }))} placeholder="email / chave pix" />
+                      <select className={inputClasses} style={focusStyle} value={form.paymentPreference || 'PIX'} onChange={e => setForm((f: any) => ({ ...f, paymentPreference: e.target.value }))}>
+                        <option value="PIX">PIX</option>
+                        <option value="TED">TED</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Grupo WhatsApp */}
+              <div className="space-y-1">
+                <label className={labelClass}>Nome Grupo WhatsApp</label>
+                <input className={inputClasses} style={focusStyle} value={form.whatsappGroupName || ''} onChange={e => setForm((f: any) => ({ ...f, whatsappGroupName: e.target.value.toUpperCase() }))} placeholder="OPERACIONAL ALS" />
+              </div>
+              <div className="space-y-1">
+                <label className={labelClass}>Link Convite Grupo</label>
+                <input className={inputClassesLower} style={focusStyle} value={form.whatsappGroupLink || ''} onChange={e => setForm((f: any) => ({ ...f, whatsappGroupLink: e.target.value }))} placeholder="https://chat.whatsapp.com/..." />
+              </div>
+
+              <p className="text-[8px] font-bold text-slate-400 uppercase italic">Todos os dados podem ser ajustados depois na aba Motoristas.</p>
             </>
           )}
 
