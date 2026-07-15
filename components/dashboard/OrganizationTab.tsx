@@ -1864,6 +1864,11 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return name === 'BL DE LONGO CUSTO';
   }, [tiposViagem, resolveEffectiveTripTypeId]);
 
+  // MERCOSUL: a coleta é confirmada no sistema "OK" (não por e-mail)
+  const isMercosul = useCallback((t: Trip): boolean => {
+    return (t.category || '').toUpperCase().includes('MERCOSUL');
+  }, []);
+
   const activeColetaTemplate = useMemo(() => {
     return emailTemplates.find(t => t.id === coletaTemplateId) || emailTemplates[0] || null;
   }, [emailTemplates, coletaTemplateId]);
@@ -2335,10 +2340,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     },
     ...(activeView === 'COLETA' ? [{
       key: 'coletaEmail',
-      label: 'Coleta do Dia',
+      label: 'Coletas',
       sortable: false,
       render: (t: Trip) => {
         const isFreteMorto = t.status === 'Frete Morto';
+        const isBL = isColetaSemEmail(t);
+        const isMerc = isMercosul(t);
         const cteCount = t.emissaoCteAttachments?.length || 0;
         // Emissões de CT-e: anexar e visualizar CT-e e NF (mesmo modal da aba Emissões)
         const cteEmissoesBtn = (
@@ -2354,25 +2361,39 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             {cteCount > 0 ? `CT-e / NF (${cteCount})` : 'Emissões CT-e'}
           </button>
         );
-        // Tipos sem e-mail (ex.: BL DE LONGO CUSTO) usam o Doc. Originário
-        if (isColetaSemEmail(t)) {
+        // BL DE LONGO CUSTO: sem e-mail — mostra o ícone de BL no lugar do botão
+        if (isBL) {
           return (
-            <div className="flex flex-col items-center gap-1 min-w-[92px]">
-              <ToggleIconBtn
-                checked={!!t.coletaDocGenerated}
-                onClick={() => handleToggleColetaDoc(t, !t.coletaDocGenerated)}
-                disabled={isFreteMorto}
-                loading={'coletaDocGenerated' in (pendingUpdates[t.id]?.data || {})}
-                activeClass="bg-emerald-50 border-emerald-400 text-emerald-600"
-                inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-emerald-300 hover:text-emerald-400"
-                badgeColor="bg-emerald-500"
-                title={isFreteMorto ? 'Bloqueado — viagem em Frete Morto' : (t.coletaDocGenerated ? 'Doc. originário gerado — clique para desmarcar' : 'Marcar doc. originário como gerado')}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-              </ToggleIconBtn>
-              <span className="text-[6px] font-black uppercase tracking-tight text-emerald-600">Doc Orig.</span>
+            <div className="flex flex-col items-center gap-1 min-w-[110px]">
+              <div className="flex items-start justify-center gap-2">
+                {/* Ícone de BL */}
+                <div className="flex flex-col items-center gap-0.5">
+                  <div className="w-9 h-9 rounded-xl border-2 border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500" title="BL de Longo Custo — sem e-mail">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                    </svg>
+                  </div>
+                  <span className="text-[6px] font-black uppercase tracking-tight text-slate-500">BL</span>
+                </div>
+                {/* Doc. Originário */}
+                <div className="flex flex-col items-center gap-0.5">
+                  <ToggleIconBtn
+                    checked={!!t.coletaDocGenerated}
+                    onClick={() => handleToggleColetaDoc(t, !t.coletaDocGenerated)}
+                    disabled={isFreteMorto}
+                    loading={'coletaDocGenerated' in (pendingUpdates[t.id]?.data || {})}
+                    activeClass="bg-emerald-50 border-emerald-400 text-emerald-600"
+                    inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-emerald-300 hover:text-emerald-400"
+                    badgeColor="bg-emerald-500"
+                    title={isFreteMorto ? 'Bloqueado — viagem em Frete Morto' : (t.coletaDocGenerated ? 'Doc. originário gerado — clique para desmarcar' : 'Marcar doc. originário como gerado')}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                  </ToggleIconBtn>
+                  <span className="text-[6px] font-black uppercase tracking-tight text-emerald-600">Doc Orig.</span>
+                </div>
+              </div>
               {cteEmissoesBtn}
             </div>
           );
@@ -2382,23 +2403,27 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         return (
           <div className="flex flex-col items-center gap-1 min-w-[124px]">
             <div className="flex items-start justify-center gap-2">
-              {/* E-mail da coleta */}
+              {/* Coleta: MERCOSUL confirma no sistema OK (botão OK); demais por e-mail */}
               <div className="flex flex-col items-center gap-0.5">
                 <ToggleIconBtn
                   checked={!!t.coletaEmailSent}
                   onClick={() => handleToggleColetaEmail(t, !t.coletaEmailSent)}
                   disabled={isFreteMorto}
                   loading={'coletaEmailSent' in (pendingUpdates[t.id]?.data || {})}
-                  activeClass="bg-blue-50 border-blue-400 text-blue-600"
-                  inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-blue-300 hover:text-blue-400"
-                  badgeColor="bg-blue-500"
-                  title={isFreteMorto ? 'Bloqueado — viagem em Frete Morto' : (t.coletaEmailSent ? 'E-mail da coleta enviado — clique para desmarcar' : 'Marcar e-mail da coleta como enviado')}
+                  activeClass={isMerc ? 'bg-emerald-50 border-emerald-400 text-emerald-600' : 'bg-blue-50 border-blue-400 text-blue-600'}
+                  inactiveClass={isMerc ? 'bg-white border-slate-200 text-slate-300 hover:border-emerald-300 hover:text-emerald-400' : 'bg-white border-slate-200 text-slate-300 hover:border-blue-300 hover:text-blue-400'}
+                  badgeColor={isMerc ? 'bg-emerald-500' : 'bg-blue-500'}
+                  title={isFreteMorto ? 'Bloqueado — viagem em Frete Morto' : isMerc ? (t.coletaEmailSent ? 'Coleta confirmada no sistema OK — clique para desmarcar' : 'MERCOSUL: marcar coleta feita no sistema OK') : (t.coletaEmailSent ? 'E-mail da coleta enviado — clique para desmarcar' : 'Marcar e-mail da coleta como enviado')}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                  </svg>
+                  {isMerc ? (
+                    <span className="text-[11px] font-black leading-none">OK</span>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                  )}
                 </ToggleIconBtn>
-                <span className="text-[6px] font-black uppercase tracking-tight text-blue-600">E-mail</span>
+                <span className={`text-[6px] font-black uppercase tracking-tight ${isMerc ? 'text-emerald-600' : 'text-blue-600'}`}>{isMerc ? 'OK' : 'E-mail'}</span>
               </div>
               {/* Doc. Originário */}
               <div className="flex flex-col items-center gap-0.5">
@@ -2423,7 +2448,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-[6px] font-black text-slate-500 uppercase tracking-tight" title="Bloqueado — viagem em Frete Morto">
                 Frete Morto
               </span>
-            ) : t.coletaEmailSent ? (
+            ) : isMerc ? null : t.coletaEmailSent ? (
               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-100 border border-blue-200 text-[6px] font-black text-blue-700 uppercase tracking-tight">
                 <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/>
@@ -2730,7 +2755,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao, tiposViagem, isColetaSemEmail, handleToggleColetaEmail, handleToggleColetaDoc, retiradaOptions, handleRetiradaCheioChange, handleTripAgendamentoUpload, handleReutComprovanteUpload, uploadingTripDoc, isEntregaConcluida, hasBaixaConfirmada, handleToggleCteEmitido, handleCteEmitidoUpload, handleRemoveCteEmitidoAnexo]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao, tiposViagem, isColetaSemEmail, isMercosul, handleToggleColetaEmail, handleToggleColetaDoc, retiradaOptions, handleRetiradaCheioChange, handleTripAgendamentoUpload, handleReutComprovanteUpload, uploadingTripDoc, isEntregaConcluida, hasBaixaConfirmada, handleToggleCteEmitido, handleCteEmitidoUpload, handleRemoveCteEmitidoAnexo]);
 
   const handleDeleteDevolucao = useCallback((d: Devolucao) => {
     setConfirmModal({

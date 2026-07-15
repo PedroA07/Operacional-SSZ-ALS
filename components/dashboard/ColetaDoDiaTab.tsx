@@ -388,6 +388,11 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
     return tiposViagem.find(tv => tv.id === resolveEffectiveTripTypeId(t))?.name?.toUpperCase() === 'BL DE LONGO CUSTO';
   }, [tiposViagem, resolveEffectiveTripTypeId]);
 
+  // MERCOSUL: a coleta é confirmada no sistema "OK" (não por e-mail)
+  const isMercosul = useCallback((t: Trip): boolean => {
+    return (t.category || '').toUpperCase().includes('MERCOSUL');
+  }, []);
+
   // Prontidão para solicitar emissão: BL de longo custo depende só do Doc. Originário
   const isReadyForEmissao = useCallback((t: Trip): boolean => {
     return isBlLongoCusto(t) ? !!t.coletaDocGenerated : (!!t.coletaEmailSent && !!t.coletaDocGenerated);
@@ -587,14 +592,19 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       label: 'E-mail',
       sortable: false,
       render: (t: Trip) => {
-        // BL DE LONGO CUSTO não usa e-mail (usa Doc. Originário) — não exibe o toggle
+        // BL DE LONGO CUSTO não usa e-mail — mostra o ícone de BL no lugar do toggle
         if (isBlLongoCusto(t)) {
           return (
             <div className="flex items-center justify-center">
-              <span className="text-[9px] font-black text-slate-300" title="BL de Longo Custo não utiliza e-mail">—</span>
+              <div className="w-9 h-9 rounded-xl border-2 border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500" title="BL de Longo Custo — sem e-mail">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                </svg>
+              </div>
             </div>
           );
         }
+        const isMerc = isMercosul(t);
         return (
           <div className="flex items-center justify-center">
             <ToggleIconBtn
@@ -606,14 +616,18 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
                 handleUpdateTrip(t, updateData);
               }}
               loading={'coletaEmailSent' in (pendingUpdates[t.id]?.data || {})}
-              activeClass="bg-blue-50 border-blue-400 text-blue-600"
-              inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-blue-300 hover:text-blue-400"
-              badgeColor="bg-blue-500"
-              title={t.coletaEmailSent ? 'E-mail enviado — clique para desmarcar' : 'Marcar e-mail como enviado'}
+              activeClass={isMerc ? 'bg-emerald-50 border-emerald-400 text-emerald-600' : 'bg-blue-50 border-blue-400 text-blue-600'}
+              inactiveClass={isMerc ? 'bg-white border-slate-200 text-slate-300 hover:border-emerald-300 hover:text-emerald-400' : 'bg-white border-slate-200 text-slate-300 hover:border-blue-300 hover:text-blue-400'}
+              badgeColor={isMerc ? 'bg-emerald-500' : 'bg-blue-500'}
+              title={isMerc ? (t.coletaEmailSent ? 'Coleta confirmada no sistema OK — clique para desmarcar' : 'MERCOSUL: marcar coleta feita no sistema OK') : (t.coletaEmailSent ? 'E-mail enviado — clique para desmarcar' : 'Marcar e-mail como enviado')}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-              </svg>
+              {isMerc ? (
+                <span className="text-[11px] font-black leading-none">OK</span>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+              )}
             </ToggleIconBtn>
           </div>
         );
@@ -876,7 +890,7 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         </button>
       )
     }
-  ], [tiposViagem, handleUpdateTrip, pendingUpdates, categories, operationTypes, isBlLongoCusto]);
+  ], [tiposViagem, handleUpdateTrip, pendingUpdates, categories, operationTypes, isBlLongoCusto, isMercosul]);
 
   const handleEmissaoSolicitada = () => {
     const readyTrips = trips.filter(isReadyForEmissao);
