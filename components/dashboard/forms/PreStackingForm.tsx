@@ -14,6 +14,7 @@ import CustomSelect from '../../shared/CustomSelect';
 import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
 import { tripSyncService } from '../../../utils/tripSyncService';
 import { osCategoryService } from '../../../utils/osCategoryService';
+import { printJsPdf } from '../../../utils/printPdf';
 
 interface PreStackingFormProps {
   user?: User;
@@ -302,16 +303,8 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
       const fileName = `Minuta PreStacking - ${effectiveDriver?.name || 'MOTORISTA'} - ${formData.os}.pdf`;
       
       if (pendingAction === 'print') {
-        const blob = pdf.output('blob');
-        const url = URL.createObjectURL(blob);
-        const win = window.open(url, '_blank');
-        if (win) {
-          win.document.title = fileName;
-          win.onload = () => {
-             win.focus();
-             win.print();
-          };
-        }
+        // Abre o diálogo de impressão do navegador (sem baixar o arquivo)
+        printJsPdf(pdf, fileName);
       } else {
         pdf.save(fileName);
       }

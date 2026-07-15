@@ -7,6 +7,7 @@ import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegiste
 import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, matchOperationType, normalizeKg, resolveClienteDestino } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 import { osCategoryService } from '../../../utils/osCategoryService';
+import { fileStorage } from '../../../utils/fileStorage';
 
 interface NewTripModalProps {
   isOpen: boolean;
@@ -48,6 +49,8 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
   // Preview da OS importada ao lado do formulário enquanto preenche
   const [osPreviewUrl, setOsPreviewUrl] = useState<string | null>(null);
   const [showOsPreview, setShowOsPreview] = useState(true);
+  // PDF original da OS — anexado à trip para visualização posterior (editar OC)
+  const [osFile, setOsFile] = useState<File | null>(null);
   useEffect(() => () => { if (osPreviewUrl) URL.revokeObjectURL(osPreviewUrl); }, [osPreviewUrl]);
 
   // Cadastro na hora (motorista/cliente) sem fechar a programação
@@ -126,6 +129,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
       } as any));
       // Preview do PDF da OS ao lado do formulário (o useEffect revoga a URL anterior)
       setOsPreviewUrl(URL.createObjectURL(file));
+      setOsFile(file);
       setShowOsPreview(true);
       const notes: string[] = [`OS ${p.os} importada — confira os campos.`];
       notes.push(`Cliente preenchido pelo ${cd.clienteOrigem === 'LOCAL ENTREGA' ? 'Local de Entrega' : 'Local de Coleta'} (tipo ${p.tipoOperacao || '—'}).`);
@@ -147,10 +151,18 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
     e.preventDefault();
     const tripId = `trip-${Date.now()}`;
     const now = new Date().toISOString();
-    
+
+    // Anexa o PDF original da OS à trip (visualização posterior ao editar a OC)
+    let osPdfUrl = (form as any).osPdfUrl || '';
+    if (osFile) {
+      try { osPdfUrl = await fileStorage.uploadTripDoc(osFile, form.os || tripId, 'os'); }
+      catch (err) { console.error('Falha ao anexar o PDF da OS:', err); }
+    }
+
     await db.saveTrip({
       ...form,
       id: tripId,
+      osPdfUrl,
       isLate: false,
       documents: [],
       advancePayment: { status: 'BLOQUEADO' },

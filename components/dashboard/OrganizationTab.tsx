@@ -13,6 +13,7 @@ import OrdemColetaForm from './forms/OrdemColetaForm';
 import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
 import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
 import EmailGeneratorModal from './email/EmailGeneratorModal';
+import CteAttachmentsModal from './emissoes/CteAttachmentsModal';
 import { localDateStr, localDateTimeStr, formatDateTimePtBR } from '../../utils/dateHelpers';
 import { r2Service } from '../../utils/r2Service';
 
@@ -528,6 +529,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [uploadingDevId, setUploadingDevId] = useState<string | null>(null);
   const [uploadingTripDoc, setUploadingTripDoc] = useState<string | null>(null); // `${tripId}:agend` | `${tripId}:reut`
   const [viewingDoc, setViewingDoc] = useState<{ url: string; fileName: string } | null>(null);
+  const [cteAttachTripId, setCteAttachTripId] = useState<string | null>(null);
 
   const handleDownloadDoc = async (url: string, fileName: string) => {
     try {
@@ -1693,6 +1695,19 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, [activeView, logAudit, onRefresh]);
 
+  // Emissões de CT-e (anexar/visualizar CT-e e NF) — mesmo modal da aba Emissões
+  const handleCteAttachmentsUpdate = useCallback(async (trip: Trip, data: Partial<Trip>) => {
+    const now = Date.now();
+    setPendingUpdates(prev => ({ ...prev, [trip.id]: { data: { ...(prev[trip.id]?.data || {}), ...data }, timestamp: now } }));
+    try {
+      await db.saveTrip({ ...trip, ...data });
+      logAudit(activeView, 'CTE', 'Anexos de CT-e/NF atualizados', trip.os, undefined, trip.id);
+    } catch {
+      setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar anexos de CT-e', type: 'error' } }));
+    }
+  }, [activeView, logAudit]);
+
   const handleSaveDevolucaoFromForm = useCallback(async (updated: Devolucao) => {
     const old = devMinutaDev;
     await db.saveDevolucao(updated);
@@ -2324,6 +2339,21 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       sortable: false,
       render: (t: Trip) => {
         const isFreteMorto = t.status === 'Frete Morto';
+        const cteCount = t.emissaoCteAttachments?.length || 0;
+        // Emissões de CT-e: anexar e visualizar CT-e e NF (mesmo modal da aba Emissões)
+        const cteEmissoesBtn = (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setCteAttachTripId(t.id); }}
+            className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border transition-all ${cteCount > 0 ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' : 'bg-white border-indigo-200 text-indigo-500 hover:bg-indigo-50 hover:border-indigo-400'}`}
+            title="Emissões de CT-e — anexar e visualizar CT-e e NF (PDF/XML)"
+          >
+            <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+            </svg>
+            {cteCount > 0 ? `CT-e / NF (${cteCount})` : 'Emissões CT-e'}
+          </button>
+        );
         // Tipos sem e-mail (ex.: BL DE LONGO CUSTO) usam o Doc. Originário
         if (isColetaSemEmail(t)) {
           return (
@@ -2343,6 +2373,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 </svg>
               </ToggleIconBtn>
               <span className="text-[6px] font-black uppercase tracking-tight text-emerald-600">Doc Orig.</span>
+              {cteEmissoesBtn}
             </div>
           );
         }
@@ -2412,6 +2443,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 Enviar E-mail
               </button>
             )}
+            {cteEmissoesBtn}
           </div>
         );
       }
@@ -3141,6 +3173,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 onClose={() => { setOcTrip(null); onRefresh(); }}
                 initialData={ocTrip.ocFormData}
                 tripId={ocTrip.id}
+                osPdfUrl={ocTrip.osPdfUrl}
               />
             </div>
           </div>
@@ -3814,6 +3847,19 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
           </div>
         </div>
       )}
+
+      {/* Modal de Emissões de CT-e (anexar/visualizar CT-e e NF) */}
+      {cteAttachTripId && (() => {
+        const attachTrip = trips.find(t => t.id === cteAttachTripId);
+        if (!attachTrip) return null;
+        return (
+          <CteAttachmentsModal
+            trip={attachTrip}
+            onClose={() => setCteAttachTripId(null)}
+            onUpdate={handleCteAttachmentsUpdate}
+          />
+        );
+      })()}
 
       {/* Modal de confirmação de remoção */}
       {confirmRemove && (

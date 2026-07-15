@@ -683,6 +683,7 @@ export interface Trip {
   emissaoCteAttachments?: EmissaoCteAttachment[];
   pesoCarga?: string;        // peso da carga (kg) — vem da OS importada
   osImportData?: any;        // dados completos extraídos da OS importada (PDF Aliança)
+  osPdfUrl?: string;         // PDF original da OS anexado (visualização ao editar a OC)
   // Organização — fluxo de Entrega/Importação
   retiradaCheio?: {          // onde o cheio é retirado (terminal pré-stacking, porto ou cliente)
     id?: string;

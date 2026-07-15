@@ -5,6 +5,7 @@ import { db } from '../../../utils/storage';
 import { osCategoryService } from '../../../utils/osCategoryService';
 import { parseAliancaOsPdf, matchCustomer, matchTipoViagem, matchOperationType, normalizeKg, resolveClienteDestino, ParsedAliancaOs } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
+import { fileStorage } from '../../../utils/fileStorage';
 
 interface ImportOsModalProps {
   onClose: () => void;
@@ -13,6 +14,7 @@ interface ImportOsModalProps {
 
 interface ImportItem {
   fileName: string;
+  file?: File;                 // PDF original — anexado à trip para visualização posterior
   parsed?: ParsedAliancaOs;
   customer?: Customer;
   tipoViagem?: ColetaTipoViagemOption;
@@ -57,6 +59,7 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
         }
         newItems.push({
           fileName: file.name,
+          file,
           parsed,
           customer: matchCustomer(customers, parsed),
           tipoViagem: matchTipoViagem(tiposViagem, parsed.docReferencia),
@@ -100,6 +103,13 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
           if (ensured) { customer = ensured.customer; if (ensured.created) customerPool = [ensured.customer, ...customerPool]; }
         }
 
+        // Anexa o PDF original da OS à trip (visualização posterior ao editar a OC)
+        let osPdfUrl = '';
+        if (it.file) {
+          try { osPdfUrl = await fileStorage.uploadTripDoc(it.file, p.os || `os-${Date.now()}-${i}`, 'os'); }
+          catch (err) { console.error('Falha ao anexar o PDF da OS importada:', err); }
+        }
+
         const trip: Trip = {
           id: `new-${Date.now()}-${i}`,
           os: p.os!.toUpperCase(),
@@ -128,6 +138,7 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
           embarcador: p.embarcador,
           agencia: p.armador,
           osImportData: p,
+          osPdfUrl,
         };
         await db.saveTrip(trip);
       }
