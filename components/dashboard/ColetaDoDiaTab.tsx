@@ -6,6 +6,8 @@ import FeedbackModal from '../shared/FeedbackModal';
 import { Mail, Settings, Send, X, Copy, ClipboardCopy, Check } from 'lucide-react';
 import EmailGeneratorModal from './email/EmailGeneratorModal';
 import CustomSelect from '../shared/CustomSelect';
+import CteAttachmentsModal from './emissoes/CteAttachmentsModal';
+import ImportOsModal from './emissoes/ImportOsModal';
 
 interface ColetaDoDiaTabProps {
   userId: string;
@@ -247,6 +249,8 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
   });
   const [settingsModal, setSettingsModal] = useState(false);
   const [emailSendModal, setEmailSendModal] = useState<{ isOpen: boolean; trip?: Trip }>({ isOpen: false });
+  const [attachTripId, setAttachTripId] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>(propTemplates);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [hiddenTripTypes, setHiddenTripTypes] = useState<string[]>(() => {
@@ -469,11 +473,30 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
         return next;
       });
       console.error("Erro ao atualizar viagem:", error);
-      window.dispatchEvent(new CustomEvent('als_show_toast', { 
-        detail: { message: 'Erro ao salvar alterações', type: 'error' } 
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Erro ao salvar alterações', type: 'error' }
       }));
     }
   }, [defaultTipoViagemId]);
+
+  // Atualização usada pelo modal de anexos de CT-e/NF — salva direto, sem
+  // injetar o tipo de viagem padrão (diferente do handleUpdateTrip geral).
+  const handleAttachmentsUpdate = useCallback(async (trip: Trip, data: Partial<Trip>) => {
+    const now = Date.now();
+    setPendingUpdates(prev => ({
+      ...prev,
+      [trip.id]: { data: { ...(prev[trip.id]?.data || {}), ...data }, timestamp: now }
+    }));
+    try {
+      await db.saveTrip({ ...trip, ...data });
+    } catch (error) {
+      setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
+      console.error('Erro ao salvar anexos:', error);
+      window.dispatchEvent(new CustomEvent('als_show_toast', {
+        detail: { message: 'Erro ao salvar anexos', type: 'error' }
+      }));
+    }
+  }, []);
 
   // Salva a nova ordem de todas as viagens visíveis após drag-and-drop
   const handleDropReorder = useCallback(async (_e: React.DragEvent, dropIdx: number) => {
@@ -803,6 +826,39 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
       )
     },
     {
+      key: 'cteAnexos',
+      label: 'Anexos CT-E / NF',
+      sortable: false,
+      render: (t: Trip) => {
+        const count = t.emissaoCteAttachments?.length || 0;
+        return count > 0 ? (
+          <button
+            type="button"
+            onClick={() => setAttachTripId(t.id)}
+            className="flex items-center gap-1.5 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[8px] font-black border border-indigo-200 hover:bg-indigo-100 transition-all"
+            title={`${count} anexo(s) — clique para gerenciar CT-e e NF`}
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+            </svg>
+            {count} {count === 1 ? 'anexo' : 'anexos'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAttachTripId(t.id)}
+            className="flex items-center gap-1 px-2 py-1 bg-slate-50 text-slate-500 rounded-lg text-[8px] font-black border border-dashed border-slate-300 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-300 transition-all"
+            title="Anexar CT-e ou NF (PDF ou XML)"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+            </svg>
+            Anexar
+          </button>
+        );
+      }
+    },
+    {
       key: 'actions',
       label: '',
       sortable: false,
@@ -1004,6 +1060,17 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
             title="Configurações da Coleta do Dia"
           >
             <Settings className="w-5 h-5" />
+          </button>
+
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="px-6 py-4 bg-indigo-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-sm hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2"
+            title="Importar OS da Aliança em PDF — cria as programações automaticamente"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+            Importar OS
           </button>
 
           <div></div>
@@ -1234,6 +1301,27 @@ const ColetaDoDiaTab: React.FC<ColetaDoDiaTabProps> = ({ userId, trips: propTrip
           </div>
         </div>
       )}
+
+      {/* Modal de Importar OS (PDF da Aliança) — igual à aba Emissões */}
+      {showImportModal && (
+        <ImportOsModal
+          onClose={() => setShowImportModal(false)}
+          onImported={onRefresh}
+        />
+      )}
+
+      {/* Modal de Anexos de CT-e / NF — igual à aba Emissões */}
+      {attachTripId && (() => {
+        const attachTrip = baseTrips.find(t => t.id === attachTripId);
+        if (!attachTrip) return null;
+        return (
+          <CteAttachmentsModal
+            trip={attachTrip}
+            onClose={() => setAttachTripId(null)}
+            onUpdate={handleAttachmentsUpdate}
+          />
+        );
+      })()}
     </div>
   );
 };

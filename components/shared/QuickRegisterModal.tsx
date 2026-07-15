@@ -4,6 +4,7 @@ import { Driver, Customer, Port, PreStacking, AuthorizedPerson } from '../../typ
 import { db } from '../../utils/storage';
 import { fileStorage } from '../../utils/fileStorage';
 import { maskCEP, maskCNPJ, maskCPF, maskRG, maskPhone, maskPlate } from '../../utils/masks';
+import CustomSelect from './CustomSelect';
 
 export type QuickRegisterType = 'driver' | 'customer' | 'port' | 'preStacking' | 'authorizedPerson';
 
@@ -415,18 +416,30 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className={labelClass}>Vínculo / Tipo</label>
-                  <select className={inputClasses} style={focusStyle} value={form.driverType || 'Externo'} onChange={e => setForm((f: any) => ({ ...f, driverType: e.target.value }))}>
-                    <option value="Externo">EXTERNO / TERCEIRO</option>
-                    <option value="Frota">FROTA ALS</option>
-                    <option value="Motoboy">MOTOBOY</option>
-                  </select>
+                  <CustomSelect
+                    value={form.driverType || 'Externo'}
+                    onChange={v => setForm((f: any) => ({ ...f, driverType: v }))}
+                    options={[
+                      { value: 'Externo', label: 'EXTERNO / TERCEIRO' },
+                      { value: 'Frota', label: 'FROTA ALS' },
+                      { value: 'Motoboy', label: 'MOTOBOY' },
+                    ]}
+                    required
+                    inputClassName={inputClasses}
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className={labelClass}>Status</label>
-                  <select className={inputClasses} style={focusStyle} value={form.status || 'Ativo'} onChange={e => setForm((f: any) => ({ ...f, status: e.target.value }))}>
-                    <option value="Ativo">ATIVO</option>
-                    <option value="Inativo">INATIVO</option>
-                  </select>
+                  <CustomSelect
+                    value={form.status || 'Ativo'}
+                    onChange={v => setForm((f: any) => ({ ...f, status: v }))}
+                    options={[
+                      { value: 'Ativo', label: 'ATIVO' },
+                      { value: 'Inativo', label: 'INATIVO' },
+                    ]}
+                    required
+                    inputClassName={inputClasses}
+                  />
                 </div>
               </div>
 
@@ -501,12 +514,18 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
                       <input className={inputClasses} style={focusStyle} value={form.beneficiaryCnpj || ''} onChange={e => setForm((f: any) => ({ ...f, beneficiaryCnpj: maskDoc(e.target.value) }))} placeholder="CPF / CNPJ" />
                       <input className={inputClasses} style={focusStyle} value={form.beneficiaryPhone || ''} onChange={e => setForm((f: any) => ({ ...f, beneficiaryPhone: maskPhone(e.target.value) }))} placeholder="(00) 00000-0000" />
                     </div>
-                    <div className="grid grid-cols-[1fr_100px] gap-3">
+                    <div className="grid grid-cols-[1fr_110px] gap-3">
                       <input type="email" className={inputClassesLower} style={focusStyle} value={form.beneficiaryEmail || ''} onChange={e => setForm((f: any) => ({ ...f, beneficiaryEmail: e.target.value.toLowerCase() }))} placeholder="email / chave pix" />
-                      <select className={inputClasses} style={focusStyle} value={form.paymentPreference || 'PIX'} onChange={e => setForm((f: any) => ({ ...f, paymentPreference: e.target.value }))}>
-                        <option value="PIX">PIX</option>
-                        <option value="TED">TED</option>
-                      </select>
+                      <CustomSelect
+                        value={form.paymentPreference || 'PIX'}
+                        onChange={v => setForm((f: any) => ({ ...f, paymentPreference: v }))}
+                        options={[
+                          { value: 'PIX', label: 'PIX' },
+                          { value: 'TED', label: 'TED' },
+                        ]}
+                        required
+                        inputClassName={inputClasses}
+                      />
                     </div>
                   </div>
                 )}
