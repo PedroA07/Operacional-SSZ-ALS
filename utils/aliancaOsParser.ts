@@ -271,6 +271,18 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
   const docRefMatch = full.match(/Doc refer[êe]ncia:\s*([^\n]+)/i);
   if (docRefMatch) result.docReferencia = docRefMatch[1].trim();
 
+  // Fallback: se não veio o campo "Doc referência", identifica a modalidade do
+  // CT-e pelo texto (CTe Rodoviário → Rodoviário; CTe Longo Curso/Custo → Longo
+  // Curso) para o tipo de viagem ser preenchido automaticamente com os cadastrados.
+  if (!result.docReferencia) {
+    const nf = norm(full);
+    if (nf.includes('LONGO CUR') || nf.includes('LONGO CUS')) {
+      result.docReferencia = 'Longo Curso';
+    } else if (nf.includes('CTE RODOVIARIO') || nf.includes('CT-E RODOVIARIO') || nf.includes('CT E RODOVIARIO')) {
+      result.docReferencia = 'Rodoviário';
+    }
+  }
+
   const retMatch = full.match(/Retirar Vazio\s+(.+?)\s+Entregar Cheio\s+([^\n]+)/i);
   if (retMatch) {
     result.retirarVazio = retMatch[1].trim().toUpperCase();
