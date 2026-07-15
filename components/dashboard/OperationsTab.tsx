@@ -801,7 +801,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
               </button>
             </div>
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-              <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCFormOpen(false); onRefresh(); }} initialData={selectedTrip.ocFormData} tripId={selectedTrip.id} />
+              <OrdemColetaForm drivers={drivers} customers={customers} ports={ports} onClose={() => { setIsOCFormOpen(false); onRefresh(); }} initialData={selectedTrip.ocFormData} tripId={selectedTrip.id} osPdfUrl={selectedTrip.osPdfUrl} />
             </div>
           </div>
         </div>,

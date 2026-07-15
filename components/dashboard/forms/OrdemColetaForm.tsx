@@ -21,6 +21,7 @@ import { localDateStr, localDateTimeStr } from '../../../utils/dateHelpers';
 import { parseAliancaOsPdf, matchCustomer, matchByName, matchOperationType, normalizeKg, resolveClienteDestino } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 import { appendPdfToJsPdf } from '../../../utils/pdfMerger';
+import { printJsPdf } from '../../../utils/printPdf';
 
 interface OrdemColetaFormProps {
   user?: User;
@@ -28,11 +29,12 @@ interface OrdemColetaFormProps {
   customers: Customer[];
   ports: Port[];
   onClose: () => void;
-  initialData?: any; 
+  initialData?: any;
   tripId?: string;
+  osPdfUrl?: string;   // PDF da OS já anexado à trip — exibe no preview lateral ao editar
 }
 
-const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, customers, ports, onClose, initialData, tripId }) => {
+const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, customers, ports, onClose, initialData, tripId, osPdfUrl }) => {
   const [isExporting, setIsExporting] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -51,7 +53,13 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
   const [osFile, setOsFile] = useState<File | null>(null);
   const [osPreviewUrl, setOsPreviewUrl] = useState<string | null>(null);
   const [showOsPreview, setShowOsPreview] = useState(true);
-  useEffect(() => () => { if (osPreviewUrl) URL.revokeObjectURL(osPreviewUrl); }, [osPreviewUrl]);
+  useEffect(() => () => { if (osPreviewUrl && osPreviewUrl.startsWith('blob:')) URL.revokeObjectURL(osPreviewUrl); }, [osPreviewUrl]);
+  // OS já anexada à trip (importada antes): exibe no preview lateral ao abrir/editar a OC
+  useEffect(() => {
+    const stored = osPdfUrl || initialData?.osPdfUrl;
+    if (stored) { setOsPreviewUrl(stored); setShowOsPreview(true); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [osPdfUrl]);
   const [plateHorse, setPlateHorse] = useState('');
   const [plateTrailer, setPlateTrailer] = useState('');
   const [swapModalOpen, setSwapModalOpen] = useState(false);
@@ -356,9 +364,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
       const fileName = `OC - ${effectiveDriver!.name} - ${formData.os}`;
 
       if (pendingAction === 'print') {
-        pdf.autoPrint();
-        const blobUrl = pdf.output('bloburl');
-        window.open(blobUrl, '_blank');
+        // Abre o diálogo de impressão do navegador (sem baixar o arquivo)
+        printJsPdf(pdf, `${fileName}.pdf`);
       } else {
         pdf.save(`${fileName}.pdf`);
       }

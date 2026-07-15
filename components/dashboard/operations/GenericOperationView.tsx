@@ -318,6 +318,7 @@ const GenericOperationView: React.FC<GenericOperationViewProps> = ({
                 onClose={() => { setIsOCFormOpen(false); window.dispatchEvent(new CustomEvent('als_force_global_refresh')); }}
                 initialData={selectedTrip.ocFormData}
                 tripId={selectedTrip.id}
+                osPdfUrl={selectedTrip.osPdfUrl}
               />
             </div>
           </div>
