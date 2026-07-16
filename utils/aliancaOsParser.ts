@@ -45,6 +45,7 @@ export interface ParsedAliancaOs {
   localEntregaCep?: string;
   localEntregaContato?: string;
   localEntregaFone?: string;
+  retirarCheio?: string;        // onde retirar o cheio (OS de entrega — terminal/porto)
   entregarVazio?: string;       // depósito de devolução do vazio (OS de entrega)
   mercadoria?: string;
   faturarNome?: string;         // tomador do serviço (campo "FATURAR A" da OS)
@@ -66,19 +67,37 @@ const norm = (s: string): string =>
 const cleanShip = (s: string): string =>
   s.replace(/\s*\/\s*/g, '/').replace(/\s+/g, ' ').trim().toUpperCase();
 
-/** Parse do texto extraído do PDF da OS. Retorna null se não parecer uma OS da Aliança. */
+/** Parse do texto extraído do PDF da OS (Aliança/Maersk e Mercosul Line). */
 export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
-  if (!/Ordem de Servi/i.test(text)) return null;
+  // Aliança: "Ordem de Serviço - ..."; Mercosul: "Ordem Serviço - ..."
+  if (!/Ordem (?:de )?Servi/i.test(text)) return null;
+
+  // OS Mercosul: a fonte dos campos insere um espaço após cada "M"
+  // ("M ERCOSUL", "CM A CGM", "EM BALAGENS"). Não dá para distinguir todo caso
+  // do espaço legítimo, então corrige só os inequívocos: "M" isolado no início
+  // de palavra e prefixo de uma letra + M (EM/AM/CM/UM quebrados). Aplica só
+  // na área de campos (o rodapé/observações usa fonte normal).
+  if (/Ordem Servi[çc]o\s*[-–]/i.test(text) && /\bM [A-ZÀ-Ú]{2,}/.test(text)) {
+    const cut = text.search(/REGISTRO DO CLIENTE|ATEN[ÇC][ÃA]O:/i);
+    const head = cut >= 0 ? text.slice(0, cut) : text;
+    const tail = cut >= 0 ? text.slice(cut) : '';
+    text = head
+      .replace(/\bM (?=[A-ZÀ-Ú]{2,})/g, 'M')                 // M ERCOSUL → MERCOSUL
+      .replace(/\b([A-ZÀ-Ú])M ([A-ZÀ-Ú])/g, '$1M$2')         // CM A → CMA, EM BALAGENS → EMBALAGENS
+      + tail;
+  }
 
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const full = lines.join('\n');
   const result: ParsedAliancaOs = {};
 
   // ── Identificação ────────────────────────────────────────────────────────
-  const osMatch = full.match(/N[ºo°]\s*([0-9][A-Z]{2,4}[0-9]{4,}[A-Z]?)/);
-  if (osMatch) result.os = osMatch[1].toUpperCase();
+  // Nº pode vir com espaço no meio (Mercosul: "6SP 561482A") — padroniza sem espaço
+  const osMatch = full.match(/N[ºo°]\s*([0-9][A-Z]{2,4}\s?[0-9]{4,}[A-Z]?)/)
+    || full.match(/^([0-9]{1,2}[A-Z]{2,4}\s?[0-9]{4,}[A-Z]?)\s*$/m);
+  if (osMatch) result.os = osMatch[1].replace(/\s+/g, '').toUpperCase();
 
-  const tipoMatch = full.match(/Ordem de Servi[çc]o\s*[-–]\s*([A-Za-zçãõÇÃÕ]+)/);
+  const tipoMatch = full.match(/Ordem (?:de )?Servi[çc]o\s*[-–]\s*([A-Za-zçãõÇÃÕ]+)/);
   if (tipoMatch) {
     const t = norm(tipoMatch[1]);
     const map: Record<string, string> = {
@@ -88,14 +107,14 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
     result.tipoOperacao = map[t] || t;
   }
 
-  const bookingMatch = full.match(/Booking\s+([A-Z0-9-]+)/i);
+  const bookingMatch = full.match(/Booking:?\s+([A-Z0-9-]+)/i);
   if (bookingMatch) result.booking = bookingMatch[1].toUpperCase();
 
-  const agMatch = full.match(/Agendamento\s+N[ºo°]?\s*(\d+)/i);
+  const agMatch = full.match(/Agendam(?:ento|\.)\s*N\.?[ºo°]?\.?:?\s*(\d+)/i);
   if (agMatch) result.agendamento = agMatch[1];
 
   // ── Navio / Viagem ───────────────────────────────────────────────────────
-  const navioCampoMatch = full.match(/Navio\s*\/\s*Viagem\s+(.+?)(?:\s+Programa[çc][ãa]o|\n|$)/i);
+  const navioCampoMatch = full.match(/Navio\s*\/\s*Viagem:?\s+(.+?)(?:\s+Programa[çc][ãa]o|\s+Data emiss|\n|$)/i);
   if (navioCampoMatch) result.navioViagemCampo = cleanShip(navioCampoMatch[1]);
 
   // Regra: quando as Demais Observações trazem "NAVIO: X", esse é o navio real
@@ -114,15 +133,15 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
   }
 
   // ── Rota ─────────────────────────────────────────────────────────────────
-  const polMatch = full.match(/POL\s+(\S+)\s+POD\s+(\S+)/i);
-  if (polMatch) { result.pol = polMatch[1]; result.pod = polMatch[2]; }
-  const destMatch = full.match(/Destino Final\s+(.+?)\s+Service/i);
+  const polMatch = full.match(/POL:?\s+(.+?)\s+POD:?\s+(\S+)/i);
+  if (polMatch) { result.pol = polMatch[1].trim(); result.pod = polMatch[2]; }
+  const destMatch = full.match(/Destino Final:?\s+(.+?)\s+(?:Service|Programa)/i);
   if (destMatch) result.destinoFinal = destMatch[1].trim().toUpperCase();
   const armadorMatch = full.match(/Armador\s+([^\n]+)/i);
   if (armadorMatch) result.armador = armadorMatch[1].trim().toUpperCase();
 
   // ── Cliente ──────────────────────────────────────────────────────────────
-  const clienteMatch = full.match(/Cliente\s+(.{3,}?)\s+Embarcador/);
+  const clienteMatch = full.match(/Cliente:?\s+(.{3,}?)\s+(?:Embarcador|Modal)/);
   if (clienteMatch && !/^(?:CNPJ|Endere)/i.test(clienteMatch[1])) {
     result.cliente = clienteMatch[1].trim().toUpperCase();
   }
@@ -167,25 +186,25 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
   }
 
   // ── Local Coleta (escopo da seção; OS de coleta/exportação) ──────────────
-  const coletaScope = full.split(/Local Coleta/i)[1]?.split(/Informa[çc][õo]es Sobre a Carga|Local Entrega/i)[0] || full;
-  const embMatch = coletaScope.match(/Embarcador\s+(.+?)\s+CNPJ\s+(\d{11,14})/)
-    || full.match(/Embarcador\s+(.+?)\s+CNPJ\s+(\d{11,14})/);
+  const coletaScope = full.split(/Local Coleta/i)[1]?.split(/Informa[çc][õo]es Sobre a Carga|Local Entrega|Mercadorias|PROGRAMA[ÇC][ÃA]O DE SERVI/i)[0] || full;
+  const embMatch = coletaScope.match(/Embarcador:?\s+(.+?)\s+CNPJ:?\s+(\d{11,14})/)
+    || full.match(/Embarcador:?\s+(.+?)\s+CNPJ:?\s+(\d{11,14})/);
   if (embMatch) {
     result.embarcador = embMatch[1].trim().toUpperCase();
     result.cnpjColeta = embMatch[2];
   }
   if (!result.cliente && result.embarcador) result.cliente = result.embarcador;
 
-  const endMatch = coletaScope.match(/Endere[çc]o\s+([^\n]+)/i);
+  const endMatch = coletaScope.match(/Endere[çc]o:?\s+([^\n]+)/i);
   if (endMatch) result.enderecoColeta = endMatch[1].trim().toUpperCase();
-  const munMatch = coletaScope.match(/Munic[íi]pio\s+(.+?)\s+Uf\s+([A-Z]{2})/i);
+  const munMatch = coletaScope.match(/Munic[íi]pio:?\s+(.+?)\s+Uf:?\s+([A-Z]{2})/i);
   if (munMatch) { result.municipioColeta = munMatch[1].trim().toUpperCase(); result.ufColeta = munMatch[2]; }
-  const bairroMatch = coletaScope.match(/Bairro\s+(.+?)\s+Cep\s+(\d{7,8})/i);
+  const bairroMatch = coletaScope.match(/Bairro:?\s+(.+?)\s+Cep:?\s+(\d{7,8})/i);
   if (bairroMatch) { result.bairroColeta = bairroMatch[1].trim().toUpperCase(); result.cepColeta = bairroMatch[2]; }
-  const contatoMatch = coletaScope.match(/Contato\s+([^\n]*?)\s*Fone\s*([\d ()\-.]*)/i);
+  const contatoMatch = coletaScope.match(/Contato:?\s+([^\n]*?)\s*Fone:?\s*([\d ()\-.]*)/i);
   if (contatoMatch) {
     const c = contatoMatch[1].trim();
-    if (c) result.contato = c.toUpperCase();
+    if (c && !/^-+$/.test(c)) result.contato = c.toUpperCase();
     const f = contatoMatch[2].trim();
     if (f) result.foneColeta = f;
   }
@@ -194,33 +213,37 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
   const entregaSplit = full.split(/Local Entrega/i);
   if (entregaSplit.length > 1) {
     const sec = entregaSplit[1].split(/Informa[çc][õo]es Sobre a Carga|Programa[çc][ãa]o de Servi/i)[0] || '';
-    const dMatch = sec.match(/Destinat[áa]rio\s+(.+?)\s+CNPJ\s+(\d{11,14})/);
+    const dMatch = sec.match(/Destinat[áa]rio:?\s+(.+?)\s+CNPJ:?\s+(\d{11,14})/);
     if (dMatch) {
       result.localEntregaNome = dMatch[1].trim().toUpperCase();
       result.localEntregaCnpj = dMatch[2];
     }
-    const eMatch = sec.match(/Endere[çc]o\s+([^\n]+)/i);
+    const eMatch = sec.match(/Endere[çc]o:?\s+([^\n]+)/i);
     if (eMatch) result.localEntregaEndereco = eMatch[1].trim().toUpperCase();
-    const mMatch = sec.match(/Munic[íi]pio\s+(.+?)\s+Uf\s+([A-Z]{2})/i);
+    const mMatch = sec.match(/Munic[íi]pio:?\s+(.+?)\s+Uf:?\s+([A-Z]{2})/i);
     if (mMatch) { result.localEntregaMunicipio = mMatch[1].trim().toUpperCase(); result.localEntregaUf = mMatch[2]; }
-    const bMatch = sec.match(/Bairro\s+(.+?)\s+Cep\s+(\d{7,8})/i);
+    const bMatch = sec.match(/Bairro:?\s+(.+?)\s+Cep:?\s+(\d{7,8})/i);
     if (bMatch) { result.localEntregaBairro = bMatch[1].trim().toUpperCase(); result.localEntregaCep = bMatch[2]; }
-    const cMatch = sec.match(/Contato\s+([^\n]*?)\s*Fone\s*([\d ()\-.]*)/i);
+    const cMatch = sec.match(/Contato:?\s+([^\n]*?)\s*Fone:?\s*([\d ()\-.]*)/i);
     if (cMatch) {
-      if (cMatch[1].trim()) result.localEntregaContato = cMatch[1].trim().toUpperCase();
+      const c = cMatch[1].trim();
+      if (c && !/^-+$/.test(c)) result.localEntregaContato = c.toUpperCase();
       if (cMatch[2].trim()) result.localEntregaFone = cMatch[2].trim();
     }
   }
 
-  // ── Entregar Vazio (depósito de devolução — OS de entrega/importação) ────
-  const vazioMatch = full.match(/Entregar Vazio\s+(.+?)(?:\s+Retirar Cheio.*)?$/im);
+  // ── Retirar Cheio / Entregar Vazio (OS de entrega/importação) ────────────
+  const retCheioMatch = full.match(/Retirar Cheio:?\s+(.+?)\s+Entregar Vazio/i);
+  if (retCheioMatch) result.retirarCheio = retCheioMatch[1].trim().toUpperCase();
+
+  const vazioMatch = full.match(/Entregar Vazio:?\s+(.+?)(?:\s+Retirar Cheio.*)?$/im);
   if (vazioMatch) result.entregarVazio = vazioMatch[1].trim().toUpperCase();
 
-  const mercMatch = full.match(/Mercadoria\s+(.+?)\s+Seguro/i);
+  const mercMatch = full.match(/Mercadorias?:?\s+(.+?)(?:\s+Seguro|\n|$)/i);
   if (mercMatch) result.mercadoria = mercMatch[1].trim().toUpperCase();
 
   // ── Tomador do serviço ("FATURAR A" nas observações de faturamento) ──────
-  const fatMatch = full.match(/FATURAR A\s*:?\s*([^\n]+)/i);
+  const fatMatch = full.match(/FATURAR A\s*:?\s*(.+?)(?=\s+CNPJ|\n|$)/i);
   if (fatMatch) {
     result.faturarNome = fatMatch[1].trim().toUpperCase();
     const after = full.slice((fatMatch.index || 0) + fatMatch[0].length, (fatMatch.index || 0) + fatMatch[0].length + 200);
@@ -248,7 +271,11 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
   }
 
   const normFull = norm(full);
-  if (/CARGO PREMIUM/.test(normFull)) {
+  // Mercosul traz o campo explícito "Padrão Alimento: SIM/NÃO" — ele decide
+  const padraoAlimentoField = normFull.match(/PADRAO ALIMENTO:?\s*(SIM|NAO)/);
+  if (padraoAlimentoField) {
+    result.padraoCarga = padraoAlimentoField[1] === 'SIM' ? 'PADRÃO ALIMENTO' : 'CARGA GERAL';
+  } else if (/CARGO PREMIUM/.test(normFull)) {
     result.padraoCarga = 'CARGO PREMIUM';
   } else if (/REEFER/.test(normFull)) {
     result.padraoCarga = 'REEFER';
@@ -259,8 +286,9 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
   }
 
   // ── Programação de Serviços: data/hora da coleta ─────────────────────────
+  // Aliança encerra a linha com um contador; Mercosul termina na hora (hh:mm)
   for (const line of lines) {
-    const m = line.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s+\d+\s*$/);
+    const m = line.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?:\s+\d+)?\s*$/);
     if (m) {
       result.dataColeta = `${m[3]}-${m[2]}-${m[1]}T${m[4].padStart(2, '0')}:${m[5]}`;
       break;
@@ -283,7 +311,7 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
     }
   }
 
-  const retMatch = full.match(/Retirar Vazio\s+(.+?)\s+Entregar Cheio\s+([^\n]+)/i);
+  const retMatch = full.match(/Retirar Vazio:?\s+(.+?)\s+Entregar Cheio:?\s+([^\n]+)/i);
   if (retMatch) {
     result.retirarVazio = retMatch[1].trim().toUpperCase();
     result.entregarCheio = retMatch[2].trim().toUpperCase();

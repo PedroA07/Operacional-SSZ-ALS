@@ -54,7 +54,7 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
       try {
         const parsed = await parseAliancaOsPdf(file);
         if (!parsed || !parsed.os) {
-          newItems.push({ fileName: file.name, error: 'PDF não reconhecido como OS da Aliança (sem camada de texto ou layout diferente).' });
+          newItems.push({ fileName: file.name, error: 'PDF não reconhecido como OS (Aliança/Mercosul) — sem camada de texto ou layout diferente.' });
           continue;
         }
         newItems.push({
@@ -172,7 +172,7 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
           <div>
             <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">Importar OS (PDF)</h3>
             <p className="text-[10px] text-slate-500 mt-0.5">
-              OS's da Aliança — os dados são extraídos automaticamente para criar a programação.
+              OS's da Aliança e da Mercosul — os dados são extraídos automaticamente para criar a programação.
             </p>
           </div>
           <button

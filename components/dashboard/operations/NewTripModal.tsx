@@ -42,7 +42,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
     category: '', subCategory: '', container: '', tara: '', seal: '', cva: ''
   });
 
-  // Importação de OS da Aliança (PDF) — preenche os campos automaticamente
+  // Importação de OS (Aliança/Mercosul, PDF) — preenche os campos automaticamente
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
   const [importNote, setImportNote] = useState<string | null>(null);
@@ -78,7 +78,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
     try {
       const p = await parseAliancaOsPdf(file);
       if (!p || !p.os) {
-        setImportNote('PDF não reconhecido como OS da Aliança.');
+        setImportNote('PDF não reconhecido como OS (Aliança/Mercosul).');
         return;
       }
       // Cliente conforme o tipo: coleta/exportação = Local Coleta;
@@ -217,7 +217,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
               onClick={() => importInputRef.current?.click()}
               disabled={importing}
               className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-50"
-              title="Importar OS da Aliança em PDF — preenche os campos automaticamente"
+              title="Importar OS (Aliança/Mercosul) em PDF — preenche os campos automaticamente"
             >
               {importing ? (
                 <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
