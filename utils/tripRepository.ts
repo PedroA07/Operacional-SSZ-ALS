@@ -79,6 +79,7 @@ export const tripRepository = {
     reutilizacao_comprovante: trip.reutilizacaoComprovante || null,
     cte_emitido: trip.cteEmitido || false,
     cte_emitido_anexos: trip.cteEmitidoAnexos?.length ? trip.cteEmitidoAnexos : null,
+    os_pdf_url: trip.osPdfUrl || null,
   }),
 
   mapFromDb: (d: any): Trip => {
@@ -168,6 +169,7 @@ export const tripRepository = {
       reutilizacaoComprovante: safeParse(d.reutilizacao_comprovante, null) || undefined,
       cteEmitido: d.cte_emitido ?? false,
       cteEmitidoAnexos: Array.isArray(safeParse(d.cte_emitido_anexos, null)) ? safeParse(d.cte_emitido_anexos, []) : undefined,
+      osPdfUrl: d.os_pdf_url ? fileStorage.getPublicUrl(d.os_pdf_url) : undefined,
       emissaoCteAttachments: Array.isArray(safeParse(d.emissao_cte_attachments, null))
         ? (safeParse(d.emissao_cte_attachments, []) as EmissaoCteAttachment[]).map(att => ({
             ...att,

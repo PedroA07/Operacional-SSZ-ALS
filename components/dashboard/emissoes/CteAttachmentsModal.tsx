@@ -37,6 +37,8 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [bundleLoading, setBundleLoading] = useState<'pdf' | 'xml' | 'all' | null>(null);
+  // Visualizador nativo da OS anexada (painel lateral)
+  const [showOsViewer, setShowOsViewer] = useState(true);
 
   const attachments = trip.emissaoCteAttachments || [];
   // Regra visual Aliança/Mercosul (aba Valores): CT-e de transporte → RODOVIÁRIO;
@@ -210,19 +212,20 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
     };
   }, [attachments]);
 
-  // Pesos vindos da OS importada (tara + peso da carga e a soma)
+  // Pesos vindos da OS importada (tara + peso da carga e a soma).
+  // A tara da OS fica em osImportData (não é a tara do container da trip).
   const pesosOs = useMemo(() => {
     const parse = (v?: string) => {
       const n = parseFloat((v || '').replace(/\./g, '').replace(',', '.'));
       return isNaN(n) ? undefined : n;
     };
-    const tara = parse(trip.tara);
-    const pesoCarga = parse(trip.pesoCarga);
+    const tara = parse(trip.osImportData?.tara) ?? parse(trip.tara);
+    const pesoCarga = parse(trip.osImportData?.pesoCarga) ?? parse(trip.pesoCarga);
     const soma = tara !== undefined || pesoCarga !== undefined
       ? (tara || 0) + (pesoCarga || 0)
       : undefined;
     return { tara, pesoCarga, soma };
-  }, [trip.tara, trip.pesoCarga]);
+  }, [trip.tara, trip.pesoCarga, trip.osImportData]);
 
   // Dados completos da OS importada (PDF Aliança) — exibidos no topo da aba Valores
   const osData = useMemo(() => {
@@ -381,7 +384,26 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
         className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[3000] p-4 animate-in fade-in duration-200"
         onClick={e => { if (e.target === e.currentTarget && !uploading) onClose(); }}
       >
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[88vh]">
+        <div className={`bg-white rounded-3xl shadow-2xl w-full ${trip.osPdfUrl && showOsViewer ? 'max-w-6xl' : 'max-w-2xl'} flex h-[88vh] max-h-[88vh] overflow-hidden transition-all`}>
+
+          {/* Visualizador nativo da OS anexada (lateral) */}
+          {trip.osPdfUrl && showOsViewer && (
+            <div className="w-[45%] border-r border-slate-200 bg-slate-100 flex flex-col shrink-0">
+              <div className="px-4 py-2 bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-between shrink-0">
+                <span>OS anexada (PDF)</span>
+                <button
+                  onClick={() => setShowOsViewer(false)}
+                  className="text-white/70 hover:text-white text-[9px] font-black uppercase"
+                  title="Ocultar a OS"
+                >
+                  Ocultar
+                </button>
+              </div>
+              <iframe src={trip.osPdfUrl} title="OS anexada" className="flex-1 w-full" />
+            </div>
+          )}
+
+          <div className="flex flex-col flex-1 min-w-0">
 
           {/* Header */}
           <div className="flex items-center justify-between p-5 pb-3 shrink-0">
@@ -393,15 +415,30 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                 {' '}— anexe os CT-Es em PDF ou XML.
               </p>
             </div>
-            <button
-              onClick={onClose}
-              disabled={uploading}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors disabled:opacity-40"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
+            <div className="flex items-center gap-2">
+              {trip.osPdfUrl && !showOsViewer && (
+                <button
+                  onClick={() => setShowOsViewer(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-700 transition-all shadow-sm"
+                  title="Ver a OS anexada ao lado"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                  </svg>
+                  Ver OS
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                disabled={uploading}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors disabled:opacity-40"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Tabs */}
@@ -431,7 +468,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
             </div>
           </div>
 
-          <div className="px-5 py-4 space-y-3 overflow-y-auto">
+          <div className="px-5 py-4 space-y-3 overflow-y-auto flex-1 min-h-0">
 
             {/* ══ Aba Anexos ══════════════════════════════════════════════════ */}
             {activeTab === 'anexos' && (
@@ -1101,6 +1138,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                 </div>
               )
             )}
+          </div>
           </div>
         </div>
       </div>

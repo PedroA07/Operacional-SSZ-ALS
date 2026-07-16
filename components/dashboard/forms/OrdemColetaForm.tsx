@@ -271,7 +271,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         embarcador: p.embarcador || prev.embarcador,
         agencia: p.armador || prev.agencia,
         horarioAgendado: p.dataColeta || prev.horarioAgendado,
-        tara: normalizeKg(p.tara) || prev.tara,
+        // Tara da OS não entra na tara do container (só nos pesos de Emissões)
         seal: p.lacre ? maskSeal(p.lacre.toUpperCase()) : prev.seal,
         category: (detected || prev.category || '').toUpperCase(),
         remetenteId: matchedCustomer?.id || prev.remetenteId,

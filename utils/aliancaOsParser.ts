@@ -177,20 +177,30 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
         const ctacTok = tokens.slice(numIdx[1] + 1, numIdx[2]).find(t => /^[A-Z0-9]{5,}$/i.test(t));
         if (ctacTok) result.ctacBl = ctacTok.toUpperCase();
       }
-      // Aut. coleta/entrega: após o valor NF (numérica ou alfanumérica, ex.: MSKF000485)
-      const tail = numIdx.length >= 3 ? tokens.slice(numIdx[2] + 1) : tokens;
-      const aut = tail.find(t => /^[A-Z0-9]{4,}$/i.test(t) && !/^[NS]$/i.test(t));
-      if (aut) result.autColeta = aut.toUpperCase();
+      // Aut. coleta/entrega: após o valor NF — pode ter letras E espaços
+      // (ex.: MSKF000485, "AB 123456"). Remove as flags IMO/Reut (N/S) das
+      // pontas e junta o restante; valores duplicados (Aut = Ped. Cliente)
+      // viram um só.
+      const tail = numIdx.length >= 3 ? [...tokens.slice(numIdx[2] + 1)] : [...tokens];
+      while (tail.length && /^[NS]$/i.test(tail[0])) tail.shift();
+      while (tail.length && /^[NS]$/i.test(tail[tail.length - 1])) tail.pop();
+      const autTokens = tail.filter(t => /^[A-Z0-9./-]+$/i.test(t));
+      if (autTokens.length) {
+        const uniq = Array.from(new Set(autTokens.map(t => t.toUpperCase())));
+        const aut = (uniq.length === 1 ? uniq[0] : autTokens.join(' ')).toUpperCase();
+        if (aut.replace(/[^A-Z0-9]/gi, '').length >= 4) result.autColeta = aut;
+      }
       break;
     }
   }
 
   // ── Local Coleta (escopo da seção; OS de coleta/exportação) ──────────────
   const coletaScope = full.split(/Local Coleta/i)[1]?.split(/Informa[çc][õo]es Sobre a Carga|Local Entrega|Mercadorias|PROGRAMA[ÇC][ÃA]O DE SERVI/i)[0] || full;
-  const embMatch = coletaScope.match(/Embarcador:?\s+(.+?)\s+CNPJ:?\s+(\d{11,14})/)
-    || full.match(/Embarcador:?\s+(.+?)\s+CNPJ:?\s+(\d{11,14})/);
+  // Nome pode quebrar em duas linhas — [\s\S] limitado + colapso de espaços
+  const embMatch = coletaScope.match(/Embarcador:?\s+([\s\S]{3,90}?)\s+CNPJ:?\s+(\d{11,14})/)
+    || full.match(/Embarcador:?\s+([\s\S]{3,90}?)\s+CNPJ:?\s+(\d{11,14})/);
   if (embMatch) {
-    result.embarcador = embMatch[1].trim().toUpperCase();
+    result.embarcador = embMatch[1].replace(/\s+/g, ' ').trim().toUpperCase();
     result.cnpjColeta = embMatch[2];
   }
   if (!result.cliente && result.embarcador) result.cliente = result.embarcador;
@@ -213,10 +223,20 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
   const entregaSplit = full.split(/Local Entrega/i);
   if (entregaSplit.length > 1) {
     const sec = entregaSplit[1].split(/Informa[çc][õo]es Sobre a Carga|Programa[çc][ãa]o de Servi/i)[0] || '';
-    const dMatch = sec.match(/Destinat[áa]rio:?\s+(.+?)\s+CNPJ:?\s+(\d{11,14})/);
+    // Nome do destinatário pode quebrar em duas linhas
+    const dMatch = sec.match(/Destinat[áa]rio:?\s+([\s\S]{3,90}?)\s+CNPJ:?\s+(\d{11,14})/);
     if (dMatch) {
-      result.localEntregaNome = dMatch[1].trim().toUpperCase();
+      result.localEntregaNome = dMatch[1].replace(/\s+/g, ' ').trim().toUpperCase();
       result.localEntregaCnpj = dMatch[2];
+    } else {
+      // Fallback: primeiro CNPJ da seção + texto entre "Destinatário" e ele
+      const cnpjSec = sec.match(/CNPJ:?\s+(\d{11,14})/i);
+      if (cnpjSec) {
+        result.localEntregaCnpj = cnpjSec[1];
+        const antes = sec.slice(0, cnpjSec.index || 0).replace(/Destinat[áa]rio:?/i, '');
+        const nome = antes.replace(/\s+/g, ' ').replace(/CNPJ:?\s*$/i, '').trim();
+        if (nome.length >= 3) result.localEntregaNome = nome.toUpperCase();
+      }
     }
     const eMatch = sec.match(/Endere[çc]o:?\s+([^\n]+)/i);
     if (eMatch) result.localEntregaEndereco = eMatch[1].trim().toUpperCase();

@@ -115,7 +115,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
         category: detectedCategory || prev.category,
         container: p.container || prev.container,
         containerType: p.containerTipo || prev.containerType,
-        tara: normalizeKg(p.tara) || prev.tara,
+        // Tara da OS não entra na tara do container (só nos pesos de Emissões)
         pesoCarga: normalizeKg(p.pesoCarga) || prev.pesoCarga,
         seal: p.lacre || prev.seal,
         autColeta: p.autColeta || prev.autColeta,
