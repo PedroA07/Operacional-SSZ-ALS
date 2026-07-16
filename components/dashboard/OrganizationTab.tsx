@@ -3278,6 +3278,19 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               <span className="text-[9px] font-black uppercase tracking-widest hidden xl:inline">Auditoria</span>
             </button>
 
+            {new URLSearchParams(window.location.search).get('view') !== 'organizacao' && (
+              <button
+                onClick={() => window.open(`${window.location.origin}${window.location.pathname}?view=organizacao`, '_blank')}
+                className="flex items-center gap-2 p-4 bg-white text-slate-600 rounded-2xl border border-slate-200 shadow-sm hover:bg-slate-50 hover:text-blue-600 transition-all active:scale-95"
+                title="Abrir a tabela em tela cheia numa nova guia"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                </svg>
+                <span className="text-[9px] font-black uppercase tracking-widest hidden xl:inline">Tela Cheia</span>
+              </button>
+            )}
+
             <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
               <button
                 onClick={() => setActiveView('COLETA')}

@@ -8,11 +8,14 @@ import BeneficiaryPortal from './components/beneficiary/BeneficiaryPortal';
 import ExternalUserApp from './components/dashboard/third-party/ExternalUserApp';
 import ForcePasswordChange from './components/ForcePasswordChange';
 import StandaloneOperationsPage from './components/StandaloneOperationsPage';
+import StandaloneOrganizationPage from './components/StandaloneOrganizationPage';
 import { db } from './utils/storage';
 import { usePresenceMonitor } from './hooks/usePresenceMonitor';
 import { authSecurity } from './utils/authSecurity';
 
-const isStandaloneOps = new URLSearchParams(window.location.search).get('view') === 'ops';
+const standaloneView = new URLSearchParams(window.location.search).get('view');
+const isStandaloneOps = standaloneView === 'ops';
+const isStandaloneOrg = standaloneView === 'organizacao';
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOGIN);
@@ -129,6 +132,11 @@ const App: React.FC = () => {
   // Modo tela cheia do painel operacional (nova guia)
   if (isStandaloneOps && user && currentScreen === AppScreen.DASHBOARD) {
     return <StandaloneOperationsPage user={user} />;
+  }
+
+  // Modo tela cheia da Organização (nova guia)
+  if (isStandaloneOrg && user && currentScreen === AppScreen.DASHBOARD) {
+    return <StandaloneOrganizationPage user={user} />;
   }
 
   return (
