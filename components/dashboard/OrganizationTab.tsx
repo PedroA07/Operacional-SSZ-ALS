@@ -402,8 +402,8 @@ const RetiradaCheioSelect: React.FC<{
     );
   }, [search, options]);
 
-  // Sugestão: na OS de entrega/importação, o cheio sai do Local Coleta (terminal)
-  const sugestao = trip.osImportData?.embarcador || trip.osImportData?.cliente || '';
+  // Sugestão: campo "Retirar Cheio" da OS; sem ele, o Local Coleta (terminal)
+  const sugestao = trip.osImportData?.retirarCheio || trip.osImportData?.embarcador || trip.osImportData?.cliente || '';
 
   return (
     <div className="relative min-w-[170px]">

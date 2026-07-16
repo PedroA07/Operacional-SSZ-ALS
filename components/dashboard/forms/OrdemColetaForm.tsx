@@ -45,7 +45,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
   const [preStackings, setPreStackings] = useState<any[]>([]);
   
   const [pendingAction, setPendingAction] = useState<'download' | 'print' | null>(null);
-  // Importação de OS da Aliança (PDF) — preenche o formulário automaticamente
+  // Importação de OS (Aliança/Mercosul, PDF) — preenche o formulário automaticamente
   const importOsInputRef = useRef<HTMLInputElement>(null);
   const [importingOs, setImportingOs] = useState(false);
   const [importOsNote, setImportOsNote] = useState<string | null>(null);
@@ -232,7 +232,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
     try {
       const p = await parseAliancaOsPdf(file);
       if (!p || !p.os) {
-        setImportOsNote('PDF não reconhecido como OS da Aliança.');
+        setImportOsNote('PDF não reconhecido como OS (Aliança/Mercosul).');
         return;
       }
       // Remetente/destino conforme o tipo da OS: coleta/exportação usa
@@ -432,7 +432,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
                 onClick={() => importOsInputRef.current?.click()}
                 disabled={importingOs}
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-50"
-                title="Importar OS da Aliança em PDF — preenche o formulário automaticamente"
+                title="Importar OS (Aliança/Mercosul) em PDF — preenche o formulário automaticamente"
               >
                 {importingOs ? (
                   <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />

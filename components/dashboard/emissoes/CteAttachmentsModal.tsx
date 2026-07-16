@@ -39,9 +39,10 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
   const [bundleLoading, setBundleLoading] = useState<'pdf' | 'xml' | 'all' | null>(null);
 
   const attachments = trip.emissaoCteAttachments || [];
-  // Regra visual da Aliança (aba Valores): CT-e de transporte → RODOVIÁRIO;
+  // Regra visual Aliança/Mercosul (aba Valores): CT-e de transporte → RODOVIÁRIO;
   // CT-e referenciado → MULTIMODAL — ajuda no preenchimento de sistemas externos
-  const isAlianca = (trip.category || '').toUpperCase().includes('ALIAN');
+  const isAlianca = /ALIAN|MERCOSUL/.test((trip.category || '').toUpperCase());
+  const categoriaLabel = (trip.category || '').toUpperCase().includes('MERCOSUL') ? 'Mercosul' : 'Aliança';
 
   // Nome base dos arquivos baixados: "OS - CONTAINER"
   const baseName = useMemo(() => {
@@ -754,7 +755,7 @@ const CteAttachmentsModal: React.FC<CteAttachmentsModalProps> = ({ trip, onClose
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                       </svg>
                       <p className="text-[9px] font-bold text-indigo-700 leading-relaxed">
-                        <span className="font-black uppercase">Aliança:</span> no preenchimento externo, o CT-e de{' '}
+                        <span className="font-black uppercase">{categoriaLabel}:</span> no preenchimento externo, o CT-e de{' '}
                         <span className="font-black">transporte</span> é sempre <span className="font-black text-blue-700">RODOVIÁRIO</span> e o CT-e{' '}
                         <span className="font-black">referenciado</span> é sempre <span className="font-black text-purple-700">MULTIMODAL</span>.
                       </p>
