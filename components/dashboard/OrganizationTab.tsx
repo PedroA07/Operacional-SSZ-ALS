@@ -1650,10 +1650,14 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   // ── CT-e Emitido (Coleta/Export e Entrega/Import) ───────────────────────
   const handleToggleCteEmitido = useCallback(async (trip: Trip, checked: boolean) => {
     const now = Date.now();
-    setPendingUpdates(prev => ({ ...prev, [trip.id]: { data: { ...(prev[trip.id]?.data || {}), cteEmitido: checked }, timestamp: now } }));
+    // Não pode existir CT-e sem Doc. Originário — ao marcar o CT-e, marca o Doc. também
+    const alsoDoc = checked && !trip.coletaDocGenerated;
+    const data: Partial<Trip> = { cteEmitido: checked, ...(alsoDoc ? { coletaDocGenerated: true } : {}) };
+    setPendingUpdates(prev => ({ ...prev, [trip.id]: { data: { ...(prev[trip.id]?.data || {}), ...data }, timestamp: now } }));
     try {
-      await db.saveTrip({ ...trip, cteEmitido: checked } as any);
+      await db.saveTrip({ ...trip, ...data } as any);
       logAudit(activeView, 'CTE', checked ? 'CT-e marcado como emitido' : 'CT-e emitido desmarcado', trip.os, undefined, trip.id);
+      if (alsoDoc) logAudit(activeView, 'COLETA', 'Doc. originário marcado automaticamente (CT-e emitido)', trip.os, undefined, trip.id);
     } catch {
       setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
       window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar CT-e emitido', type: 'error' } }));
@@ -1671,9 +1675,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         const url = await r2Service.upload(file, fileName, `cte-emitido/${trip.os || trip.id}`);
         novos.push({ id: `cte-anx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, url, fileName: file.name, uploadDate: new Date().toISOString() });
       }
-      // Anexar já marca o CT-e como emitido (o anexo continua opcional)
+      // Anexar já marca o CT-e como emitido (o anexo continua opcional) e, como
+      // não pode existir CT-e sem Doc. Originário, marca o Doc. também.
       const anexos = [...(trip.cteEmitidoAnexos || []), ...novos];
-      await db.saveTrip({ ...trip, cteEmitidoAnexos: anexos, cteEmitido: true } as any);
+      await db.saveTrip({ ...trip, cteEmitidoAnexos: anexos, cteEmitido: true, coletaDocGenerated: true } as any);
       logAudit(activeView, 'CTE', `${novos.length} PDF(s) do CT-e emitido anexado(s)`, trip.os, undefined, trip.id);
       window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'PDF(s) do CT-e anexado(s)', type: 'success' } }));
       onRefresh();
