@@ -121,7 +121,8 @@ const ImportOsModal: React.FC<ImportOsModalProps> = ({ onClose, onImported }) =>
           category: it.category || 'ALIANÇA',
           container: p.container || '',
           containerType: p.containerTipo,
-          tara: normalizeKg(p.tara),
+          // Tara da OS NÃO preenche a tara do container — fica em osImportData
+          // e alimenta só os pesos em Emissões
           pesoCarga: normalizeKg(p.pesoCarga),
           seal: p.lacre,
           customer: customer
