@@ -39,15 +39,15 @@ export const searchService = {
   mapDriver: (d: Driver): AutocompleteItem => ({
     id: d.id,
     type: 'DRIVER',
-    mainText: d.name,
-    subText: `CAVALO: ${d.plateHorse} | CARRETA: ${d.plateTrailer}`,
+    mainText: d.name || '',
+    subText: `CAVALO: ${d.plateHorse || '—'} | CARRETA: ${d.plateTrailer || '—'}`,
     document: maskCPF(d.cpf),
     location: maskPhone(d.phone),
     details: {
-      plateHorse: d.plateHorse,
-      plateTrailer: d.plateTrailer,
-      phone: d.phone,
-      documentRaw: d.cpf
+      plateHorse: d.plateHorse || '',
+      plateTrailer: d.plateTrailer || '',
+      phone: d.phone || '',
+      documentRaw: d.cpf || ''
     },
     originalData: d
   }),

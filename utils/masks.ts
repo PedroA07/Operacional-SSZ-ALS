@@ -1,6 +1,6 @@
 
-export const maskCPF = (value: string) => {
-  return value
+export const maskCPF = (value?: string | null) => {
+  return (value || '')
     .replace(/\D/g, '')
     .replace(/(\d{3})(\d)/, '$1.$2')
     .replace(/(\d{3})(\d)/, '$1.$2')
@@ -8,8 +8,8 @@ export const maskCPF = (value: string) => {
     .replace(/(-\d{2})\d+?$/, '$1');
 };
 
-export const maskCNPJ = (value: string) => {
-  return value
+export const maskCNPJ = (value?: string | null) => {
+  return (value || '')
     .replace(/\D/g, '')
     .replace(/^(\d{2})(\d)/, '$1.$2')
     .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
@@ -18,8 +18,8 @@ export const maskCNPJ = (value: string) => {
     .substring(0, 18);
 };
 
-export const maskRG = (value: string) => {
-  return value
+export const maskRG = (value?: string | null) => {
+  return (value || '')
     .replace(/\D/g, '')
     .replace(/(\d{2})(\d)/, '$1.$2')
     .replace(/(\d{3})(\d)/, '$1.$2')
@@ -27,30 +27,30 @@ export const maskRG = (value: string) => {
     .replace(/(-\d{1})\d+?$/, '$1');
 };
 
-export const maskPhone = (value: string) => {
-  return value
+export const maskPhone = (value?: string | null) => {
+  return (value || '')
     .replace(/\D/g, '')
     .replace(/(\d{2})(\d)/, '($1) $2')
     .replace(/(\d{5})(\d)/, '$1-$2')
     .replace(/(-\d{4})\d+?$/, '$1');
 };
 
-export const maskPlate = (value: string) => {
-  return value
+export const maskPlate = (value?: string | null) => {
+  return (value || '')
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '')
     .replace(/^([A-Z]{3})([0-9A-Z]{1,4})$/, '$1-$2')
     .substring(0, 8);
 };
 
-export const maskCEP = (value: string) => {
-  return value
+export const maskCEP = (value?: string | null) => {
+  return (value || '')
     .replace(/\D/g, '')
     .replace(/(\d{5})(\d)/, '$1-$2')
     .replace(/(-\d{3})\d+?$/, '$1');
 };
 
-export const maskSeal = (value: string) => {
+export const maskSeal = (value?: string | null) => {
   if (!value) return '';
   // Regra solicitada: Remover qualquer caractere especial, deixar apenas letras e números
   return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
