@@ -96,7 +96,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
       label: 'Contato Direto',
       render: (d: Driver) => (
         <div className="space-y-1">
-          <a href={`https://wa.me/55${d.phone.replace(/\D/g,'')}`} target="_blank" className="flex items-center gap-1.5 text-blue-600 font-black text-[10px] hover:underline">
+          <a href={`https://wa.me/55${(d.phone || '').replace(/\D/g,'')}`} target="_blank" className="flex items-center gap-1.5 text-blue-600 font-black text-[10px] hover:underline">
             <Icons.Whatsapp />
             {maskPhone(d.phone)}
           </a>
@@ -146,13 +146,13 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
       key: 'acesso',
       label: 'Acesso Portal',
       render: (d: Driver) => {
-        const linkedUser = usersMap.get(d.id) || usersMap.get(d.cpf.replace(/\D/g,''));
+        const linkedUser = usersMap.get(d.id) || usersMap.get((d.cpf || '').replace(/\D/g,''));
         const passVisible = showPasswords[d.id];
         return (
           <div className="p-3 bg-slate-900 rounded-2xl border border-white/5 space-y-2 min-w-[200px]">
              <div className="flex justify-between items-center">
                 <span className="text-[7px] font-black text-slate-500 uppercase">Login</span>
-                <span className="text-[10px] font-mono font-black text-blue-400">{d.cpf.replace(/\D/g,'')}</span>
+                <span className="text-[10px] font-mono font-black text-blue-400">{(d.cpf || '').replace(/\D/g,'')}</span>
              </div>
              <div className="flex justify-between items-center">
                 <span className="text-[7px] font-black text-slate-500 uppercase">Senha</span>
@@ -166,7 +166,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
              <div className="pt-1.5 border-t border-white/5 flex justify-between items-center">
                 <span className="text-[7px] font-black text-amber-500 uppercase">Chave Contrato</span>
                 <span className="text-[10px] font-mono font-black text-amber-200">
-                   {d.beneficiaryCnpj ? d.beneficiaryCnpj.replace(/\D/g,'').slice(-4) : d.cpf.replace(/\D/g,'').slice(-4)}
+                   {d.beneficiaryCnpj ? d.beneficiaryCnpj.replace(/\D/g,'').slice(-4) : (d.cpf || '').replace(/\D/g,'').slice(-4)}
                 </span>
              </div>
           </div>
