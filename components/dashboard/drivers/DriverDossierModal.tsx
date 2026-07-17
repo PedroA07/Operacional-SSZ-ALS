@@ -31,7 +31,7 @@ const DriverDossierModal: React.FC<DriverDossierModalProps> = ({ isOpen, onClose
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
-      const fileName = `DOSSIE_ALS_${driver.name.replace(/\s+/g, '_')}_${driver.plateHorse}`;
+      const fileName = `DOSSIE_ALS_${(driver.name || 'MOTORISTA').replace(/\s+/g, '_')}_${driver.plateHorse || ''}`;
       const element = document.getElementById(`dossier-preview-container`);
       const parent = element?.parentElement;
       

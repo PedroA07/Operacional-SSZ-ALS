@@ -188,7 +188,7 @@ const DriverProfileTemplate: React.FC<DriverProfileTemplateProps> = ({ driver, v
              <div style={{ display: 'flex', justifyContent: 'center', gap: '60px' }}>
                 <div style={{ textAlign: 'center' }}>
                    <p style={{ fontSize: '7px', fontWeight: 'bold', color: '#94a3b8' }}>USUÁRIO (CPF)</p>
-                   <p style={{ fontSize: '13px', fontWeight: 'black', fontFamily: 'monospace' }}>{driver.cpf.replace(/\D/g, '')}</p>
+                   <p style={{ fontSize: '13px', fontWeight: 'black', fontFamily: 'monospace' }}>{(driver.cpf || '').replace(/\D/g, '')}</p>
                 </div>
                 <div style={{ textAlign: 'center' }}>
                    <p style={{ fontSize: '7px', fontWeight: 'bold', color: '#94a3b8' }}>SENHA PADRÃO</p>
