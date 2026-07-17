@@ -496,7 +496,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                           onFocus={() => setShowBenefDropdown(true)}
                         />
                         {showBenefDropdown && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden z-50 shadow-2xl max-h-64 overflow-y-auto">
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-2xl overflow-x-hidden overflow-y-auto z-50 shadow-2xl max-h-64 custom-scrollbar">
                             {beneficiaries
                               .filter(b => {
                                 const q = benefSearch.toLowerCase();

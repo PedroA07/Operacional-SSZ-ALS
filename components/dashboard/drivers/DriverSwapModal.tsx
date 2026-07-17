@@ -132,7 +132,7 @@ const PlatePicker: React.FC<PlatePickerProps> = ({
               onFocus={() => setShowDriverList(true)}
             />
             {showDriverList && (
-              <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden max-h-44 overflow-y-auto">
+              <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-x-hidden overflow-y-auto max-h-44 custom-scrollbar">
                 {filteredDrivers.length === 0 ? (
                   <p className="text-center text-[10px] text-slate-400 font-bold py-4 uppercase">Nenhum motorista encontrado</p>
                 ) : filteredDrivers.map(d => (
