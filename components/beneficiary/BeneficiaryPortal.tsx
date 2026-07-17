@@ -187,7 +187,7 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-4">
+      <div className="h-[100dvh] bg-slate-950 flex flex-col items-center justify-center gap-4">
         <img src="/logo.jpg" alt="ALS" className="w-16 h-16 rounded-3xl object-contain border border-white/10 shadow-2xl"/>
         <div className="flex gap-1.5">
           {[0,1,2].map(i => (
@@ -202,7 +202,7 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
   // ── View 1: lista de motoristas ──────────────────────────────────────────────
   if (!selectedDriver) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col">
+      <div className="h-[100dvh] bg-slate-950 flex flex-col overflow-hidden">
         <header className="px-6 pt-12 pb-6 bg-slate-950/80 backdrop-blur-md border-b border-white/5">
           <div className="flex items-center justify-between">
             <div>
@@ -286,7 +286,7 @@ const BeneficiaryPortal: React.FC<Props> = ({ user, onLogout }) => {
 
   // ── View 2: contratos do motorista selecionado ───────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col">
+    <div className="h-[100dvh] bg-slate-950 flex flex-col overflow-hidden">
       <header className="px-6 pt-12 pb-5 bg-slate-950/80 backdrop-blur-md border-b border-white/5">
         <div className="flex items-center gap-4">
           <button onClick={handleBack}
