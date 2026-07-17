@@ -66,44 +66,33 @@ const StandaloneOrganizationPage: React.FC<StandaloneOrganizationPageProps> = ({
       <NotificationToast />
       <SimpleToast />
 
-      {/* Header fixo no topo */}
-      <div className="sticky top-0 z-50 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="w-9 h-9 rounded-xl overflow-hidden shadow-sm">
-            <img src="/logo.jpg" alt="ALS" className="w-full h-full object-cover" />
-          </div>
-          <div>
-            <p className="font-black text-slate-800 text-sm uppercase tracking-tight leading-none">Organização</p>
-            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-              Tela Cheia • {trips.length} registros • Atualizado {lastSync}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => loadData(false)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-500 rounded-xl text-[9px] font-black uppercase hover:bg-blue-50 hover:text-blue-600 transition-all"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Atualizar
-          </button>
-          <button
-            onClick={() => window.close()}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase hover:bg-red-600 transition-all"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Fechar Guia
-          </button>
-        </div>
+      {/* Controles flutuantes discretos — a guia é dedicada à tabela em tela cheia */}
+      <div className="fixed top-3 right-3 z-[60] flex items-center gap-2">
+        <span className="hidden md:inline text-[8px] font-bold text-slate-400 uppercase tracking-widest mr-1">
+          {trips.length} registros • {lastSync}
+        </span>
+        <button
+          onClick={() => loadData(false)}
+          title="Atualizar"
+          className="w-9 h-9 flex items-center justify-center bg-white/90 border border-slate-200 text-slate-500 rounded-xl shadow-sm hover:bg-blue-50 hover:text-blue-600 transition-all backdrop-blur"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+        <button
+          onClick={() => window.close()}
+          title="Fechar guia"
+          className="w-9 h-9 flex items-center justify-center bg-slate-900 text-white rounded-xl shadow-sm hover:bg-red-600 transition-all"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
-      {/* Tabela da Organização — scroll natural da página */}
-      <div className="p-8">
+      {/* Tabela da Organização em tela cheia */}
+      <div className="p-3">
         <OrganizationTab
           userId={user.id}
           trips={trips}
@@ -112,6 +101,7 @@ const StandaloneOrganizationPage: React.FC<StandaloneOrganizationPageProps> = ({
           drivers={drivers}
           customers={customers}
           onRefresh={() => loadData(false)}
+          standalone
         />
       </div>
     </div>

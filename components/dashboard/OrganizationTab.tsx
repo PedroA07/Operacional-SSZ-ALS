@@ -25,6 +25,7 @@ interface OrganizationTabProps {
   drivers: Driver[];
   customers: Customer[];
   onRefresh: () => void;
+  standalone?: boolean;   // modo tela cheia (aba dedicada) — enxuga o cabeçalho
 }
 
 interface LocationSearchableSelectProps {
@@ -512,7 +513,7 @@ const isEntregaViewType = (typeRaw: string): boolean => {
   return /ENTREGA|IMPORTA/.test(t);
 };
 
-const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, drivers, customers, onRefresh }) => {
+const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, drivers, customers, onRefresh, standalone = false }) => {
   const [locations, setLocations] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategoryFilters, setSelectedCategoryFilters] = useState<string[]>([]);
@@ -3258,13 +3259,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         defaultLocationId={selectedTripForScheduling?.destination?.id || selectedTripForScheduling?.customer?.id}
       />
 
-      <div className="flex flex-col gap-4 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
+      <div className={`flex flex-col gap-4 bg-white border border-slate-200 shadow-sm ${standalone ? 'p-4 rounded-2xl' : 'p-8 rounded-[3rem]'}`}>
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-6 flex-wrap">
-            <div>
-              <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Organização Operacional</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de Agendamentos e NF • Dados desde 06/03/2026</p>
-            </div>
+            {!standalone && (
+              <div>
+                <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Organização Operacional</h2>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão de Agendamentos e NF • Dados desde 06/03/2026</p>
+              </div>
+            )}
 
             <button
               onClick={() => setSettingsModal(true)}
