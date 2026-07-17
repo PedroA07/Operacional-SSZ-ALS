@@ -576,6 +576,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     isOpen: false, title: '', message: '', onConfirm: () => {}
   });
   const [ocTrip, setOcTrip] = useState<Trip | null>(null);
+  const [newOcOpen, setNewOcOpen] = useState(false);   // Ordem de Coleta de uma nova programação (em branco)
 
   // ─── Coleta do Dia (status de envio de e-mail / doc originário) ─────────────
   const [tiposViagem, setTiposViagem] = useState<ColetaTipoViagemOption[]>([]);
@@ -2675,20 +2676,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               </svg>
               {activeView === 'ENTREGA' ? 'Minuta Devolução' : (hasMinuta ? 'Minuta ✓' : 'Gerar Minuta')}
             </button>
-            {/* Coleta/Export: fazer a Ordem de Coleta direto da linha */}
-            {activeView !== 'ENTREGA' && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setOcTrip(t); }}
-                className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${t.ocFormData ? 'bg-indigo-50 border-indigo-300 text-indigo-700 hover:bg-indigo-100' : 'bg-white border-indigo-200 text-indigo-500 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                title={t.ocFormData ? 'Ordem de Coleta já gerada — clique para reeditar' : 'Fazer Ordem de Coleta'}
-              >
-                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                {t.ocFormData ? 'OC ✓' : 'Fazer OC'}
-              </button>
-            )}
             {hasMinuta && (
               <button
                 type="button"
@@ -3194,17 +3181,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      {ocTrip && createPortal(
+      {(ocTrip || newOcOpen) && createPortal(
         <div className="fixed inset-0 z-[400] animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
             <div className="px-8 py-5 bg-blue-600 flex items-center justify-between shrink-0 shadow-lg">
               <div>
                 <p className="text-[8px] font-black text-white/60 uppercase tracking-widest mb-0.5">Organização Operacional</p>
                 <h2 className="font-black text-white text-sm uppercase tracking-widest">Ordem de Coleta</h2>
-                <p className="text-[9px] text-white/60 font-bold uppercase tracking-widest mt-0.5">OS: {ocTrip.os}</p>
+                <p className="text-[9px] text-white/60 font-bold uppercase tracking-widest mt-0.5">{ocTrip ? `OS: ${ocTrip.os}` : 'Nova Programação'}</p>
               </div>
               <button
-                onClick={() => { setOcTrip(null); onRefresh(); }}
+                onClick={() => { setOcTrip(null); setNewOcOpen(false); onRefresh(); }}
                 className="w-10 h-10 flex items-center justify-center bg-white/15 border border-white/20 text-white/80 hover:text-white hover:bg-white/30 rounded-full transition-all active:scale-90"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -3215,10 +3202,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 drivers={drivers}
                 customers={customers}
                 ports={ports}
-                onClose={() => { setOcTrip(null); onRefresh(); }}
-                initialData={ocTrip.ocFormData}
-                tripId={ocTrip.id}
-                osPdfUrl={ocTrip.osPdfUrl}
+                onClose={() => { setOcTrip(null); setNewOcOpen(false); onRefresh(); }}
+                initialData={ocTrip?.ocFormData}
+                tripId={ocTrip?.id}
+                osPdfUrl={ocTrip?.osPdfUrl}
               />
             </div>
           </div>
@@ -3341,6 +3328,20 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             </div>
           </div>
 
+          <div className="flex items-center gap-3">
+          {activeView === 'COLETA' && (
+            <button
+              onClick={() => setNewOcOpen(true)}
+              className="px-6 py-4 bg-indigo-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2"
+              title="Gerar uma Ordem de Coleta de uma nova programação (em branco)"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              Fazer OC
+            </button>
+          )}
+
           <button
             onClick={handleFinalizeTrips}
             disabled={isFinalizing || trips.filter(t => isTripReadyToFinalize(t)).length === 0}
@@ -3358,6 +3359,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               </>
             )}
           </button>
+          </div>
         </div>
 
         {categories.length > 0 && (
