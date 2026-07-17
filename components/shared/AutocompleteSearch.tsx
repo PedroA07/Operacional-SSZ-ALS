@@ -52,10 +52,13 @@ const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
 
     const searchNorm = val.toLowerCase().trim();
     const filtered = data
-      .map(mapToAutocomplete)
+      // Um registro com dado inválido (ex.: sem CPF/telefone) não pode derrubar
+      // a lista inteira — mapeia de forma segura e descarta o que falhar.
+      .map(item => { try { return mapToAutocomplete(item); } catch { return null; } })
+      .filter((item): item is AutocompleteItem => !!item)
       .filter(item => {
         return (
-          item.mainText.toLowerCase().includes(searchNorm) ||
+          item.mainText?.toLowerCase().includes(searchNorm) ||
           item.subText?.toLowerCase().includes(searchNorm) ||
           item.document?.replace(/\D/g, '').includes(searchNorm) ||
           item.location?.toLowerCase().includes(searchNorm) ||
