@@ -1943,7 +1943,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     if (readyTrips.length === 0) {
       alert(activeView === 'ENTREGA'
         ? "Nenhuma viagem está concluída para limpar. Na Entrega/Import a viagem conclui quando a baixa do vazio é confirmada via status, está agendada ou o container foi reutilizado — e o CT-e precisa estar marcado como emitido."
-        : "Nenhuma viagem está pronta para limpar. É obrigatório que o CT-e esteja marcado como emitido. Além disso, as viagens agendadas precisam ter 'NF' e 'Adiantamento' marcados, ou as viagens em Frete Morto precisam ter 'Adiantamento' marcado.");
+        : "Nenhuma viagem está pronta para limpar. É obrigatório que o CT-e esteja marcado como emitido e que as viagens agendadas tenham 'NF' e 'Adiantamento' marcados. Viagens em Frete Morto não têm CT-e — basta o 'Adiantamento' marcado.");
       return;
     }
 
@@ -2057,9 +2057,10 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   [isTripScheduled, hasBaixaConfirmada]);
 
   const isTripReadyToFinalize = useCallback((t: Trip) => {
-    // Só permite limpar/finalizar quando o CT-e está marcado como emitido.
-    if (!t.cteEmitido) return false;
+    // Frete Morto não tem CT-e — pode limpar só com o adiantamento marcado
     if (t.status === 'Frete Morto') return !!t.hasAdvance;
+    // Nos demais casos, só permite limpar/finalizar com o CT-e emitido
+    if (!t.cteEmitido) return false;
     if (activeView === 'ENTREGA') return isEntregaConcluida(t);
     return isTripScheduled(t) && !!t.sentNF && !!t.hasAdvance;
   }, [isTripScheduled, activeView, isEntregaConcluida]);
