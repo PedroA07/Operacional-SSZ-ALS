@@ -53,6 +53,8 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
   const [osFile, setOsFile] = useState<File | null>(null);
   const [osPreviewUrl, setOsPreviewUrl] = useState<string | null>(null);
   const [showOsPreview, setShowOsPreview] = useState(true);
+  // Partes da OS sem cadastro correspondente — mostra o aviso com botão de cadastrar
+  const [importUnmatched, setImportUnmatched] = useState<{ remetente?: string; destinatario?: string }>({});
   useEffect(() => () => { if (osPreviewUrl && osPreviewUrl.startsWith('blob:')) URL.revokeObjectURL(osPreviewUrl); }, [osPreviewUrl]);
   // OS já anexada à trip (importada antes): exibe no preview lateral ao abrir/editar a OC
   useEffect(() => {
@@ -278,6 +280,11 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         destinatarioId: matchedDest?.id || prev.destinatarioId,
       }));
       if (detected) setUserHasChosenCategory(true);
+      // Sem cadastro correspondente: campo fica vazio e mostra o botão de cadastrar
+      setImportUnmatched({
+        remetente: !matchedCustomer && cd.clienteNome ? cd.clienteNome : undefined,
+        destinatario: !matchedDest && cd.destinoNome ? cd.destinoNome : undefined,
+      });
       // Mantém a OS anexada: preview ao lado e páginas no PDF final da OC
       setOsFile(file);
       setOsPreviewUrl(URL.createObjectURL(file));
@@ -290,6 +297,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
       else if (matchedCustomer) notes.push(`Remetente vinculado: ${matchedCustomer.name || matchedCustomer.legalName}.`);
       else if (cd.clienteNome) notes.push(`Cliente "${cd.clienteNome}" não encontrado no cadastro — selecione ou cadastre.`);
       if (matchedDest) notes.push(`Destino vinculado: ${(matchedDest as any).name}.`);
+      else if (cd.destinoNome) notes.push(`Destino "${cd.destinoNome}" não encontrado no cadastro — cadastre pelo botão abaixo do campo.`);
       if (p.senhaOc) notes.push(`Autorização de Coleta preenchida: ${p.senhaOc}.`);
       if (p.padraoCarga && p.padraoCarga !== 'CARGA GERAL') notes.push(`Padrão de carga: ${p.padraoCarga}.`);
       setImportOsNote(notes.join(' '));
@@ -503,6 +511,25 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
           quickAddLabel="Cadastrar novo cliente"
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>}
         />
+        {importUnmatched.remetente && !formData.remetenteId && (
+          <div className="flex items-center gap-2 -mt-3 p-2.5 bg-amber-50 border border-amber-300 rounded-xl">
+            <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+            <p className="text-[9px] font-bold text-amber-700 flex-1 min-w-0">
+              <span className="font-black">"{importUnmatched.remetente}"</span> (da OS) não tem cadastro.
+            </p>
+            <button
+              type="button"
+              onClick={() => setQuickAdd({ type: 'customer', name: importUnmatched.remetente!, onDone: (c) => { setExtraCustomers(prev => [c, ...prev]); setFormData((p: any) => ({ ...p, remetenteId: c.id })); setImportUnmatched(prev => ({ ...prev, remetente: undefined })); } })}
+              className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest rounded-lg hover:bg-amber-600 transition-all shrink-0"
+              title="Cadastrar este cliente"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
+              Cadastrar
+            </button>
+          </div>
+        )}
 
         <AutocompleteSearch
           label="2. Destinatário (Local Destino)"
@@ -515,6 +542,25 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
           quickAddLabel="Cadastrar porto ou pré-stacking"
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>}
         />
+        {importUnmatched.destinatario && !formData.destinatarioId && (
+          <div className="flex items-center gap-2 -mt-3 p-2.5 bg-amber-50 border border-amber-300 rounded-xl">
+            <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+            <p className="text-[9px] font-bold text-amber-700 flex-1 min-w-0">
+              <span className="font-black">"{importUnmatched.destinatario}"</span> (da OS) não tem cadastro.
+            </p>
+            <button
+              type="button"
+              onClick={() => setQuickAdd({ type: 'port', name: importUnmatched.destinatario!, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData((prev: any) => ({ ...prev, destinatarioId: p.id })); setImportUnmatched(prev => ({ ...prev, destinatario: undefined })); } })}
+              className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest rounded-lg hover:bg-amber-600 transition-all shrink-0"
+              title="Cadastrar este destino (porto/pré-stacking)"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
+              Cadastrar
+            </button>
+          </div>
+        )}
 
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 space-y-6 shadow-sm">
           <p className={labelClass}>3. Dados do Equipamento</p>

@@ -507,17 +507,21 @@ export function matchOperationType<T extends { name?: string }>(
 export function matchByName<T extends { name?: string }>(list: T[], target?: string): T | undefined {
   const t = normMatch(target || '');
   if (!t) return undefined;
+  // Comparações por PALAVRA inteira — substring solta gerava falso positivo
+  // (ex.: "TERMINAIS" dentro de "DETERMINAIS" casava com outro terminal)
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const tWords = new Set(t.split(' '));
   let best: T | undefined;
   let bestScore = 0;
   for (const item of list) {
     const n = normMatch(item.name || '');
     if (!n) continue;
     if (t === n) return item;
-    if (t.includes(n) || n.includes(t)) return item;
+    if (new RegExp(`\\b${esc(n)}\\b`).test(t) || new RegExp(`\\b${esc(t)}\\b`).test(n)) return item;
     const tokens = n.split(' ').filter(w => w.length > 3);
     if (tokens.length === 0) continue;
-    const score = tokens.filter(w => t.includes(w)).length / tokens.length;
-    if (score >= 0.5 && score > bestScore) { bestScore = score; best = item; }
+    const score = tokens.filter(w => tWords.has(w)).length / tokens.length;
+    if (score >= 0.6 && score > bestScore) { bestScore = score; best = item; }
   }
   return best;
 }
