@@ -22,6 +22,7 @@ import { parseAliancaOsPdf, matchCustomer, matchByName, matchOperationType, norm
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 import { appendPdfToJsPdf } from '../../../utils/pdfMerger';
 import { printJsPdf } from '../../../utils/printPdf';
+import { fileStorage } from '../../../utils/fileStorage';
 
 interface OrdemColetaFormProps {
   user?: User;
@@ -260,6 +261,11 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
       const matchedOpType = matchOperationType(operationTypes, p.tipoOperacao)?.name;
       const detected = osCategoryService.detectCategoryFromOS(p.os);
 
+      // Anexa o PDF da OS à viagem para reaparecer ao reeditar a OC / emitir CT-e
+      let uploadedOsUrl = '';
+      try { uploadedOsUrl = await fileStorage.uploadTripDoc(file, p.os || `os-${Date.now()}`, 'os'); }
+      catch (err) { console.error('Falha ao anexar o PDF da OS à viagem:', err); }
+
       setFormData((prev: any) => ({
         ...prev,
         os: p.os,
@@ -278,6 +284,9 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
         category: (detected || prev.category || '').toUpperCase(),
         remetenteId: matchedCustomer?.id || prev.remetenteId,
         destinatarioId: matchedDest?.id || prev.destinatarioId,
+        // Persistidos na viagem via mapOCtoTrip → visualizador lateral em CT-e/OC
+        osPdfUrl: uploadedOsUrl || prev.osPdfUrl,
+        osImportData: p,
       }));
       if (detected) setUserHasChosenCategory(true);
       // Sem cadastro correspondente: campo fica vazio e mostra o botão de cadastrar

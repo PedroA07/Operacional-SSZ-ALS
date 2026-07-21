@@ -14,6 +14,7 @@ import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
 import { searchService } from '../../../utils/searchService';
 import ConfirmDialog from '../../shared/ConfirmDialog';
+import { printJsPdf } from '../../../utils/printPdf';
 
 interface DevolucaoVazioFormProps {
   user?: User;
@@ -51,6 +52,8 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
   const [showDateError, setShowDateError] = useState(false);
   // Sem data/hora: pergunta se o terminal dispensa agendamento antes de obrigar
   const [confirmSemAgendamento, setConfirmSemAgendamento] = useState<null | 'save' | 'pdf'>(null);
+  // Ação de exportação escolhida (baixar ou imprimir) — preservada pelo ConfirmDialog
+  const [exportAction, setExportAction] = useState<'download' | 'print'>('download');
 
   useEffect(() => {
     const saved = sessionStorage.getItem('als_active_session');
@@ -187,13 +190,14 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
     }
   };
 
-  const downloadPDF = async (semAgendamento = false) => {
+  const exportPDF = async (action: 'download' | 'print' = 'download', semAgendamento = false) => {
     if (!effectiveDriver || !formData.container) {
       alert("Preencha Container e Motorista para prosseguir.");
       return;
     }
     // Terminal pode dispensar agendamento — pergunta antes de obrigar a data/hora
     if (!formData.agendamentoDateTime && !semAgendamento) {
+      setExportAction(action);
       setConfirmSemAgendamento('pdf');
       return;
     }
@@ -252,7 +256,9 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      pdf.save(`DEVOLUÇÃO DE VAZIO - ${effectiveDriver!.name} - ${formData.container}.pdf`);
+      const fileName = `DEVOLUÇÃO DE VAZIO - ${effectiveDriver!.name} - ${formData.container}.pdf`;
+      if (action === 'print') printJsPdf(pdf, fileName);
+      else pdf.save(fileName);
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
@@ -445,15 +451,19 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           {devolucao && onSave && (
-            <button disabled={isSaving} onClick={() => saveData()} className="py-6 bg-white border-2 border-slate-200 text-slate-700 rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-3 active:scale-95 shadow-sm">
-              {isSaving ? 'Processando...' : 'Salvar Dados'}
+            <button disabled={isSaving} onClick={() => saveData()} className="py-6 bg-white border-2 border-slate-200 text-slate-700 rounded-[1.8rem] text-[10px] font-black uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm">
+              {isSaving ? '...' : 'Salvar Dados'}
             </button>
           )}
-          <button disabled={isExporting} onClick={() => downloadPDF()} className={`py-6 bg-slate-900 text-white rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${devolucao && onSave ? '' : 'col-span-2'}`}>
+          <button disabled={isExporting} onClick={() => exportPDF('print')} className={`py-6 bg-white border-2 border-slate-200 text-slate-700 rounded-[1.8rem] text-[10px] font-black uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm ${devolucao && onSave ? '' : ''}`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4" strokeWidth="2.5"/></svg>
+            {isExporting ? '...' : 'Imprimir'}
+          </button>
+          <button disabled={isExporting} onClick={() => exportPDF('download')} className={`py-6 bg-slate-900 text-white rounded-[1.8rem] text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-2 active:scale-95 ${devolucao && onSave ? '' : 'col-span-2'}`}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth="2.5"/></svg>
-            {isExporting ? 'Gerando PDF...' : 'Baixar Minuta'}
+            {isExporting ? '...' : 'Baixar Minuta'}
           </button>
         </div>
       </div>
@@ -486,7 +496,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
           const action = confirmSemAgendamento;
           setConfirmSemAgendamento(null);
           if (action === 'save') saveData(true);
-          else if (action === 'pdf') downloadPDF(true);
+          else if (action === 'pdf') exportPDF(exportAction, true);
         }}
         onCancel={() => { setConfirmSemAgendamento(null); setShowDateError(true); }}
       />

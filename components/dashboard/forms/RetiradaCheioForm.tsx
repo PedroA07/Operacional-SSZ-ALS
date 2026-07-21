@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Driver, Customer, Port, User } from '../../../types';
 import { jsPDF } from 'jspdf';
+import { printJsPdf } from '../../../utils/printPdf';
 import html2canvas from 'html2canvas';
 import RetiradaCheioTemplate from './RetiradaCheioTemplate';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
@@ -105,7 +106,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
 
   const effectiveDriver = selectedDriver ? { ...selectedDriver, plateHorse, plateTrailer } : undefined;
 
-  const downloadPDF = async () => {
+  const downloadPDF = async (action: 'download' | 'print' = 'download') => {
     if (!effectiveDriver || !formData.container) {
       alert('Preencha o Container e selecione o Motorista para continuar.');
       return;
@@ -136,7 +137,9 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      pdf.save(`RETIRADA CHEIO - ${effectiveDriver!.name} - ${formData.container}.pdf`);
+      const fileName = `RETIRADA CHEIO - ${effectiveDriver!.name} - ${formData.container}.pdf`;
+      if (action === 'print') printJsPdf(pdf, fileName);
+      else pdf.save(fileName);
     } catch (e) {
       console.error('Erro ao gerar PDF de Retirada de Cheio:', e);
     } finally {
@@ -366,13 +369,24 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
           />
         </div>
 
-        <button
-          disabled={isExporting}
-          onClick={downloadPDF}
-          className="w-full py-6 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95 disabled:opacity-60"
-        >
-          {isExporting ? 'GERANDO PDF...' : 'BAIXAR MINUTA DE RETIRADA CHEIO'}
-        </button>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            disabled={isExporting}
+            onClick={() => downloadPDF('print')}
+            className="py-6 bg-white border-2 border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 shadow-sm transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4" strokeWidth="2.5"/></svg>
+            {isExporting ? '...' : 'Imprimir'}
+          </button>
+          <button
+            disabled={isExporting}
+            onClick={() => downloadPDF('download')}
+            className="py-6 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 shadow-xl transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth="2.5"/></svg>
+            {isExporting ? '...' : 'Baixar Minuta'}
+          </button>
+        </div>
       </div>
 
       {/* PAINEL DIREITO — PREVIEW */}

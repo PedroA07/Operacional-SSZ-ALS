@@ -98,7 +98,11 @@ export const tripSyncService = {
         schedulingDate: terminalTime,
         category: category
       } : undefined,
-      scheduling: scheduling
+      scheduling: scheduling,
+      // OS importada anexada — mantém o PDF e os dados extraídos na viagem para
+      // aparecerem ao reeditar a OC ou na emissão de CT-e (visualizador lateral)
+      osPdfUrl: formData.osPdfUrl || undefined,
+      osImportData: formData.osImportData || undefined,
     };
   },
 
