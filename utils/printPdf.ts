@@ -4,13 +4,17 @@ import type { jsPDF } from 'jspdf';
  * Abre o diálogo de impressão do navegador para um PDF gerado com jsPDF,
  * SEM iniciar download.
  *
- * Usa `autoPrint()` (embute a ação de impressão no PDF) + um iframe oculto,
- * abordagem mais confiável que `window.open`, que em muitos navegadores baixa
- * o arquivo em vez de exibir o visualizador (ou é bloqueado como pop-up).
+ * Combina duas coisas:
+ *  1. `autoPrint()` — embute no PDF a ação de imprimir ao abrir (dispara
+ *     sozinho no visualizador nativo do Chrome/Edge).
+ *  2. Um iframe COM DIMENSÃO REAL, porém invisível (fora da tela / opacity 0).
+ *     Iframes com 0x0 ou `visibility:hidden` NÃO inicializam o visualizador de
+ *     PDF no Chrome — por isso nem o autoPrint nem `contentWindow.print()`
+ *     funcionavam e o arquivo acabava baixando. Mantendo dimensão real, o
+ *     visualizador carrega e o diálogo de impressão abre.
  */
 export function printJsPdf(pdf: jsPDF, fileName?: string): void {
   try {
-    // Dispara o diálogo de impressão assim que o PDF carrega no visualizador.
     pdf.autoPrint();
   } catch {
     /* alguns builds do jsPDF podem não expor autoPrint — seguimos com o iframe */
@@ -20,15 +24,17 @@ export function printJsPdf(pdf: jsPDF, fileName?: string): void {
   const url = URL.createObjectURL(blob);
 
   const iframe = document.createElement('iframe');
+  // Fora da tela, mas com tamanho real: o Chrome só carrega o visualizador de
+  // PDF (e executa o autoPrint) quando o iframe tem dimensão e não está oculto.
   iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
+  iframe.style.left = '-10000px';
+  iframe.style.top = '0';
+  iframe.style.width = '900px';
+  iframe.style.height = '1200px';
   iframe.style.border = '0';
-  iframe.style.visibility = 'hidden';
+  iframe.style.opacity = '0';
+  iframe.style.pointerEvents = 'none';
   if (fileName) iframe.title = fileName;
-  iframe.src = url;
 
   let printed = false;
   const triggerPrint = () => {
@@ -38,17 +44,17 @@ export function printJsPdf(pdf: jsPDF, fileName?: string): void {
       iframe.contentWindow?.focus();
       iframe.contentWindow?.print();
     } catch {
-      // Fallback: abre em nova aba — o autoPrint dispara o diálogo lá.
-      window.open(url, '_blank');
+      /* o autoPrint embutido já dispara o diálogo ao carregar o PDF */
     }
   };
 
-  iframe.onload = () => setTimeout(triggerPrint, 250);
+  iframe.onload = () => setTimeout(triggerPrint, 400);
+  iframe.src = url;
   document.body.appendChild(iframe);
 
   // Limpeza: remove o iframe e revoga a URL após a impressão.
   setTimeout(() => {
     try { document.body.removeChild(iframe); } catch { /* já removido */ }
     URL.revokeObjectURL(url);
-  }, 60000);
+  }, 120000);
 }
