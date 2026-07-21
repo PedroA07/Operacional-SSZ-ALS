@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Driver, Customer, Port, PreStacking, User, Liberacao } from '../../../types';
 import { jsPDF } from 'jspdf';
+import { printJsPdf } from '../../../utils/printPdf';
 import html2canvas from 'html2canvas';
 import LiberacaoVazioTemplate from './LiberacaoVazioTemplate';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
@@ -166,7 +167,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
     }
   };
 
-  const downloadPDF = async () => {
+  const downloadPDF = async (action: 'download' | 'print' = 'download') => {
     if (!effectiveDriver || !formData.booking) {
       alert("Preencha Booking e Motorista.");
       return;
@@ -221,7 +222,9 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      pdf.save(`LIBERAÇÃO DE VAZIO - ${effectiveDriver.name} - ${formData.booking}.pdf`);
+      const fileName = `LIBERAÇÃO DE VAZIO - ${effectiveDriver.name} - ${formData.booking}.pdf`;
+      if (action === 'print') printJsPdf(pdf, fileName);
+      else pdf.save(fileName);
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
 
@@ -390,15 +393,19 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           {liberacao && onSave && (
-            <button disabled={isSaving} onClick={saveData} className="py-6 bg-white border-2 border-slate-200 text-slate-700 rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-3 active:scale-95 shadow-sm">
-              {isSaving ? 'Processando...' : 'Salvar Dados'}
+            <button disabled={isSaving} onClick={saveData} className="py-6 bg-white border-2 border-slate-200 text-slate-700 rounded-[1.8rem] text-[10px] font-black uppercase hover:bg-slate-50 transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm">
+              {isSaving ? '...' : 'Salvar Dados'}
             </button>
           )}
-          <button disabled={isExporting} onClick={downloadPDF} className={`py-6 bg-slate-900 text-white rounded-[1.8rem] text-[11px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${liberacao && onSave ? '' : 'col-span-2'}`}>
+          <button disabled={isExporting} onClick={() => downloadPDF('print')} className="py-6 bg-white border-2 border-slate-200 text-slate-700 rounded-[1.8rem] text-[10px] font-black uppercase hover:bg-slate-50 transition-all shadow-sm flex items-center justify-center gap-2 active:scale-95">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4" strokeWidth="2.5"/></svg>
+            {isExporting ? '...' : 'Imprimir'}
+          </button>
+          <button disabled={isExporting} onClick={() => downloadPDF('download')} className={`py-6 bg-slate-900 text-white rounded-[1.8rem] text-[10px] font-black uppercase hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-2 active:scale-95 ${liberacao && onSave ? '' : ''}`}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth="2.5"/></svg>
-            {isExporting ? 'Gerando PDF...' : 'Baixar Liberação'}
+            {isExporting ? '...' : 'Baixar Liberação'}
           </button>
         </div>
       </div>
