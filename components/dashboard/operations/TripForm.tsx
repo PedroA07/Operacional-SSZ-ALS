@@ -11,7 +11,7 @@ import { db } from '../../../utils/storage';
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
-import { parseAliancaOsPdf, matchCustomer, matchByName, matchOperationType, matchTipoViagem, normalizeKg, resolveClienteDestino } from '../../../utils/aliancaOsParser';
+import { parseAliancaOsPdf, matchCustomer, matchByName, matchOperationType, matchTipoViagem, normalizeKg, resolveClienteDestino, isEntregaImportacaoOs } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 import { fileStorage } from '../../../utils/fileStorage';
 
@@ -87,6 +87,7 @@ const TripForm: React.FC<TripFormProps> = ({
     category: '', container: '', tara: '', seal: '', cva: '',
     containerType: '40HC', agencia: '', padrao: 'CARGA GERAL', obs: '',
     customer: null, destination: null, driver: null,
+    retiradaCheio: null, retiradaVazio: null,
     scheduling: null,
     isScheduled: false
   });
@@ -164,6 +165,10 @@ const TripForm: React.FC<TripFormProps> = ({
         if (ensured) { matched = ensured.customer; autoRegistered = ensured.created; if (ensured.created) setExtraCustomers(prev => [ensured.customer as any, ...prev]); }
       }
       const matchedDest = matchByName(allPorts as any[], cd.destinoNome);
+      // Local de origem (retirada): cheio p/ entrega/importação, vazio p/ coleta/exportação
+      const isImp = isEntregaImportacaoOs(p);
+      const origemNome = isImp ? p.retirarCheio : p.retirarVazio;
+      const matchedOrigem = origemNome ? matchByName(allPorts as any[], origemNome) : undefined;
       const matchedType = matchOperationType(operationTypes, p.tipoOperacao)?.name;
       const detected = osCategoryService.detectCategoryFromOS(p.os);
       let tipoViagemId: string | undefined;
@@ -195,6 +200,8 @@ const TripForm: React.FC<TripFormProps> = ({
         coletaTipoViagem: tipoViagemId || prev.coletaTipoViagem,
         customer: matched || prev.customer,
         destination: matchedDest || prev.destination,
+        retiradaCheio: isImp ? (matchedOrigem || prev.retiradaCheio) : prev.retiradaCheio,
+        retiradaVazio: !isImp ? (matchedOrigem || prev.retiradaVazio) : prev.retiradaVazio,
         osPdfUrl: uploadedOsUrl || prev.osPdfUrl,
         osImportData: p,
       }));
@@ -224,13 +231,13 @@ const TripForm: React.FC<TripFormProps> = ({
   const inputClass = "w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
   const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
 
-  const SelectedEntityCard = ({ entity, onClear, type }: any) => {
+  const SelectedEntityCard = ({ entity, onClear, type, title }: any) => {
     if (!entity) return null;
     const isCustomer = type === 'customer';
     return (
       <div className="bg-white p-5 rounded-3xl border-2 border-blue-500 shadow-lg flex items-center justify-between animate-in zoom-in-95">
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">{isCustomer ? 'Cliente Selecionado' : 'Destino Selecionado'}</p>
+          <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">{title || (isCustomer ? 'Cliente Selecionado' : 'Destino Selecionado')}</p>
           <h5 className="text-sm font-black text-slate-900 uppercase truncate leading-tight">{entity.legalName || entity.name}</h5>
           <div className="flex items-center gap-3 mt-2">
             <span className="text-[9px] font-black bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">{maskCNPJ(entity.cnpj)}</span>
@@ -243,6 +250,9 @@ const TripForm: React.FC<TripFormProps> = ({
       </div>
     );
   };
+
+  // Direção da operação define os rótulos/campos da cadeia logística
+  const isImportDir = /ENTREGA|IMPORTA/i.test(formData.type || '');
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-10 pb-10">
@@ -400,41 +410,86 @@ const TripForm: React.FC<TripFormProps> = ({
         </div>
       </div>
 
-      {/* II. CLIENTE & DESTINO */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
-          <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">II. Identificação do Cliente</h4>
-          {formData.customer ? (
-            <SelectedEntityCard entity={formData.customer} type="customer" onClear={() => setFormData({...formData, customer: null})} />
-          ) : (
-            <AutocompleteSearch
-              label="Buscar Cliente"
-              placeholder="Razão ou CNPJ..."
-              data={allCustomers}
-              onSelect={(c) => setFormData({...formData, customer: c})}
-              mapToAutocomplete={searchService.mapCustomer}
-              onQuickAdd={(name) => setQuickAdd({ type: 'customer', name, onDone: (c) => { setExtraCustomers(prev => [c, ...prev]); setFormData((f: any) => ({ ...f, customer: c })); } })}
-              quickAddLabel="Cadastrar novo cliente"
-            />
-          )}
-        </div>
-        <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
-          <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">III. Local de Entrega</h4>
-          {formData.destination ? (
-            <SelectedEntityCard entity={formData.destination} type="destination" onClear={() => setFormData({...formData, destination: null})} />
-          ) : (
-            <AutocompleteSearch
-              label="Buscar Terminal"
-              placeholder="Nome do Terminal..."
-              data={allPorts}
-              onSelect={(p) => setFormData({...formData, destination: p})}
-              mapToAutocomplete={searchService.mapPort}
-              onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData((f: any) => ({ ...f, destination: p })); } })}
-              quickAddLabel="Cadastrar porto ou pré-stacking"
-            />
-          )}
-        </div>
-      </div>
+      {/* II. CADEIA LOGÍSTICA (rótulos conforme o tipo de operação) */}
+      {(() => {
+        // Import/Entrega cabotagem:  Retirada do Cheio → Cliente (entrega) → Devolução do Vazio
+        // Export/Coleta cabotagem:   Retirada do Vazio → Cliente (coleta)  → Entrega (porto/pré-stk)
+        const origem = isImportDir
+          ? { title: 'II. Retirada do Cheio', badge: 'Onde o cheio é retirado (porto/terminal/pré-stacking)' }
+          : { title: 'II. Retirada do Vazio', badge: 'Onde o vazio é retirado (porto/pré-stacking) — p/ liberação de vazio' };
+        const origemField = isImportDir ? 'retiradaCheio' : 'retiradaVazio';
+        const clienteBadge = isImportDir ? 'Local de Entrega' : 'Local de Coleta';
+        const dest = isImportDir
+          ? { title: 'IV. Local de Devolução', badge: 'Devolução do vazio (porto/pré-stacking) — ou reutilização' }
+          : { title: 'IV. Local de Entrega', badge: 'Entrega do cheio (porto/pré-stacking)' };
+        const setPort = (field: string, p: any) => setFormData((f: any) => ({ ...f, [field]: p }));
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Slot 1 — Origem (retirada cheio/vazio) */}
+            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-4">
+              <div>
+                <h4 className="text-[10px] font-black text-cyan-600 uppercase tracking-[0.25em]">{origem.title}</h4>
+                <p className="text-[8px] font-bold text-slate-400 mt-1 leading-tight">{origem.badge}</p>
+              </div>
+              {formData[origemField] ? (
+                <SelectedEntityCard entity={formData[origemField]} type="destination" title="Local Selecionado" onClear={() => setPort(origemField, null)} />
+              ) : (
+                <AutocompleteSearch
+                  label="Buscar Porto / Pré-Stacking"
+                  placeholder="Nome do local..."
+                  data={allPorts}
+                  onSelect={(p) => setPort(origemField, p)}
+                  mapToAutocomplete={searchService.mapPort}
+                  onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setPort(origemField, p); } })}
+                  quickAddLabel="Cadastrar porto ou pré-stacking"
+                />
+              )}
+            </div>
+
+            {/* Slot 2 — Cliente */}
+            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-4">
+              <div>
+                <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.25em]">III. Cliente</h4>
+                <p className="text-[8px] font-bold text-slate-400 mt-1 leading-tight">{clienteBadge}</p>
+              </div>
+              {formData.customer ? (
+                <SelectedEntityCard entity={formData.customer} type="customer" onClear={() => setFormData({...formData, customer: null})} />
+              ) : (
+                <AutocompleteSearch
+                  label="Buscar Cliente"
+                  placeholder="Razão ou CNPJ..."
+                  data={allCustomers}
+                  onSelect={(c) => setFormData({...formData, customer: c})}
+                  mapToAutocomplete={searchService.mapCustomer}
+                  onQuickAdd={(name) => setQuickAdd({ type: 'customer', name, onDone: (c) => { setExtraCustomers(prev => [c, ...prev]); setFormData((f: any) => ({ ...f, customer: c })); } })}
+                  quickAddLabel="Cadastrar novo cliente"
+                />
+              )}
+            </div>
+
+            {/* Slot 3 — Destino (entrega/devolução) */}
+            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-4">
+              <div>
+                <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.25em]">{dest.title}</h4>
+                <p className="text-[8px] font-bold text-slate-400 mt-1 leading-tight">{dest.badge}</p>
+              </div>
+              {formData.destination ? (
+                <SelectedEntityCard entity={formData.destination} type="destination" title={isImportDir ? 'Devolução Selecionada' : 'Entrega Selecionada'} onClear={() => setFormData({...formData, destination: null})} />
+              ) : (
+                <AutocompleteSearch
+                  label="Buscar Porto / Pré-Stacking"
+                  placeholder="Nome do local..."
+                  data={allPorts}
+                  onSelect={(p) => setFormData({...formData, destination: p})}
+                  mapToAutocomplete={searchService.mapPort}
+                  onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData((f: any) => ({ ...f, destination: p })); } })}
+                  quickAddLabel="Cadastrar porto ou pré-stacking"
+                />
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* III. MOTORISTA */}
       <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
