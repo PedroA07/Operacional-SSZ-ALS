@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Driver, PlateEntry, OperationDefinition, Customer, Beneficiary } from '../../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../../utils/masks';
 import { fileStorage } from '../../../utils/fileStorage';
@@ -151,6 +151,23 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [benefSearch, setBenefSearch] = useState('');
   const [showBenefDropdown, setShowBenefDropdown] = useState(false);
+
+  // Filtra beneficiários por nome OU documento. Só compara dígitos quando a
+  // busca tem dígitos — antes, um nome digitado zerava a query numérica e
+  // "".includes("") casava com todos, mascarando o filtro por nome.
+  const filteredBeneficiaries = useMemo(() => {
+    const q = benefSearch.trim().toLowerCase();
+    if (!q) return beneficiaries;
+    const qDigits = q.replace(/\D/g, '');
+    return beneficiaries.filter(b => {
+      if ((b.name || '').toLowerCase().includes(q)) return true;
+      if (qDigits) {
+        if ((b.cpf || '').replace(/\D/g, '').includes(qDigits)) return true;
+        if ((b.cnpj || '').replace(/\D/g, '').includes(qDigits)) return true;
+      }
+      return false;
+    });
+  }, [beneficiaries, benefSearch]);
 
   const initialForm: Partial<Driver> = {
     photo: '', name: '', cpf: '', rg: '', cnh: '',
@@ -497,15 +514,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                         />
                         {showBenefDropdown && (
                           <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-2xl overflow-x-hidden overflow-y-auto z-50 shadow-2xl max-h-64 custom-scrollbar">
-                            {beneficiaries
-                              .filter(b => {
-                                const q = benefSearch.toLowerCase();
-                                return (
-                                  b.name.toLowerCase().includes(q) ||
-                                  (b.cpf || '').replace(/\D/g, '').includes(q.replace(/\D/g, '')) ||
-                                  (b.cnpj || '').replace(/\D/g, '').includes(q.replace(/\D/g, ''))
-                                );
-                              })
+                            {filteredBeneficiaries
                               .map(b => (
                                 <button
                                   key={b.id}
@@ -531,10 +540,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                                 </button>
                               ))
                             }
-                            {beneficiaries.filter(b => {
-                              const q = benefSearch.toLowerCase();
-                              return b.name.toLowerCase().includes(q) || (b.cpf || '').replace(/\D/g,'').includes(q.replace(/\D/g,'')) || (b.cnpj||'').replace(/\D/g,'').includes(q.replace(/\D/g,''));
-                            }).length === 0 && (
+                            {filteredBeneficiaries.length === 0 && (
                               <div className="px-5 py-4 text-center">
                                 <p className="text-[10px] text-slate-500 font-bold">Nenhum resultado</p>
                                 <p className="text-[9px] text-slate-600 mt-1">Cadastre o beneficiário na aba Beneficiários e retorne aqui.</p>
