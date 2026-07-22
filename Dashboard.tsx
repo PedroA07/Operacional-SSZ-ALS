@@ -9,6 +9,7 @@ import UserProfile from './components/dashboard/UserProfile';
 import NotificationCenter from './components/dashboard/notifications/NotificationCenter';
 import EmailCenter from './components/dashboard/email/EmailCenter';
 import MessageCenter from './components/dashboard/email/MessageCenter';
+import BulkImportOsModal from './components/dashboard/operations/BulkImportOsModal';
 import NotificationToast from './components/dashboard/notifications/NotificationToast';
 import SimpleToast from './components/shared/SimpleToast';
 import FeedbackModal from './components/shared/FeedbackModal';
@@ -145,6 +146,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
+  const [showBulkImportOs, setShowBulkImportOs] = useState(false);
   const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 
@@ -315,8 +317,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans text-slate-900">
       <NotificationToast />
       <SimpleToast />
-      
-      <FeedbackModal 
+
+      {showBulkImportOs && (
+        <BulkImportOsModal
+          user={user}
+          onClose={() => setShowBulkImportOs(false)}
+          onImported={loadTripsOnly}
+        />
+      )}
+
+      <FeedbackModal
         isOpen={feedback.show} 
         onClose={() => setFeedback({ ...feedback, show: false })}
         title={feedback.title}
@@ -361,6 +371,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowBulkImportOs(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-700 transition-all shadow-sm active:scale-95"
+              title="Importar OS em massa — cria as programações e libera as minutas"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+              </svg>
+              <span className="hidden md:inline">Importar OS</span>
+            </button>
             <DatabaseStatus />
             <EmailCenter user={user} trips={trips} />
             <MessageCenter user={user} />
