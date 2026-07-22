@@ -244,44 +244,49 @@ export const tripRepository = {
       return result;
     };
 
-    const { error } = await doUpsert(payload as any);
+    // Identifica a coluna ausente a partir da mensagem do erro. Cobre os dois
+    // formatos: PostgREST/PGRST204 ("Could not find the 'X' column of ...") e
+    // Postgres cru ("column \"X\" of relation ... does not exist").
+    const parseMissingColumn = (err: any): string | null => {
+      const msg = `${err?.message || ''} ${err?.details || ''}`;
+      let m = msg.match(/could not find the ['"]?(\w+)['"]? column/i);
+      if (m) return m[1];
+      m = msg.match(/column ['"]?(\w+)['"]? (?:of relation|does not exist)/i);
+      if (m) return m[1];
+      if (/coleta_order_index/.test(msg)) return 'coleta_order_index';
+      if (/\bagencia\b/.test(msg)) return 'agencia';
+      return null;
+    };
 
-    if (error) {
-      // Coluna inexistente no banco (migration ainda não aplicada) — remove o campo e tenta de novo
-      const missingColumnMatch = error.message?.match(/column ["']?(\w+)["']? (of relation|does not exist)/i)
-        || error.details?.match(/column ["']?(\w+)["']? (of relation|does not exist)/i);
-      const isUnknownColumn = error.code === 'PGRST204' || !!missingColumnMatch
-        || error.message.includes('agencia')
-        || error.message.includes('coleta_order_index');
+    // Remove UMA coluna ausente por tentativa e repete — assim, mesmo que várias
+    // migrações não tenham sido aplicadas (retirada_vazio, os_pdf_url, etc.), a
+    // viagem é salva sem elas em vez de falhar.
+    let result = await doUpsert(payload as any);
+    const removed: string[] = [];
+    let attempts = 0;
+    while (result.error && attempts < 15) {
+      const col = parseMissingColumn(result.error);
+      const isUnknownColumn = result.error.code === 'PGRST204' || !!col;
+      if (!isUnknownColumn || !col || removed.includes(col)) break;
+      removed.push(col);
+      delete (payload as any)[col];
+      attempts++;
+      result = await doUpsert(payload as any);
+    }
 
-      if (isUnknownColumn) {
-        const columnsToRemove: string[] = ['coleta_order_index'];
-        if (error.message.includes('agencia')) columnsToRemove.push('agencia');
-        if (missingColumnMatch && !columnsToRemove.includes(missingColumnMatch[1])) {
-          columnsToRemove.push(missingColumnMatch[1]);
-        }
+    if (removed.length) {
+      console.warn(`Colunas ausentes no banco [${removed.join(', ')}] — viagem salva sem elas. Aplique as migrações do Supabase.`);
+    }
 
-        const retryPayload = { ...payload } as any;
-        columnsToRemove.forEach(col => delete retryPayload[col]);
-
-        console.warn(`Colunas ausentes no banco [${columnsToRemove.join(', ')}] — tentando salvar sem elas...`);
-
-        const { error: retryError } = await doUpsert(retryPayload);
-
-        if (retryError) {
-          console.error("ERRO AO SALVAR TRIP (RETRY):", retryError);
-          throw retryError;
-        }
-      } else {
-        console.error("ERRO DETALHADO AO SALVAR TRIP:", {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-          payload
-        });
-        throw error;
-      }
+    if (result.error) {
+      console.error("ERRO DETALHADO AO SALVAR TRIP:", {
+        message: result.error.message,
+        details: result.error.details,
+        hint: result.error.hint,
+        code: result.error.code,
+        payload,
+      });
+      throw result.error;
     }
 
     // Dispara automação se o status mudou ou se é uma nova viagem
