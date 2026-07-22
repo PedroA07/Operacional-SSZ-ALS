@@ -10,6 +10,7 @@ import NotificationCenter from './components/dashboard/notifications/Notificatio
 import EmailCenter from './components/dashboard/email/EmailCenter';
 import MessageCenter from './components/dashboard/email/MessageCenter';
 import BulkImportOsModal from './components/dashboard/operations/BulkImportOsModal';
+import PendingImportsModal from './components/dashboard/operations/PendingImportsModal';
 import NotificationToast from './components/dashboard/notifications/NotificationToast';
 import SimpleToast from './components/shared/SimpleToast';
 import FeedbackModal from './components/shared/FeedbackModal';
@@ -147,6 +148,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const [opsView, setOpsView] = useState<{ type: 'list' | 'category' | 'client', id?: string, categoryName?: string, clientName?: string }>({ type: 'list' });
   const [showBulkImportOs, setShowBulkImportOs] = useState(false);
+  const [showPendingImports, setShowPendingImports] = useState(false);
+  const pendingImportsCount = useMemo(() => trips.filter(t => t.importPendente && !t.isCompleted).length, [trips]);
   const realtimeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 
@@ -326,6 +329,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         />
       )}
 
+      {showPendingImports && (
+        <PendingImportsModal
+          user={user}
+          trips={trips}
+          customers={customers}
+          drivers={drivers}
+          categories={categories}
+          onClose={() => setShowPendingImports(false)}
+          onRefresh={loadTripsOnly}
+        />
+      )}
+
       <FeedbackModal
         isOpen={feedback.show} 
         onClose={() => setFeedback({ ...feedback, show: false })}
@@ -380,6 +395,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
               </svg>
               <span className="hidden md:inline">Importar OS</span>
+            </button>
+            <button
+              onClick={() => setShowPendingImports(true)}
+              className="relative flex items-center gap-1.5 px-3 py-1.5 bg-white border border-amber-300 text-amber-700 text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-50 transition-all shadow-sm active:scale-95"
+              title="OS importadas pendentes — gerar minutas ou editar programação"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <span className="hidden md:inline">Pendentes</span>
+              {pendingImportsCount > 0 && (
+                <span className="min-w-[16px] h-4 px-1 flex items-center justify-center bg-amber-500 text-white text-[8px] font-black rounded-full">{pendingImportsCount}</span>
+              )}
             </button>
             <DatabaseStatus />
             <EmailCenter user={user} trips={trips} />

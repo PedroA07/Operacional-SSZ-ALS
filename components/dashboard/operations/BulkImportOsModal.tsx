@@ -161,6 +161,7 @@ const BulkImportOsModal: React.FC<BulkImportOsModalProps> = ({ user, onClose, on
           balancePayment: { status: 'AGUARDANDO_DOCS' } as any,
           advancePayment: { status: 'BLOQUEADO' } as any,
           coletaEmissaoSolicitada: true,
+          importPendente: true,
           coletaTipoViagem: it.tipoViagem?.id,
           autColeta: p.autColeta,
           embarcador: p.embarcador,
