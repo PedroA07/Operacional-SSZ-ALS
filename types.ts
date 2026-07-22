@@ -685,7 +685,7 @@ export interface Trip {
   osImportData?: any;        // dados completos extraídos da OS importada (PDF Aliança)
   osPdfUrl?: string;         // PDF original da OS anexado (visualização ao editar a OC)
   // Organização — fluxo de Entrega/Importação
-  retiradaCheio?: {          // onde o cheio é retirado (terminal pré-stacking, porto ou cliente)
+  retiradaCheio?: {          // onde o cheio é retirado (terminal pré-stacking, porto ou cliente) — import/entrega
     id?: string;
     name: string;
     legalName?: string;
@@ -693,6 +693,15 @@ export interface Trip {
     city?: string;
     state?: string;
     kind?: string;           // PORTO | PRÉ-STACKING | CLIENTE
+  };
+  retiradaVazio?: {          // onde o vazio é retirado (porto/pré-stacking) — export/coleta (p/ liberação de vazio)
+    id?: string;
+    name: string;
+    legalName?: string;
+    cnpj?: string;
+    city?: string;
+    state?: string;
+    kind?: string;
   };
   agendamentoAnexo?: {       // comprovante de agendamento anexado (quando não há minuta)
     id: string;
