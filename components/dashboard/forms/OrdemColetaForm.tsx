@@ -23,6 +23,7 @@ import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 import { appendPdfToJsPdf } from '../../../utils/pdfMerger';
 import { printJsPdf } from '../../../utils/printPdf';
 import { fileStorage } from '../../../utils/fileStorage';
+import { fetchFileBlob } from '../../../utils/fileDownloader';
 
 interface OrdemColetaFormProps {
   user?: User;
@@ -372,11 +373,17 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
 
-      // Anexa a OS importada ao PDF final — baixa/imprime OC + OS juntas
-      if (osFile) {
-        try { await appendPdfToJsPdf(pdf, osFile); }
-        catch (err) { console.error('Não foi possível anexar a OS ao PDF da OC:', err); }
-      }
+      // Sempre anexa a OS ao PDF final — do arquivo importado agora OU do PDF
+      // já anexado à viagem (osPdfUrl) — para OC + OS saírem juntas
+      try {
+        const storedOsUrl = osPdfUrl || initialData?.osPdfUrl;
+        if (osFile) {
+          await appendPdfToJsPdf(pdf, osFile);
+        } else if (storedOsUrl) {
+          const osBlob = await fetchFileBlob(storedOsUrl);
+          if (osBlob) await appendPdfToJsPdf(pdf, osBlob);
+        }
+      } catch (err) { console.error('Não foi possível anexar a OS ao PDF da OC:', err); }
 
       const fileName = `OC - ${effectiveDriver!.name} - ${formData.os}`;
 
