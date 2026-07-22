@@ -24,6 +24,10 @@ const TripModal: React.FC<TripModalProps> = ({
   const [ports, setPorts] = useState<(Port | PreStacking)[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Preview da OS importada ao lado do formulário
+  const [osPreviewUrl, setOsPreviewUrl] = useState<string | null>(null);
+  const [showOsPreview, setShowOsPreview] = useState(true);
+  useEffect(() => () => { if (osPreviewUrl) URL.revokeObjectURL(osPreviewUrl); }, [osPreviewUrl]);
 
   useEffect(() => {
     if (isOpen) {
@@ -128,30 +132,54 @@ const TripModal: React.FC<TripModalProps> = ({
               <p className="text-[9px] text-white/60 font-bold uppercase tracking-widest mt-0.5">Painel de Gerenciamento de Cargas</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center bg-white/15 border border-white/20 text-white/80 hover:text-white hover:bg-white/30 rounded-full transition-all active:scale-90"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
+          <div className="flex items-center gap-3">
+            {osPreviewUrl && (
+              <button
+                onClick={() => setShowOsPreview(v => !v)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm ${showOsPreview ? 'bg-white text-blue-700 hover:bg-white/90' : 'bg-white/15 border border-white/20 text-white/80 hover:bg-white/25'}`}
+                title="Mostrar/ocultar a OS importada ao lado"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+                {showOsPreview ? 'Ocultar OS' : 'Ver OS'}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="w-10 h-10 flex items-center justify-center bg-white/15 border border-white/20 text-white/80 hover:text-white hover:bg-white/30 rounded-full transition-all active:scale-90"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar bg-slate-50">
-          <div className="max-w-5xl mx-auto p-10">
-            <TripForm
-              editTrip={editTrip}
-              initialCategory={initialCategory}
-              initialCustomer={initialCustomer}
-              drivers={drivers}
-              customers={customers}
-              categories={categories}
-              ports={ports}
-              onCancel={onClose}
-              onSave={handleSave}
-              isSaving={isSaving}
-            />
+        <div className="flex flex-1 min-h-0">
+          {osPreviewUrl && showOsPreview && (
+            <div className="w-1/2 border-r border-slate-200 bg-slate-100 flex flex-col shrink-0">
+              <div className="px-4 py-2 bg-slate-800 text-white text-[9px] font-black uppercase tracking-widest shrink-0">OS importada (PDF)</div>
+              <iframe src={osPreviewUrl} title="OS importada" className="flex-1 w-full" />
+            </div>
+          )}
+          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar bg-slate-50">
+            <div className={`${osPreviewUrl && showOsPreview ? 'max-w-3xl' : 'max-w-5xl'} mx-auto p-10 transition-all`}>
+              <TripForm
+                editTrip={editTrip}
+                initialCategory={initialCategory}
+                initialCustomer={initialCustomer}
+                drivers={drivers}
+                customers={customers}
+                categories={categories}
+                ports={ports}
+                onCancel={onClose}
+                onSave={handleSave}
+                isSaving={isSaving}
+                onOsPreview={(url) => { setOsPreviewUrl(url); setShowOsPreview(true); }}
+              />
+            </div>
           </div>
         </div>
       </div>
