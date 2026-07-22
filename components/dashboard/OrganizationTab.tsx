@@ -2532,6 +2532,37 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 : <><svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>{anexos.length > 0 ? 'Anexar Mais' : 'Anexar PDF'}</>}
               <input type="file" accept=".pdf,application/pdf" multiple className="hidden" disabled={isUploading} onChange={e => { const fs = Array.from(e.target.files || []); if (fs.length) { handleCteEmitidoUpload(t, fs); e.target.value = ''; } }} />
             </label>
+
+            {/* Entrega/Import: Doc Originário + Emissões (anexar/ver CT-e e NF) na mesma coluna */}
+            {activeView === 'ENTREGA' && (() => {
+              const docChecked = !!t.coletaDocGenerated;
+              const cteCount = t.emissaoCteAttachments?.length || 0;
+              return (
+                <div className="w-full flex flex-col items-center gap-1 mt-1.5 pt-1.5 border-t border-slate-100">
+                  <span className="text-[6px] font-black text-slate-400 uppercase tracking-tight">Doc Originário</span>
+                  <ToggleIconBtn
+                    checked={docChecked}
+                    onClick={() => handleToggleColetaDoc(t, !docChecked)}
+                    loading={'coletaDocGenerated' in (pendingUpdates[t.id]?.data || {})}
+                    activeClass="bg-emerald-50 border-emerald-400 text-emerald-600"
+                    inactiveClass="bg-white border-slate-200 text-slate-300 hover:border-emerald-300 hover:text-emerald-400"
+                    badgeColor="bg-emerald-500"
+                    title={docChecked ? 'Doc. originário gerado — clique para desmarcar' : 'Marcar doc. originário como gerado'}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  </ToggleIconBtn>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setCteAttachTripId(t.id); }}
+                    className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border transition-all ${cteCount > 0 ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' : 'bg-white border-indigo-200 text-indigo-500 hover:bg-indigo-50 hover:border-indigo-400'}`}
+                    title="Emissões de CT-e — anexar e visualizar CT-e e NF (PDF/XML) e os dados"
+                  >
+                    <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                    {cteCount > 0 ? `CT-e / NF (${cteCount})` : 'Emissões CT-e'}
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         );
       }
