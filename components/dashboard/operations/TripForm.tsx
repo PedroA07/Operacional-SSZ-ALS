@@ -11,6 +11,9 @@ import { db } from '../../../utils/storage';
 import DriverSwapModal, { DriverSwapResult } from '../drivers/DriverSwapModal';
 import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
+import { parseAliancaOsPdf, matchCustomer, matchByName, matchOperationType, matchTipoViagem, normalizeKg, resolveClienteDestino } from '../../../utils/aliancaOsParser';
+import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
+import { fileStorage } from '../../../utils/fileStorage';
 
 interface TripFormProps {
   editTrip?: Trip | null;
@@ -23,15 +26,23 @@ interface TripFormProps {
   onCancel: () => void;
   onSave: (data: any) => Promise<void>;
   isSaving: boolean;
+  /** Notifica o modal para exibir a OS importada no painel lateral */
+  onOsPreview?: (url: string | null) => void;
 }
 
 const TripForm: React.FC<TripFormProps> = ({
-  editTrip, initialCategory, initialCustomer, drivers, customers, categories, ports, onCancel, onSave, isSaving
+  editTrip, initialCategory, initialCustomer, drivers, customers, categories, ports, onCancel, onSave, isSaving, onOsPreview
 }) => {
   const [containerTypes, setContainerTypes] = useState<any[]>([]);
   const [operationTypes, setOperationTypes] = useState<any[]>([]);
   const [swapModalOpen, setSwapModalOpen] = useState(false);
   const [userHasChosenCategory, setUserHasChosenCategory] = useState(!!editTrip?.category);
+
+  // Importação de OS (Aliança/Mercosul, PDF) — preenche o formulário
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importNote, setImportNote] = useState<string | null>(null);
+  const osPreviewUrlRef = useRef<string | null>(null);
 
   // Cadastro na hora (motorista/cliente/porto) sem fechar a programação
   const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
@@ -130,6 +141,86 @@ const TripForm: React.FC<TripFormProps> = ({
     return cat?.name?.toUpperCase() || '';
   };
 
+  const handleImportOs = async (file: File | undefined) => {
+    if (!file) return;
+    setImporting(true);
+    setImportNote(null);
+    try {
+      const p = await parseAliancaOsPdf(file);
+      if (!p || !p.os) { setImportNote('PDF não reconhecido como OS (Aliança/Mercosul).'); return; }
+
+      // Cliente/destino conforme o tipo (coleta/export = Local Coleta → Entregar
+      // Cheio; entrega/import = Local Entrega → Entregar Vazio). Sem cadastro,
+      // cadastra o cliente pelo CNPJ.
+      const cd = resolveClienteDestino(p);
+      let matched: any = matchCustomer(allCustomers, p);
+      let autoRegistered = false;
+      if (!matched && cd.clienteCnpj) {
+        const ensured = await ensureCustomerByCnpj(allCustomers, cd.clienteCnpj, {
+          nome: cd.clienteNome, cnpj: cd.clienteCnpj,
+          endereco: cd.clienteEndereco, municipio: cd.clienteMunicipio, uf: cd.clienteUf,
+          bairro: cd.clienteBairro, cep: cd.clienteCep,
+        });
+        if (ensured) { matched = ensured.customer; autoRegistered = ensured.created; if (ensured.created) setExtraCustomers(prev => [ensured.customer as any, ...prev]); }
+      }
+      const matchedDest = matchByName(allPorts as any[], cd.destinoNome);
+      const matchedType = matchOperationType(operationTypes, p.tipoOperacao)?.name;
+      const detected = osCategoryService.detectCategoryFromOS(p.os);
+      let tipoViagemId: string | undefined;
+      try { const tvs = await db.getColetaTiposViagem(); tipoViagemId = matchTipoViagem(tvs || [], p.docReferencia)?.id; } catch { /* segue sem */ }
+
+      // Anexa o PDF da OS à viagem (visualizador lateral em OC / emissão de CT-e)
+      let uploadedOsUrl = '';
+      try { uploadedOsUrl = await fileStorage.uploadTripDoc(file, p.os || `os-${Date.now()}`, 'os'); }
+      catch (err) { console.error('Falha ao anexar o PDF da OS à viagem:', err); }
+
+      if (detected) setUserHasChosenCategory(true);
+      setFormData((prev: any) => ({
+        ...prev,
+        os: p.os || prev.os,
+        booking: p.booking || prev.booking,
+        ship: p.ship || prev.ship,
+        autColeta: p.autColeta || prev.autColeta,
+        embarcador: p.embarcador || prev.embarcador,
+        dateTime: p.dataColeta || prev.dateTime,
+        type: matchedType || p.tipoOperacao || prev.type,
+        category: (detected || prev.category || '').toUpperCase(),
+        container: p.container || prev.container,
+        containerType: p.containerTipo || prev.containerType,
+        // Tara da OS não entra na tara do container (só nos pesos de Emissões)
+        pesoCarga: normalizeKg(p.pesoCarga) || prev.pesoCarga,
+        seal: p.lacre ? maskSeal(p.lacre.toUpperCase()) : prev.seal,
+        agencia: p.armador || prev.agencia,
+        padrao: p.padraoCarga || prev.padrao,
+        coletaTipoViagem: tipoViagemId || prev.coletaTipoViagem,
+        customer: matched || prev.customer,
+        destination: matchedDest || prev.destination,
+        osPdfUrl: uploadedOsUrl || prev.osPdfUrl,
+        osImportData: p,
+      }));
+
+      // Preview lateral da OS
+      if (osPreviewUrlRef.current) URL.revokeObjectURL(osPreviewUrlRef.current);
+      const blobUrl = URL.createObjectURL(file);
+      osPreviewUrlRef.current = blobUrl;
+      onOsPreview?.(blobUrl);
+
+      const notes: string[] = [`OS ${p.os} importada — confira os campos.`];
+      notes.push(`Cliente pelo ${cd.clienteOrigem === 'LOCAL ENTREGA' ? 'Local de Entrega' : 'Local de Coleta'} (tipo ${p.tipoOperacao || '—'}).`);
+      if (p.shipFromObs) notes.push(`Navio das Demais Observações (campo trazia: ${p.navioViagemCampo || '—'}).`);
+      if (autoRegistered) notes.push(`Cliente cadastrado automaticamente pelo CNPJ: ${matched.name || matched.legalName}.`);
+      else if (!matched && cd.clienteNome) notes.push(`Cliente "${cd.clienteNome}" não encontrado — selecione ou cadastre.`);
+      if (!matchedDest && cd.destinoNome) notes.push(`Destino "${cd.destinoNome}" não encontrado — selecione ou cadastre.`);
+      setImportNote(notes.join(' '));
+    } catch (err) {
+      console.error('Erro ao importar OS:', err);
+      setImportNote('Erro ao ler o PDF da OS.');
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) importInputRef.current.value = '';
+    }
+  };
+
   const inputClass = "w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-white text-slate-700 font-bold uppercase focus:border-blue-500 outline-none transition-all shadow-sm placeholder:text-slate-300";
   const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1 block";
 
@@ -155,7 +246,34 @@ const TripForm: React.FC<TripFormProps> = ({
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }} className="space-y-10 pb-10">
-      
+
+      {/* Importar OS (Aliança/Mercosul) — preenche os campos automaticamente */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-indigo-50/60 border border-indigo-200 rounded-3xl p-5">
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] font-black text-indigo-700 uppercase tracking-widest">Importar OS em PDF</p>
+          <p className="text-[9px] font-bold text-indigo-500/80 mt-0.5">OS da Aliança ou Mercosul — extrai os dados e anexa a OS à viagem.</p>
+        </div>
+        <input ref={importInputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={e => handleImportOs(e.target.files?.[0])} />
+        <button
+          type="button"
+          onClick={() => importInputRef.current?.click()}
+          disabled={importing}
+          className="flex items-center justify-center gap-2 px-5 py-3 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-50 shrink-0"
+        >
+          {importing ? (
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+          )}
+          {importing ? 'Lendo OS...' : 'Importar OS'}
+        </button>
+      </div>
+      {importNote && (
+        <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-2xl text-[10px] font-bold text-indigo-700 -mt-6">
+          {importNote}
+        </div>
+      )}
+
       {/* I. DADOS DA VIAGEM */}
       <div className="bg-slate-50/50 p-8 rounded-[3rem] border border-slate-100 space-y-6">
         <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">I. Dados Principais da Viagem</h4>
