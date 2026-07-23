@@ -1629,6 +1629,18 @@ export const db = {
     }));
   },
 
+  // Conta posts do feed mais novos que `sinceIso` (novidades desde a última
+  // visita). Opcionalmente exclui os posts do próprio usuário.
+  getHandoverUnreadCount: async (sinceIso: string | null, excludeAuthorId?: string): Promise<number> => {
+    if (!supabase) return 0;
+    let q = supabase.from('handover_posts').select('id', { count: 'exact', head: true });
+    if (sinceIso) q = q.gt('created_at', sinceIso);
+    if (excludeAuthorId) q = q.neq('author_id', excludeAuthorId);
+    const { count, error } = await q;
+    if (error) { console.error('[getHandoverUnreadCount]', error.message); return 0; }
+    return count || 0;
+  },
+
   saveHandoverPost: async (post: Omit<HandoverPost, 'id' | 'createdAt'>): Promise<string | null> => {
     if (!supabase) return null;
     const row: any = {

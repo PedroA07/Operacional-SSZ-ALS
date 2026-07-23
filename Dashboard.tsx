@@ -119,6 +119,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>(DashboardTab.INICIO);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ 'Operações': false, 'Administrativo': false });
   const [sidebarState, setSidebarState] = useState<'open' | 'collapsed' | 'hidden'>('open');
+
+  // ── Novidades do Feed de Atividades (contador na aba lateral) ──────────────
+  const HANDOVER_SEEN_KEY = `als_handover_seen_${user.id}`;
+  const [handoverUnread, setHandoverUnread] = useState(0);
+
+  const refreshHandoverUnread = useCallback(async () => {
+    const since = localStorage.getItem(HANDOVER_SEEN_KEY);
+    const count = await db.getHandoverUnreadCount(since, user.id);
+    setHandoverUnread(count);
+  }, [HANDOVER_SEEN_KEY, user.id]);
+
+  useEffect(() => {
+    refreshHandoverUnread();
+    if (!supabase) return;
+    const ch = supabase
+      .channel('sidebar-handover-badge')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'handover_posts' }, () => refreshHandoverUnread())
+      .subscribe();
+    return () => { supabase!.removeChannel(ch); };
+  }, [refreshHandoverUnread]);
+
+  // Ao abrir o Feed, marca tudo como visto e zera o contador
+  useEffect(() => {
+    if (activeTab === DashboardTab.HANDOVER) {
+      localStorage.setItem(HANDOVER_SEEN_KEY, new Date().toISOString());
+      setHandoverUnread(0);
+    }
+  }, [activeTab, HANDOVER_SEEN_KEY]);
   
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -363,6 +391,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         availableOps={availableOps}
         setOpsView={setOpsView}
         staffList={staffList}
+        handoverUnread={handoverUnread}
       />
 
       <main className="flex-1 flex flex-col overflow-hidden">
