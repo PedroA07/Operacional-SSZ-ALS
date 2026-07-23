@@ -318,6 +318,11 @@ export interface DutySwapRequest {
   createdAt: string;
 }
 
+export interface HandoverReactionUser {
+  id: string;   // userId
+  name: string; // nome de exibição de quem reagiu
+}
+
 export interface HandoverPost {
   id: string;
   title?: string; // Título opcional do post
@@ -326,8 +331,9 @@ export interface HandoverPost {
   authorName: string;
   authorPhoto?: string;
   authorRole?: string;
+  authorPosition?: string; // função/cargo do autor (ex.: "Analista Operacional")
   mentions: HandoverMention[];
-  reactions?: Record<string, string[]>; // emoji -> lista de userIds
+  reactions?: Record<string, HandoverReactionUser[]>; // emoji -> quem reagiu
   createdAt: string;
   updatedAt?: string;
 }
@@ -341,7 +347,8 @@ export interface HandoverComment {
   authorName: string;
   authorPhoto?: string;
   authorRole?: string;
-  reactions?: Record<string, string[]>; // emoji -> lista de userIds
+  authorPosition?: string; // função/cargo do autor
+  reactions?: Record<string, HandoverReactionUser[]>; // emoji -> quem reagiu
   createdAt: string;
   updatedAt?: string;
 }

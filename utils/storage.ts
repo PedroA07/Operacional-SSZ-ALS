@@ -91,6 +91,21 @@ function mapShipToDb(s: Partial<Ship>): any {
   };
 }
 
+// Normaliza reações do feed: aceita o formato antigo (lista de userIds) e o
+// novo (lista de { id, name }), sempre devolvendo { id, name }.
+function normHandoverReactions(raw: any): Record<string, { id: string; name: string }[]> {
+  const out: Record<string, { id: string; name: string }[]> = {};
+  if (raw && typeof raw === 'object') {
+    for (const emoji of Object.keys(raw)) {
+      const arr = Array.isArray(raw[emoji]) ? raw[emoji] : [];
+      out[emoji] = arr.map((u: any) =>
+        typeof u === 'string' ? { id: u, name: '' } : { id: String(u?.id || ''), name: u?.name || '' }
+      ).filter((u: any) => u.id);
+    }
+  }
+  return out;
+}
+
 export const db = {
   checkConnection: async () => {
     if (!supabase) return false;
@@ -1606,13 +1621,13 @@ export const db = {
   },
 
   // Passagem de Serviço
-  getHandoverPosts: async (): Promise<HandoverPost[]> => {
+  getHandoverPosts: async (limit = 100, offset = 0): Promise<HandoverPost[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase
       .from('handover_posts')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(100);
+      .range(offset, offset + limit - 1);
     if (error) { console.error('[getHandoverPosts]', error.message); return []; }
     return (data || []).map(p => ({
       id: String(p.id),
@@ -1622,8 +1637,9 @@ export const db = {
       authorName: p.author_name || '',
       authorPhoto: p.author_photo,
       authorRole: p.author_role,
+      authorPosition: p.author_position || '',
       mentions: p.mentions || [],
-      reactions: p.reactions || {},
+      reactions: normHandoverReactions(p.reactions),
       createdAt: p.created_at,
       updatedAt: p.updated_at,
     }));
@@ -1652,10 +1668,12 @@ export const db = {
       mentions: post.mentions,
     };
     if (post.title !== undefined) row.title = post.title;
+    if (post.authorPosition) row.author_position = post.authorPosition;
     let { data, error } = await supabase.from('handover_posts').insert(row).select('id').single();
-    // Coluna 'title' pode não existir ainda em produção — refaz sem ela
-    if (error && /title/i.test(error.message) && row.title !== undefined) {
+    // Colunas 'title'/'author_position' podem não existir ainda — refaz sem elas
+    if (error && /(title|author_position)/i.test(error.message)) {
       delete row.title;
+      delete row.author_position;
       ({ data, error } = await supabase.from('handover_posts').insert(row).select('id').single());
     }
     if (error) { console.error('[saveHandoverPost]', error.message); return null; }
@@ -1695,7 +1713,8 @@ export const db = {
       authorName: c.author_name || '',
       authorPhoto: c.author_photo,
       authorRole: c.author_role,
-      reactions: c.reactions || {},
+      authorPosition: c.author_position || '',
+      reactions: normHandoverReactions(c.reactions),
       createdAt: c.created_at,
       updatedAt: c.updated_at,
     }));
@@ -1712,10 +1731,12 @@ export const db = {
       author_role: comment.authorRole,
     };
     if (comment.parentId) row.parent_id = comment.parentId;
+    if (comment.authorPosition) row.author_position = comment.authorPosition;
     let { data, error } = await supabase.from('handover_comments').insert(row).select('id').single();
-    // Coluna 'parent_id' pode não existir ainda — refaz sem ela
-    if (error && /parent_id/i.test(error.message) && row.parent_id) {
+    // Colunas 'parent_id'/'author_position' podem não existir ainda — refaz sem elas
+    if (error && /(parent_id|author_position)/i.test(error.message)) {
       delete row.parent_id;
+      delete row.author_position;
       ({ data, error } = await supabase.from('handover_comments').insert(row).select('id').single());
     }
     if (error) { console.error('[saveHandoverComment]', error.message); return null; }
@@ -1738,11 +1759,11 @@ export const db = {
     return true;
   },
 
-  // Reações (emoji -> userIds) em posts ou comentários do feed
+  // Reações (emoji -> quem reagiu) em posts ou comentários do feed
   updateHandoverReactions: async (
     kind: 'post' | 'comment',
     id: string,
-    reactions: Record<string, string[]>
+    reactions: Record<string, { id: string; name: string }[]>
   ): Promise<boolean> => {
     if (!supabase) return false;
     const table = kind === 'post' ? 'handover_posts' : 'handover_comments';
