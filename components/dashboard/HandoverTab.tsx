@@ -195,7 +195,7 @@ const PostCard: React.FC<{
 
   // ── Comments state ─────────────────────────────────────────────────────────
   const [comments,          setComments]          = useState<HandoverComment[]>([]);
-  const [showComments,      setShowComments]      = useState(false);
+  const [showAllComments,   setShowAllComments]   = useState(false);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [commentText,       setCommentText]       = useState('');
   const [isPostingComment,  setIsPostingComment]  = useState(false);
@@ -243,11 +243,8 @@ const PostCard: React.FC<{
     setIsLoadingComments(false);
   }, [post.id]);
 
-  const toggleComments = async () => {
-    const willShow = !showComments;
-    setShowComments(willShow);
-    if (willShow) await loadComments();
-  };
+  // Carrega os comentários ao montar para sempre exibir os últimos 3
+  useEffect(() => { loadComments(); }, [loadComments]);
 
   const submitComment = async (parentId?: string) => {
     const text = (parentId ? replyText : commentText).trim();
@@ -477,33 +474,47 @@ const PostCard: React.FC<{
               )}
             </div>
           </div>
-          <button
-            onClick={toggleComments}
-            className={`flex items-center gap-1.5 text-[9px] font-black uppercase transition-colors ${showComments ? 'text-blue-500' : 'text-slate-400 hover:text-blue-500'}`}
-          >
+          <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-slate-400">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
             </svg>
-            {commentCount !== null
-              ? `${commentCount} comentário${commentCount !== 1 ? 's' : ''}`
-              : 'Comentários'
+            {topLevelComments.length > 0
+              ? `${topLevelComments.length} comentário${topLevelComments.length !== 1 ? 's' : ''}`
+              : 'Sem comentários'
             }
-          </button>
+          </div>
         </div>
       )}
 
-      {/* Comments section */}
-      {!isEditingPost && showComments && (
+      {/* Comments section — sempre visível, mostrando os últimos 3 */}
+      {!isEditingPost && (
         <div className="border-t border-slate-50 bg-slate-50/40 px-6 py-4 space-y-3">
-          {isLoadingComments ? (
+          {isLoadingComments && comments.length === 0 ? (
             <div className="flex items-center gap-2 justify-center py-3">
               <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"/>
               <span className="text-[8px] font-bold text-slate-400 uppercase">Carregando...</span>
             </div>
           ) : (
             <>
-              {/* Comment list (com respostas aninhadas) */}
-              {topLevelComments.map(c => (
+              {/* Botão para ver comentários anteriores (além dos últimos 3) */}
+              {!showAllComments && topLevelComments.length > 3 && (
+                <button
+                  onClick={() => setShowAllComments(true)}
+                  className="text-[9px] font-black text-slate-500 hover:text-blue-500 uppercase tracking-wide transition-colors"
+                >
+                  Ver {topLevelComments.length - 3} comentário{topLevelComments.length - 3 !== 1 ? 's' : ''} anterior{topLevelComments.length - 3 !== 1 ? 'es' : ''}
+                </button>
+              )}
+              {showAllComments && topLevelComments.length > 3 && (
+                <button
+                  onClick={() => setShowAllComments(false)}
+                  className="text-[9px] font-black text-slate-400 hover:text-blue-500 uppercase tracking-wide transition-colors"
+                >
+                  Mostrar menos
+                </button>
+              )}
+              {/* Comment list (com respostas aninhadas) — últimos 3 por padrão */}
+              {(showAllComments ? topLevelComments : topLevelComments.slice(-3)).map(c => (
                 <div key={c.id} className="space-y-2">
                   {renderCommentCard(c, false)}
                   {/* Respostas */}
