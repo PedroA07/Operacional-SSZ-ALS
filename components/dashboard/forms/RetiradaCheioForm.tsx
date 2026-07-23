@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Driver, Customer, Port, User } from '../../../types';
 import { jsPDF } from 'jspdf';
-import { printJsPdf } from '../../../utils/printPdf';
+import PdfPreviewModal from '../../shared/PdfPreviewModal';
 import html2canvas from 'html2canvas';
 import RetiradaCheioTemplate from './RetiradaCheioTemplate';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
@@ -36,6 +36,7 @@ const commonPODs = [
 
 const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, customers, ports, onClose, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
+  const [previewPdf, setPreviewPdf] = useState<{ url: string; fileName: string } | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const [plateHorse, setPlateHorse] = useState('');
@@ -138,7 +139,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       const fileName = `RETIRADA CHEIO - ${effectiveDriver!.name} - ${formData.container}.pdf`;
-      if (action === 'print') printJsPdf(pdf, fileName);
+      if (action === 'print') setPreviewPdf({ url: URL.createObjectURL(pdf.output('blob')), fileName });
       else pdf.save(fileName);
     } catch (e) {
       console.error('Erro ao gerar PDF de Retirada de Cheio:', e);
@@ -411,6 +412,10 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
           onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}
         />
       )}
+      {previewPdf && (
+        <PdfPreviewModal url={previewPdf.url} fileName={previewPdf.fileName} onClose={() => setPreviewPdf(null)} />
+      )}
+
     </div>
   );
 };

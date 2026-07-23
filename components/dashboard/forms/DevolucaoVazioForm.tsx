@@ -14,7 +14,7 @@ import CustomSelect from '../../shared/CustomSelect';
 import DateTimePicker from '../../shared/DateTimePicker';
 import { searchService } from '../../../utils/searchService';
 import ConfirmDialog from '../../shared/ConfirmDialog';
-import { printJsPdf } from '../../../utils/printPdf';
+import PdfPreviewModal from '../../shared/PdfPreviewModal';
 
 interface DevolucaoVazioFormProps {
   user?: User;
@@ -39,6 +39,7 @@ const commonPODs = ['SANTOS', 'PARANAGUÁ', 'ITAGUAÍ', 'RIO DE JANEIRO', 'NAVEG
 
 const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, customers, ports, preStackings = [], onClose, devolucao, onSave, initialFormData, tripId, tripOs, onAgendamentoSave }) => {
   const [isExporting, setIsExporting] = useState(false);
+  const [previewPdf, setPreviewPdf] = useState<{ url: string; fileName: string } | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const podRef = useRef<HTMLDivElement>(null);
@@ -257,7 +258,7 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       const fileName = `DEVOLUÇÃO DE VAZIO - ${effectiveDriver!.name} - ${formData.container}.pdf`;
-      if (action === 'print') printJsPdf(pdf, fileName);
+      if (action === 'print') setPreviewPdf({ url: URL.createObjectURL(pdf.output('blob')), fileName });
       else pdf.save(fileName);
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
@@ -500,6 +501,10 @@ const DevolucaoVazioForm: React.FC<DevolucaoVazioFormProps> = ({ user, drivers, 
         }}
         onCancel={() => { setConfirmSemAgendamento(null); setShowDateError(true); }}
       />
+      {previewPdf && (
+        <PdfPreviewModal url={previewPdf.url} fileName={previewPdf.fileName} onClose={() => setPreviewPdf(null)} />
+      )}
+
     </div>
   );
 };

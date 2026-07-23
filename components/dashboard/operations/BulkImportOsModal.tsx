@@ -408,6 +408,14 @@ const BulkImportOsModal: React.FC<BulkImportOsModalProps> = ({ user, onClose, on
                   initialData={buildOcInitial(activeMinuta.item)}
                   tripId={activeMinuta.item.createdTripId}
                   osPdfUrl={activeMinuta.item.osPdfUrl}
+                  onGenerated={async () => {
+                    // OC gerada — sai da fila de pendentes (OC vem antes da liberação de vazio)
+                    const tid = activeMinuta.item.createdTripId;
+                    if (tid) {
+                      try { const all = await db.getTrips(); const fresh = all.find(t => t.id === tid); if (fresh) await db.saveTrip({ ...fresh, importPendente: false }); } catch (e) { console.error(e); }
+                      onImported?.();
+                    }
+                  }}
                 />
               )}
               {activeMinuta.kind === 'liberacao' && (

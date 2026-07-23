@@ -21,9 +21,9 @@ import { localDateStr, localDateTimeStr } from '../../../utils/dateHelpers';
 import { parseAliancaOsPdf, matchCustomer, matchByName, matchOperationType, normalizeKg, resolveClienteDestino } from '../../../utils/aliancaOsParser';
 import { ensureCustomerByCnpj } from '../../../utils/entityAutoRegister';
 import { appendPdfToJsPdf } from '../../../utils/pdfMerger';
-import { printJsPdf } from '../../../utils/printPdf';
 import { fileStorage } from '../../../utils/fileStorage';
 import { fetchFileBlob } from '../../../utils/fileDownloader';
+import PdfPreviewModal from '../../shared/PdfPreviewModal';
 
 interface OrdemColetaFormProps {
   user?: User;
@@ -34,9 +34,12 @@ interface OrdemColetaFormProps {
   initialData?: any;
   tripId?: string;
   osPdfUrl?: string;   // PDF da OS já anexado à trip — exibe no preview lateral ao editar
+  /** Chamado após gerar a OC com sucesso (baixar/imprimir) */
+  onGenerated?: () => void;
 }
 
-const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, customers, ports, onClose, initialData, tripId, osPdfUrl }) => {
+const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, customers, ports, onClose, initialData, tripId, osPdfUrl, onGenerated }) => {
+  const [previewPdf, setPreviewPdf] = useState<{ url: string; fileName: string } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -388,12 +391,14 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
       const fileName = `OC - ${effectiveDriver!.name} - ${formData.os}`;
 
       if (pendingAction === 'print') {
-        // Abre o diálogo de impressão do navegador (sem baixar o arquivo)
-        printJsPdf(pdf, `${fileName}.pdf`);
+        // Abre o PDF em um modal de visualização nativo (imprimir de lá)
+        setPreviewPdf({ url: URL.createObjectURL(pdf.output('blob')), fileName: `${fileName}.pdf` });
       } else {
         pdf.save(`${fileName}.pdf`);
       }
-      
+      // OC gerada com sucesso — notifica (ex.: remover dos pendentes)
+      onGenerated?.();
+
     } catch (e) { 
       console.error(e); 
       alert("Falha ao processar operação no servidor.");
@@ -769,6 +774,10 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
           onClose={() => setQuickAdd(null)}
           onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}
         />
+      )}
+
+      {previewPdf && (
+        <PdfPreviewModal url={previewPdf.url} fileName={previewPdf.fileName} onClose={() => setPreviewPdf(null)} />
       )}
     </div>
   );
