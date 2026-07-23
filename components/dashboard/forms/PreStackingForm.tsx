@@ -14,7 +14,7 @@ import CustomSelect from '../../shared/CustomSelect';
 import QuickRegisterModal, { QuickRegisterType } from '../../shared/QuickRegisterModal';
 import { tripSyncService } from '../../../utils/tripSyncService';
 import { osCategoryService } from '../../../utils/osCategoryService';
-import { printJsPdf } from '../../../utils/printPdf';
+import PdfPreviewModal from '../../shared/PdfPreviewModal';
 
 interface PreStackingFormProps {
   user?: User;
@@ -92,6 +92,7 @@ const normalizeSchedulingFields = (data: any) => {
 
 const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, customers, ports, onClose, initialOS, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
+  const [previewPdf, setPreviewPdf] = useState<{ url: string; fileName: string } | null>(null);
   const [isLoadingTrip, setIsLoadingTrip] = useState(false);
   const [isTerminalDropdownOpen, setIsTerminalDropdownOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -304,7 +305,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
       
       if (pendingAction === 'print') {
         // Abre o diálogo de impressão do navegador (sem baixar o arquivo)
-        printJsPdf(pdf, fileName);
+        setPreviewPdf({ url: URL.createObjectURL(pdf.output('blob')), fileName });
       } else {
         pdf.save(fileName);
       }
@@ -663,6 +664,10 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
           onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}
         />
       )}
+      {previewPdf && (
+        <PdfPreviewModal url={previewPdf.url} fileName={previewPdf.fileName} onClose={() => setPreviewPdf(null)} />
+      )}
+
     </div>
   );
 };

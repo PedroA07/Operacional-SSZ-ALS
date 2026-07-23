@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Driver, Customer, Port, PreStacking, User, Liberacao } from '../../../types';
 import { jsPDF } from 'jspdf';
-import { printJsPdf } from '../../../utils/printPdf';
+import PdfPreviewModal from '../../shared/PdfPreviewModal';
 import html2canvas from 'html2canvas';
 import LiberacaoVazioTemplate from './LiberacaoVazioTemplate';
 import AutocompleteSearch from '../../shared/AutocompleteSearch';
@@ -29,6 +29,7 @@ const commonPODs = ['SANTOS', 'PARANAGUÁ', 'ITAGUAÍ', 'RIO DE JANEIRO', 'NAVEG
 
 const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, customers, ports, preStackings = [], onClose, liberacao, onSave, initialFormData }) => {
   const [isExporting, setIsExporting] = useState(false);
+  const [previewPdf, setPreviewPdf] = useState<{ url: string; fileName: string } | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const podRef = useRef<HTMLDivElement>(null);
@@ -223,7 +224,7 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       const fileName = `LIBERAÇÃO DE VAZIO - ${effectiveDriver.name} - ${formData.booking}.pdf`;
-      if (action === 'print') printJsPdf(pdf, fileName);
+      if (action === 'print') setPreviewPdf({ url: URL.createObjectURL(pdf.output('blob')), fileName });
       else pdf.save(fileName);
     } catch (e) { console.error(e); } finally { setIsExporting(false); }
   };
@@ -426,6 +427,10 @@ const LiberacaoVazioForm: React.FC<LiberacaoVazioFormProps> = ({ user, drivers, 
           onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}
         />
       )}
+      {previewPdf && (
+        <PdfPreviewModal url={previewPdf.url} fileName={previewPdf.fileName} onClose={() => setPreviewPdf(null)} />
+      )}
+
     </div>
   );
 };

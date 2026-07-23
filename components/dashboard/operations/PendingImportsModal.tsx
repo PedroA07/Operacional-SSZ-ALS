@@ -40,8 +40,13 @@ const PendingImportsModal: React.FC<PendingImportsModalProps> = ({ user, trips, 
 
   const removeFromPending = async (trip: Trip) => {
     setBusyId(trip.id);
-    try { await db.saveTrip({ ...trip, importPendente: false }); onRefresh(); }
-    catch (e) { console.error('Erro ao remover dos pendentes:', e); }
+    try {
+      // Usa a versão mais recente da viagem (pode ter sido atualizada ao gerar a OC)
+      let fresh = trip;
+      try { const all = await db.getTrips(); fresh = all.find(t => t.id === trip.id) || trip; } catch { /* usa a local */ }
+      await db.saveTrip({ ...fresh, importPendente: false });
+      onRefresh();
+    } catch (e) { console.error('Erro ao remover dos pendentes:', e); }
     finally { setBusyId(null); }
   };
 
@@ -169,7 +174,7 @@ const PendingImportsModal: React.FC<PendingImportsModalProps> = ({ user, trips, 
             </div>
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
               {activeMinuta.kind === 'oc' && (
-                <OrdemColetaForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={() => setActiveMinuta(null)} initialData={buildOcInitial(activeMinuta.trip)} tripId={activeMinuta.trip.id} osPdfUrl={activeMinuta.trip.osPdfUrl} />
+                <OrdemColetaForm user={user} drivers={drivers} customers={customers} ports={ports} onClose={() => setActiveMinuta(null)} initialData={buildOcInitial(activeMinuta.trip)} tripId={activeMinuta.trip.id} osPdfUrl={activeMinuta.trip.osPdfUrl} onGenerated={() => removeFromPending(activeMinuta.trip)} />
               )}
               {activeMinuta.kind === 'liberacao' && (
                 <LiberacaoVazioForm user={user} drivers={drivers} customers={customers} ports={ports} preStackings={preStacking} onClose={() => setActiveMinuta(null)} initialFormData={buildLiberacaoInitial(activeMinuta.trip)} />
