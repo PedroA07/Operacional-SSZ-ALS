@@ -55,6 +55,76 @@ const relativeTime = (iso: string): string => {
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' });
 };
 
+// ── Emojis / Reações ───────────────────────────────────────────────────────────
+const EMOJIS = ['👍','❤️','😂','🎉','😮','😢','🙏','🔥','✅','❌','👀','💪','👏','🙌','🤝','👌','🫡','😅','😉','🤔','💯','⚠️','⏰','📌','📦','🚛','⚓','🛑','✔️','⭐','😍','🥳'];
+const QUICK_REACTIONS = ['👍','❤️','😂','🎉','👀','✅'];
+
+const toggleReactionMap = (
+  reactions: Record<string, string[]> = {},
+  emoji: string,
+  userId: string
+): Record<string, string[]> => {
+  const next: Record<string, string[]> = {};
+  for (const k of Object.keys(reactions)) next[k] = [...(reactions[k] || [])];
+  const arr = next[emoji] || [];
+  if (arr.includes(userId)) {
+    const filtered = arr.filter(u => u !== userId);
+    if (filtered.length === 0) delete next[emoji];
+    else next[emoji] = filtered;
+  } else {
+    next[emoji] = [...arr, userId];
+  }
+  return next;
+};
+
+// Popover de seleção de emoji (auto-contido, sem libs externas)
+const EmojiPicker: React.FC<{ onPick: (emoji: string) => void; onClose: () => void; align?: 'left' | 'right'; direction?: 'up' | 'down' }> = ({ onPick, onClose, align = 'left', direction = 'up' }) => (
+  <>
+    <div className="fixed inset-0 z-[60]" onMouseDown={onClose} />
+    <div className={`absolute z-[61] ${direction === 'down' ? 'top-full mt-2' : 'bottom-full mb-2'} ${align === 'right' ? 'right-0' : 'left-0'} bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 grid grid-cols-8 gap-0.5 w-64 max-h-52 overflow-y-auto`}>
+      {EMOJIS.map(e => (
+        <button key={e} type="button" onMouseDown={ev => { ev.preventDefault(); onPick(e); }}
+          className="w-7 h-7 rounded-lg hover:bg-slate-100 text-[17px] leading-none flex items-center justify-center transition-colors">
+          {e}
+        </button>
+      ))}
+    </div>
+  </>
+);
+
+// Barra de reações (chips com contagem + botão de reagir)
+const ReactionBar: React.FC<{
+  reactions: Record<string, string[]>;
+  userId: string;
+  onToggle: (emoji: string) => void;
+}> = ({ reactions, userId, onToggle }) => {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const entries = Object.entries(reactions || {}).filter(([, u]) => (u || []).length > 0);
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      {entries.map(([emoji, users]) => {
+        const mine = users.includes(userId);
+        return (
+          <button key={emoji} type="button" onClick={() => onToggle(emoji)}
+            title={`${users.length} reaç${users.length > 1 ? 'ões' : 'ão'}`}
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-black transition-all ${mine ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+            <span className="text-[12px] leading-none">{emoji}</span>{users.length}
+          </button>
+        );
+      })}
+      <div className="relative">
+        <button type="button" onClick={() => setPickerOpen(v => !v)} title="Reagir"
+          className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-slate-200 text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-all">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </button>
+        {pickerOpen && (
+          <EmojiPicker onPick={e => { onToggle(e); setPickerOpen(false); }} onClose={() => setPickerOpen(false)} />
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ── Post Card (self-contained with comments + edit) ───────────────────────────
 const PostCard: React.FC<{
   post: HandoverPost;
@@ -114,6 +184,38 @@ const PostCard: React.FC<{
   const [editingCommentId,  setEditingCommentId]  = useState<string | null>(null);
   const [editCommentText,   setEditCommentText]   = useState('');
   const [commentCount,      setCommentCount]      = useState<number | null>(null);
+  const [replyingTo,        setReplyingTo]        = useState<string | null>(null);
+  const [replyText,         setReplyText]         = useState('');
+  const [commentEmojiOpen,  setCommentEmojiOpen]  = useState(false);
+  const [replyEmojiOpen,    setReplyEmojiOpen]    = useState(false);
+
+  // ── Reações do post ──────────────────────────────────────────────────────────
+  const [postReactions, setPostReactions] = useState<Record<string, string[]>>(post.reactions || {});
+  const [postEmojiOpen, setPostEmojiOpen] = useState(false);
+  // Mantém as reações sincronizadas quando o feed recarrega (realtime)
+  useEffect(() => { setPostReactions(post.reactions || {}); }, [post.reactions]);
+  const togglePostReaction = async (emoji: string) => {
+    const next = toggleReactionMap(postReactions, emoji, currentUser.id);
+    setPostReactions(next);
+    const ok = await db.updateHandoverReactions('post', post.id, next);
+    if (!ok) { setPostReactions(post.reactions || {}); showToast('Erro ao reagir'); }
+  };
+
+  const toggleCommentReaction = async (commentId: string, emoji: string) => {
+    let previous: Record<string, string[]> = {};
+    setComments(prev => prev.map(c => {
+      if (c.id !== commentId) return c;
+      previous = c.reactions || {};
+      return { ...c, reactions: toggleReactionMap(c.reactions || {}, emoji, currentUser.id) };
+    }));
+    const target = comments.find(c => c.id === commentId);
+    const next = toggleReactionMap(target?.reactions || {}, emoji, currentUser.id);
+    const ok = await db.updateHandoverReactions('comment', commentId, next);
+    if (!ok) {
+      setComments(prev => prev.map(c => c.id === commentId ? { ...c, reactions: previous } : c));
+      showToast('Erro ao reagir');
+    }
+  };
 
   const loadComments = useCallback(async () => {
     setIsLoadingComments(true);
@@ -129,18 +231,21 @@ const PostCard: React.FC<{
     if (willShow) await loadComments();
   };
 
-  const submitComment = async () => {
-    if (!commentText.trim()) return;
+  const submitComment = async (parentId?: string) => {
+    const text = (parentId ? replyText : commentText).trim();
+    if (!text) return;
     setIsPostingComment(true);
     await db.saveHandoverComment({
       postId:      post.id,
-      content:     commentText.trim(),
+      parentId,
+      content:     text,
       authorId:    currentUser.id,
       authorName:  currentUser.displayName,
       authorPhoto: currentUser.photo,
       authorRole:  currentUser.role,
     });
-    setCommentText('');
+    if (parentId) { setReplyText(''); setReplyingTo(null); }
+    else setCommentText('');
     await loadComments();
     setIsPostingComment(false);
   };
@@ -166,6 +271,77 @@ const PostCard: React.FC<{
 
   const canEditPost = withinWindow(post.createdAt, post.authorId);
   const canDelete   = currentUser.id === post.authorId || isAdmin;
+
+  const topLevelComments = comments.filter(c => !c.parentId);
+  const repliesOf = (id: string) => comments.filter(c => c.parentId === id);
+
+  const renderCommentCard = (c: HandoverComment, isReply: boolean) => {
+    const cCanEdit = withinWindow(c.createdAt, c.authorId);
+    const cCanDel  = currentUser.id === c.authorId || isAdmin;
+    return (
+      <div key={c.id} className="flex gap-2.5 group">
+        <div className={`${isReply ? 'w-6 h-6' : 'w-7 h-7'} rounded-xl overflow-hidden bg-slate-100 shrink-0 mt-0.5 border border-slate-100`}>
+          {c.authorPhoto
+            ? <img src={c.authorPhoto} className="w-full h-full object-cover" alt="" />
+            : <div className="w-full h-full flex items-center justify-center text-slate-400 font-black text-[9px]">{c.authorName.charAt(0)}</div>
+          }
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="bg-white rounded-2xl px-3 py-2 border border-slate-100">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[9px] font-black text-slate-600 uppercase">{c.authorName}</span>
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                {cCanEdit && editingCommentId !== c.id && (
+                  <button onClick={() => { setEditingCommentId(c.id); setEditCommentText(c.content); }} title="Editar" className="p-1 text-slate-300 hover:text-blue-500 rounded-lg transition-all">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  </button>
+                )}
+                {cCanDel && (
+                  <button onClick={() => deleteComment(c.id)} title="Excluir" className="p-1 text-slate-300 hover:text-red-500 rounded-lg transition-all">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                )}
+              </div>
+            </div>
+            {editingCommentId === c.id ? (
+              <div className="space-y-2">
+                <textarea
+                  value={editCommentText}
+                  onChange={e => setEditCommentText(e.target.value)}
+                  className="w-full px-2 py-1.5 rounded-xl border border-blue-200 text-[10px] font-medium resize-none outline-none focus:border-blue-400 bg-blue-50/20"
+                  rows={2}
+                  autoFocus
+                />
+                <div className="flex gap-1.5 justify-end">
+                  <button onClick={() => setEditingCommentId(null)} className="px-3 py-1 rounded-lg border border-slate-200 text-[8px] font-black text-slate-500 uppercase transition-all hover:bg-slate-50">
+                    Cancelar
+                  </button>
+                  <button onClick={() => saveEditComment(c.id)} className="px-3 py-1 bg-blue-600 rounded-lg text-[8px] font-black text-white uppercase hover:bg-blue-700 transition-all">
+                    Salvar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[10px] text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">{c.content}
+                {c.updatedAt && <span className="text-[7px] text-slate-300 ml-1">· editado</span>}
+              </p>
+            )}
+          </div>
+          {/* Meta + ações do comentário */}
+          <div className="flex items-center gap-2 mt-1 ml-2 flex-wrap">
+            <span className="text-[7px] font-bold text-slate-400 uppercase">{relativeTime(c.createdAt)}</span>
+            {!isReply && (
+              <button onClick={() => { setReplyingTo(prev => prev === c.id ? null : c.id); setReplyText(''); }}
+                className="text-[7px] font-black text-slate-400 hover:text-blue-500 uppercase transition-colors">
+                Responder
+              </button>
+            )}
+            <ReactionBar reactions={c.reactions || {}} userId={currentUser.id} onToggle={(e) => toggleCommentReaction(c.id, e)} />
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
@@ -244,7 +420,39 @@ const PostCard: React.FC<{
 
       {/* Action bar */}
       {!isEditingPost && (
-        <div className="px-6 pb-3 pt-1 border-t border-slate-50">
+        <div className="px-6 pb-3 pt-1 border-t border-slate-50 space-y-2">
+          {/* Reações do post */}
+          <div className="flex items-center gap-1.5 flex-wrap pt-1">
+            {QUICK_REACTIONS.map(e => {
+              const users = postReactions[e] || [];
+              const mine = users.includes(currentUser.id);
+              return (
+                <button key={e} type="button" onClick={() => togglePostReaction(e)}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-black transition-all ${mine ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:border-blue-300 hover:text-blue-500'}`}>
+                  <span className="text-[13px] leading-none">{e}</span>{users.length > 0 && users.length}
+                </button>
+              );
+            })}
+            {/* reações extras já aplicadas que não estão na barra rápida */}
+            {Object.entries(postReactions).filter(([e, u]) => !QUICK_REACTIONS.includes(e) && (u || []).length > 0).map(([e, users]) => {
+              const mine = users.includes(currentUser.id);
+              return (
+                <button key={e} type="button" onClick={() => togglePostReaction(e)}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-black transition-all ${mine ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                  <span className="text-[13px] leading-none">{e}</span>{users.length}
+                </button>
+              );
+            })}
+            <div className="relative">
+              <button type="button" onClick={() => setPostEmojiOpen(v => !v)} title="Mais emojis"
+                className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-slate-200 text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-all">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+              </button>
+              {postEmojiOpen && (
+                <EmojiPicker onPick={e => { togglePostReaction(e); setPostEmojiOpen(false); }} onClose={() => setPostEmojiOpen(false)} />
+              )}
+            </div>
+          </div>
           <button
             onClick={toggleComments}
             className={`flex items-center gap-1.5 text-[9px] font-black uppercase transition-colors ${showComments ? 'text-blue-500' : 'text-slate-400 hover:text-blue-500'}`}
@@ -270,64 +478,53 @@ const PostCard: React.FC<{
             </div>
           ) : (
             <>
-              {/* Comment list */}
-              {comments.map(c => {
-                const cCanEdit = withinWindow(c.createdAt, c.authorId);
-                const cCanDel  = currentUser.id === c.authorId || isAdmin;
-                return (
-                  <div key={c.id} className="flex gap-2.5 group">
-                    <div className="w-7 h-7 rounded-xl overflow-hidden bg-slate-100 shrink-0 mt-0.5 border border-slate-100">
-                      {c.authorPhoto
-                        ? <img src={c.authorPhoto} className="w-full h-full object-cover" alt="" />
-                        : <div className="w-full h-full flex items-center justify-center text-slate-400 font-black text-[9px]">{c.authorName.charAt(0)}</div>
-                      }
+              {/* Comment list (com respostas aninhadas) */}
+              {topLevelComments.map(c => (
+                <div key={c.id} className="space-y-2">
+                  {renderCommentCard(c, false)}
+                  {/* Respostas */}
+                  {repliesOf(c.id).length > 0 && (
+                    <div className="ml-9 space-y-2 border-l-2 border-slate-100 pl-3">
+                      {repliesOf(c.id).map(r => renderCommentCard(r, true))}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="bg-white rounded-2xl px-3 py-2 border border-slate-100">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[9px] font-black text-slate-600 uppercase">{c.authorName}</span>
-                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {cCanEdit && editingCommentId !== c.id && (
-                              <button onClick={() => { setEditingCommentId(c.id); setEditCommentText(c.content); }} className="p-1 text-slate-300 hover:text-blue-500 rounded-lg transition-all">
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                              </button>
-                            )}
-                            {cCanDel && (
-                              <button onClick={() => deleteComment(c.id)} className="p-1 text-slate-300 hover:text-red-500 rounded-lg transition-all">
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                              </button>
-                            )}
-                          </div>
+                  )}
+                  {/* Campo de resposta */}
+                  {replyingTo === c.id && (
+                    <div className="ml-9 flex gap-2 pl-3">
+                      <div className="flex-1 relative flex gap-2">
+                        <div className="flex-1 relative">
+                          <textarea
+                            value={replyText}
+                            onChange={e => setReplyText(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(c.id); } }}
+                            placeholder={`Responder a ${c.authorName}...`}
+                            className="w-full pl-3 pr-8 py-2 bg-white rounded-2xl border border-slate-200 text-[10px] font-medium resize-none outline-none focus:border-blue-300 transition-colors"
+                            rows={1}
+                            autoFocus
+                          />
+                          <button type="button" onClick={() => setReplyEmojiOpen(v => !v)} title="Emoji"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-blue-500 transition-colors">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                          </button>
+                          {replyEmojiOpen && (
+                            <EmojiPicker align="right" onPick={e => { setReplyText(t => t + e); setReplyEmojiOpen(false); }} onClose={() => setReplyEmojiOpen(false)} />
+                          )}
                         </div>
-                        {editingCommentId === c.id ? (
-                          <div className="space-y-2">
-                            <textarea
-                              value={editCommentText}
-                              onChange={e => setEditCommentText(e.target.value)}
-                              className="w-full px-2 py-1.5 rounded-xl border border-blue-200 text-[10px] font-medium resize-none outline-none focus:border-blue-400 bg-blue-50/20"
-                              rows={2}
-                              autoFocus
-                            />
-                            <div className="flex gap-1.5 justify-end">
-                              <button onClick={() => setEditingCommentId(null)} className="px-3 py-1 rounded-lg border border-slate-200 text-[8px] font-black text-slate-500 uppercase transition-all hover:bg-slate-50">
-                                Cancelar
-                              </button>
-                              <button onClick={() => saveEditComment(c.id)} className="px-3 py-1 bg-blue-600 rounded-lg text-[8px] font-black text-white uppercase hover:bg-blue-700 transition-all">
-                                Salvar
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-[10px] text-slate-700 font-medium leading-relaxed">{c.content}
-                            {c.updatedAt && <span className="text-[7px] text-slate-300 ml-1">· editado</span>}
-                          </p>
-                        )}
+                        <button
+                          onClick={() => submitComment(c.id)}
+                          disabled={!replyText.trim() || isPostingComment}
+                          className="px-3 py-2 bg-blue-600 rounded-2xl text-[9px] font-black text-white uppercase hover:bg-blue-700 disabled:opacity-40 transition-all shrink-0 flex items-center"
+                        >
+                          {isPostingComment
+                            ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>
+                            : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                          }
+                        </button>
                       </div>
-                      <p className="text-[7px] font-bold text-slate-400 uppercase mt-1 ml-2">{relativeTime(c.createdAt)}</p>
                     </div>
-                  </div>
-                );
-              })}
+                  )}
+                </div>
+              ))}
 
               {/* New comment input */}
               <div className="flex gap-2.5 pt-2 border-t border-slate-100">
@@ -338,16 +535,25 @@ const PostCard: React.FC<{
                   }
                 </div>
                 <div className="flex-1 flex gap-2">
-                  <textarea
-                    value={commentText}
-                    onChange={e => setCommentText(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(); } }}
-                    placeholder="Escrever comentário... (Enter para enviar)"
-                    className="flex-1 px-3 py-2 bg-white rounded-2xl border border-slate-200 text-[10px] font-medium resize-none outline-none focus:border-blue-300 transition-colors"
-                    rows={1}
-                  />
+                  <div className="flex-1 relative">
+                    <textarea
+                      value={commentText}
+                      onChange={e => setCommentText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(); } }}
+                      placeholder="Escrever comentário... (Enter para enviar)"
+                      className="w-full pl-3 pr-8 py-2 bg-white rounded-2xl border border-slate-200 text-[10px] font-medium resize-none outline-none focus:border-blue-300 transition-colors"
+                      rows={1}
+                    />
+                    <button type="button" onClick={() => setCommentEmojiOpen(v => !v)} title="Emoji"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-blue-500 transition-colors">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </button>
+                    {commentEmojiOpen && (
+                      <EmojiPicker align="right" onPick={e => { setCommentText(t => t + e); setCommentEmojiOpen(false); }} onClose={() => setCommentEmojiOpen(false)} />
+                    )}
+                  </div>
                   <button
-                    onClick={submitComment}
+                    onClick={() => submitComment()}
                     disabled={!commentText.trim() || isPostingComment}
                     className="px-3 py-2 bg-blue-600 rounded-2xl text-[9px] font-black text-white uppercase hover:bg-blue-700 disabled:opacity-40 transition-all shrink-0 flex items-center"
                   >
@@ -382,6 +588,7 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
   const [isEmpty,   setIsEmpty]   = useState(true);
   const [title,     setTitle]     = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [composerEmojiOpen, setComposerEmojiOpen] = useState(false);
   const [mentions,  setMentions]  = useState<HandoverMention[]>([]);
 
   // ── Mention picker state
@@ -839,6 +1046,19 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
                 className="hidden"
                 onChange={e => { handleFilesSelected(e.target.files); e.target.value = ''; }}
               />
+              <div className="relative">
+                <button
+                  type="button"
+                  title="Inserir emoji"
+                  onMouseDown={e => { e.preventDefault(); setComposerEmojiOpen(v => !v); }}
+                  className={`w-7 h-7 flex items-center justify-center rounded-lg text-[15px] transition-all ${composerEmojiOpen ? 'bg-blue-600' : 'hover:bg-slate-100'}`}
+                >
+                  😊
+                </button>
+                {composerEmojiOpen && (
+                  <EmojiPicker direction="down" onPick={e => { insertHtmlAtCursor(e); setComposerEmojiOpen(false); }} onClose={() => setComposerEmojiOpen(false)} />
+                )}
+              </div>
               <div className="w-px h-5 bg-slate-200 mx-1" />
               <button
                 type="button"

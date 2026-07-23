@@ -327,6 +327,7 @@ export interface HandoverPost {
   authorPhoto?: string;
   authorRole?: string;
   mentions: HandoverMention[];
+  reactions?: Record<string, string[]>; // emoji -> lista de userIds
   createdAt: string;
   updatedAt?: string;
 }
@@ -334,11 +335,13 @@ export interface HandoverPost {
 export interface HandoverComment {
   id: string;
   postId: string;
+  parentId?: string; // resposta a outro comentário
   content: string;
   authorId: string;
   authorName: string;
   authorPhoto?: string;
   authorRole?: string;
+  reactions?: Record<string, string[]>; // emoji -> lista de userIds
   createdAt: string;
   updatedAt?: string;
 }
