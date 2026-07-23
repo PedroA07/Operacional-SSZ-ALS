@@ -330,6 +330,21 @@ export interface HandoverAttachment {
   width?: number; // largura de exibição em px (imagens redimensionáveis)
 }
 
+export interface HandoverNotification {
+  id: string;
+  recipientUserId?: string;
+  recipientStaffId?: string;
+  recipientName?: string;
+  actorId?: string;
+  actorName?: string;
+  type: 'mention' | 'reply' | 'mark';
+  postId?: string;
+  commentId?: string;
+  excerpt?: string;
+  read: boolean;
+  createdAt: string;
+}
+
 export interface HandoverPost {
   id: string;
   title?: string; // Título opcional do post

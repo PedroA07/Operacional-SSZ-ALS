@@ -3,7 +3,7 @@ import {
   User, Driver, Customer, Port, PreStacking, Staff, Trip, Category,
   Notification, AvantidaRecord, AvantidaPriceRule, SealBatch, SealRecord, StaySession,
   StayRecord, NotificationType, NotificationOrigin, PresenceStatus,
-  LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, DutySwapRequest,
+  LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, HandoverNotification, DutySwapRequest,
   BotGroup, BotAutomation, FreightContract, Beneficiary, MonitoredShip, ShipTerminalConfig, Ship,
   Devolucao, DevolucaoStatus, Liberacao, LiberacaoStatus,
   FreightRoute, FreightVehicleType
@@ -1776,6 +1776,70 @@ export const db = {
     const { error } = await supabase.from(table).update({ reactions }).eq('id', id);
     if (error) { console.error('[updateHandoverReactions]', error.message); return false; }
     return true;
+  },
+
+  // ── Notificações do Feed ────────────────────────────────────────────────────
+  createHandoverNotification: async (n: Omit<HandoverNotification, 'id' | 'read' | 'createdAt'>): Promise<void> => {
+    if (!supabase) return;
+    // Não notifica a si mesmo
+    if (n.actorId && (n.actorId === n.recipientUserId)) return;
+    const { error } = await supabase.from('handover_notifications').insert({
+      recipient_user_id:  n.recipientUserId || null,
+      recipient_staff_id: n.recipientStaffId || null,
+      recipient_name:     n.recipientName || null,
+      actor_id:           n.actorId || null,
+      actor_name:         n.actorName || null,
+      type:               n.type,
+      post_id:            n.postId || null,
+      comment_id:         n.commentId || null,
+      excerpt:            n.excerpt || null,
+    });
+    if (error) console.error('[createHandoverNotification]', error.message);
+  },
+
+  getHandoverNotifications: async (userId?: string, staffId?: string): Promise<HandoverNotification[]> => {
+    if (!supabase) return [];
+    const ors: string[] = [];
+    if (userId)  ors.push(`recipient_user_id.eq.${userId}`);
+    if (staffId) ors.push(`recipient_staff_id.eq.${staffId}`);
+    if (ors.length === 0) return [];
+    const { data, error } = await supabase
+      .from('handover_notifications')
+      .select('*')
+      .or(ors.join(','))
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) { console.error('[getHandoverNotifications]', error.message); return []; }
+    return (data || []).map(r => ({
+      id: String(r.id),
+      recipientUserId: r.recipient_user_id || undefined,
+      recipientStaffId: r.recipient_staff_id || undefined,
+      recipientName: r.recipient_name || undefined,
+      actorId: r.actor_id || undefined,
+      actorName: r.actor_name || undefined,
+      type: (r.type || 'mention') as HandoverNotification['type'],
+      postId: r.post_id || undefined,
+      commentId: r.comment_id || undefined,
+      excerpt: r.excerpt || undefined,
+      read: !!r.read,
+      createdAt: r.created_at,
+    }));
+  },
+
+  markHandoverNotificationRead: async (id: string): Promise<void> => {
+    if (!supabase) return;
+    const { error } = await supabase.from('handover_notifications').update({ read: true }).eq('id', id);
+    if (error) console.error('[markHandoverNotificationRead]', error.message);
+  },
+
+  markAllHandoverNotificationsRead: async (userId?: string, staffId?: string): Promise<void> => {
+    if (!supabase) return;
+    const ors: string[] = [];
+    if (userId)  ors.push(`recipient_user_id.eq.${userId}`);
+    if (staffId) ors.push(`recipient_staff_id.eq.${staffId}`);
+    if (ors.length === 0) return;
+    const { error } = await supabase.from('handover_notifications').update({ read: true }).or(ors.join(',')).eq('read', false);
+    if (error) console.error('[markAllHandoverNotificationsRead]', error.message);
   },
 
   getHandoverEditWindow: async (): Promise<number> => {

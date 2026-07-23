@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { User, Trip, Driver, Customer, Port, HandoverPost, HandoverComment, HandoverMention, HandoverAttachment, Staff, DutySwapRequest } from '../../types';
+import { User, Trip, Driver, Customer, Port, HandoverPost, HandoverComment, HandoverMention, HandoverAttachment, HandoverNotification, Staff, DutySwapRequest } from '../../types';
 import { db, supabase } from '../../utils/storage';
 import { showToast } from '../shared/SimpleToast';
 import CustomSelect from '../shared/CustomSelect';
@@ -380,6 +380,17 @@ const PostCard: React.FC<{
       authorRole:  currentUser.role,
       authorPosition: currentUser.position,
     });
+    // Notificação: resposta a um comentário → autor do comentário;
+    // comentário no post → autor do post.
+    const excerpt = text || (atts.length ? '[anexo]' : (extra?.stickerUrl ? '[GIF]' : ''));
+    if (parentId) {
+      const parent = comments.find(c => c.id === parentId);
+      if (parent && parent.authorId !== currentUser.id) {
+        db.createHandoverNotification({ recipientUserId: parent.authorId, recipientName: parent.authorName, actorId: currentUser.id, actorName: currentUser.displayName, type: 'reply', postId: post.id, commentId: parentId, excerpt });
+      }
+    } else if (post.authorId !== currentUser.id) {
+      db.createHandoverNotification({ recipientUserId: post.authorId, recipientName: post.authorName, actorId: currentUser.id, actorName: currentUser.displayName, type: 'reply', postId: post.id, excerpt });
+    }
     if (parentId) { setReplyText(''); setReplyingTo(null); }
     else { setCommentText(''); setPendingAtts([]); }
     await loadComments();
@@ -846,6 +857,38 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
     return map;
   }, [posts]);
 
+  // ── Notificações do feed (menções, respostas, marcações) ──────────────────
+  const notifStaffId = (user as any).staffId as string | undefined | null;
+  const [notifications, setNotifications] = useState<HandoverNotification[]>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const loadNotifications = useCallback(async () => {
+    const list = await db.getHandoverNotifications(user.id, notifStaffId || undefined);
+    setNotifications(list);
+  }, [user.id, notifStaffId]);
+  const unreadNotif = notifications.filter(n => !n.read).length;
+  useEffect(() => {
+    loadNotifications();
+    if (!supabase) return;
+    const ch = supabase
+      .channel('handover-notif-' + Math.random().toString(36).slice(2, 7))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'handover_notifications' }, () => loadNotifications())
+      .subscribe();
+    return () => { supabase!.removeChannel(ch); };
+  }, [loadNotifications]);
+  const markAllNotifRead = async () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    await db.markAllHandoverNotificationsRead(user.id, notifStaffId || undefined);
+  };
+  const openNotif = async (n: HandoverNotification) => {
+    if (!n.read) { setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x)); await db.markHandoverNotificationRead(n.id); }
+  };
+  const notifText = (n: HandoverNotification) => {
+    const who = n.actorName || 'Alguém';
+    if (n.type === 'mention' || n.type === 'mark') return `${who} marcou você em uma publicação`;
+    if (n.commentId) return `${who} respondeu seu comentário`;
+    return `${who} comentou na sua publicação`;
+  };
+
   // ── Composer state
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -1215,6 +1258,11 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
       setIsPosting(false);
       return;
     }
+    // Notifica os usuários marcados (menções do tipo 'user')
+    const excerpt = title.trim() || (el.innerText || '').trim().slice(0, 80);
+    mentions.filter(m => m.type === 'user').forEach(m => {
+      db.createHandoverNotification({ recipientStaffId: m.id, recipientName: m.label, actorId: user.id, actorName: user.displayName, type: 'mention', postId: id, excerpt });
+    });
     el.innerHTML = '';
     setIsEmpty(true);
     setTitle('');
@@ -1254,6 +1302,51 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
             <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5 tracking-wider">Feed de comunicação da equipe</p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Sino de notificações */}
+            <div className="relative">
+              <button
+                onClick={() => setNotifOpen(v => !v)}
+                className={`relative p-2 bg-white rounded-xl border transition-all ${notifOpen ? 'border-blue-400 text-blue-600' : 'border-slate-200 text-slate-400 hover:text-blue-600'}`}
+                title="Notificações"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                </svg>
+                {unreadNotif > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[8px] font-black leading-none ring-2 ring-white">
+                    {unreadNotif > 9 ? '9+' : unreadNotif}
+                  </span>
+                )}
+              </button>
+              {notifOpen && (
+                <>
+                  <div className="fixed inset-0 z-[60]" onClick={() => setNotifOpen(false)} />
+                  <div className="absolute z-[61] right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                      <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Notificações</span>
+                      {unreadNotif > 0 && (
+                        <button onClick={markAllNotifRead} className="text-[8px] font-black text-blue-500 hover:text-blue-700 uppercase">Marcar todas lidas</button>
+                      )}
+                    </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <p className="text-[9px] font-bold text-slate-400 uppercase text-center py-8">Sem notificações</p>
+                      ) : notifications.map(n => (
+                        <button key={n.id} onClick={() => openNotif(n)}
+                          className={`w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition-colors flex gap-2.5 ${n.read ? '' : 'bg-blue-50/40'}`}>
+                          <span className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${n.read ? 'bg-transparent' : 'bg-blue-500'}`} />
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold text-slate-700 leading-snug">{notifText(n)}</p>
+                            {n.excerpt && <p className="text-[9px] text-slate-400 truncate mt-0.5">"{n.excerpt}"</p>}
+                            <p className="text-[7px] font-black text-slate-400 uppercase mt-0.5">{relativeTime(n.createdAt)}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             <button
               onClick={load}
               className="p-2 bg-white rounded-xl border border-slate-200 text-slate-400 hover:text-blue-600 transition-all"
