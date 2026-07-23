@@ -1709,6 +1709,7 @@ export const db = {
       postId: c.post_id,
       parentId: c.parent_id || undefined,
       content: c.content || '',
+      stickerUrl: c.sticker_url || undefined,
       authorId: c.author_id || '',
       authorName: c.author_name || '',
       authorPhoto: c.author_photo,
@@ -1732,11 +1733,13 @@ export const db = {
     };
     if (comment.parentId) row.parent_id = comment.parentId;
     if (comment.authorPosition) row.author_position = comment.authorPosition;
+    if (comment.stickerUrl) row.sticker_url = comment.stickerUrl;
     let { data, error } = await supabase.from('handover_comments').insert(row).select('id').single();
-    // Colunas 'parent_id'/'author_position' podem não existir ainda — refaz sem elas
-    if (error && /(parent_id|author_position)/i.test(error.message)) {
+    // Colunas opcionais podem não existir ainda — refaz sem elas
+    if (error && /(parent_id|author_position|sticker_url)/i.test(error.message)) {
       delete row.parent_id;
       delete row.author_position;
+      delete row.sticker_url;
       ({ data, error } = await supabase.from('handover_comments').insert(row).select('id').single());
     }
     if (error) { console.error('[saveHandoverComment]', error.message); return null; }
