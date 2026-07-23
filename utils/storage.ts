@@ -1623,6 +1623,7 @@ export const db = {
       authorPhoto: p.author_photo,
       authorRole: p.author_role,
       mentions: p.mentions || [],
+      reactions: p.reactions || {},
       createdAt: p.created_at,
       updatedAt: p.updated_at,
     }));
@@ -1676,11 +1677,13 @@ export const db = {
     return (data || []).map(c => ({
       id: String(c.id),
       postId: c.post_id,
+      parentId: c.parent_id || undefined,
       content: c.content || '',
       authorId: c.author_id || '',
       authorName: c.author_name || '',
       authorPhoto: c.author_photo,
       authorRole: c.author_role,
+      reactions: c.reactions || {},
       createdAt: c.created_at,
       updatedAt: c.updated_at,
     }));
@@ -1688,14 +1691,21 @@ export const db = {
 
   saveHandoverComment: async (comment: Omit<HandoverComment, 'id' | 'createdAt' | 'updatedAt'>): Promise<string | null> => {
     if (!supabase) return null;
-    const { data, error } = await supabase.from('handover_comments').insert({
+    const row: any = {
       post_id: comment.postId,
       content: comment.content,
       author_id: comment.authorId,
       author_name: comment.authorName,
       author_photo: comment.authorPhoto,
       author_role: comment.authorRole,
-    }).select('id').single();
+    };
+    if (comment.parentId) row.parent_id = comment.parentId;
+    let { data, error } = await supabase.from('handover_comments').insert(row).select('id').single();
+    // Coluna 'parent_id' pode não existir ainda — refaz sem ela
+    if (error && /parent_id/i.test(error.message) && row.parent_id) {
+      delete row.parent_id;
+      ({ data, error } = await supabase.from('handover_comments').insert(row).select('id').single());
+    }
     if (error) { console.error('[saveHandoverComment]', error.message); return null; }
     return String(data?.id);
   },
@@ -1713,6 +1723,19 @@ export const db = {
     if (!supabase) return false;
     const { error } = await supabase.from('handover_comments').delete().eq('id', id);
     if (error) { console.error('[deleteHandoverComment]', error.message); return false; }
+    return true;
+  },
+
+  // Reações (emoji -> userIds) em posts ou comentários do feed
+  updateHandoverReactions: async (
+    kind: 'post' | 'comment',
+    id: string,
+    reactions: Record<string, string[]>
+  ): Promise<boolean> => {
+    if (!supabase) return false;
+    const table = kind === 'post' ? 'handover_posts' : 'handover_comments';
+    const { error } = await supabase.from(table).update({ reactions }).eq('id', id);
+    if (error) { console.error('[updateHandoverReactions]', error.message); return false; }
     return true;
   },
 
