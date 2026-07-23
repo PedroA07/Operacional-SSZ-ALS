@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { User, Trip, Driver, Customer, Port, HandoverPost, HandoverComment, HandoverMention, Staff, DutySwapRequest } from '../../types';
+import { User, Trip, Driver, Customer, Port, HandoverPost, HandoverComment, HandoverMention, HandoverAttachment, Staff, DutySwapRequest } from '../../types';
 import { db, supabase } from '../../utils/storage';
 import { showToast } from '../shared/SimpleToast';
 import CustomSelect from '../shared/CustomSelect';
@@ -70,6 +70,44 @@ const EMOJIS = [
 const DEFAULT_TOP = ['👍','❤️','😂'];
 const EMOJI_USAGE_KEY = 'als_emoji_usage';
 
+// Palavras-chave (PT) para pesquisar emojis no seletor
+const EMOJI_KEYWORDS: Record<string, string> = {
+  '👍':'joia positivo curtir like ok bom','👎':'negativo ruim nao dislike','❤️':'coracao amor vermelho like',
+  '🔥':'fogo top incrivel bombando','🎉':'festa parabens comemorar','😂':'risada chorar rindo engracado',
+  '🤣':'rolando risada gargalhada','😅':'alivio suor nervoso','😊':'feliz sorriso contente','😍':'apaixonado amor olhos',
+  '🥰':'amor carinho feliz','😘':'beijo','😎':'legal descolado oculos','🤩':'maravilhado estrela uau',
+  '🥳':'festa aniversario comemorar','😇':'anjo santo','🙂':'sorriso leve','😉':'piscada','😌':'aliviado calmo',
+  '😴':'sono dormindo cansado','🤔':'pensando duvida','🤨':'desconfiado duvida','😐':'neutro serio',
+  '😶':'sem palavras mudo','🙄':'revirar olhos','😏':'malicioso sorriso','😥':'triste preocupado','😮':'surpreso uau',
+  '😯':'surpreso','😲':'chocado surpreso','😳':'envergonhado vermelho','🥺':'suplicando pidao carinha',
+  '😢':'triste choro lagrima','😭':'chorando muito triste','😤':'bufando irritado','😡':'raiva bravo',
+  '🤬':'palavrao xingando raiva','🤯':'explodindo mente chocado','😱':'grito medo susto','😨':'medo assustado',
+  '😰':'ansioso suor medo','😓':'suor cansado','🤗':'abraco','🤭':'risinho tapando boca','🤫':'silencio segredo',
+  '🤥':'mentira','😬':'constrangido nervoso','🙃':'de cabeca para baixo ironia','😜':'lingua brincadeira',
+  '😝':'lingua zoar','🤪':'doido maluco','🤢':'enjoo nojo','🤮':'vomito nojo','🤧':'espirro resfriado',
+  '😷':'mascara doente','🤒':'febre doente','🤕':'machucado','🥴':'tonto bebado','🤠':'caubói chapeu',
+  '👏':'palmas parabens aplausos','🙌':'maos ceu comemorar','🤝':'aperto de mao acordo negocio','🙏':'obrigado orando por favor',
+  '💪':'forca musculo','👌':'ok perfeito','✌️':'paz vitoria','🤞':'torcendo sorte','🤙':'e ai relax',
+  '👊':'soco toca aqui','✊':'punho forca','🫡':'continencia respeito','🫠':'derretendo','🫶':'coracao maos amor',
+  '👋':'oi tchau aceno','✋':'pare mao','👇':'para baixo','👈':'esquerda','👉':'direita','👆':'para cima',
+  '☝️':'atencao um dedo','💯':'cem nota maxima top','✅':'certo ok concluido','❌':'errado cancelar nao',
+  '❗':'exclamacao atencao','❓':'pergunta duvida','⚠️':'alerta atencao aviso','⛔':'proibido','🚫':'proibido nao',
+  '✔️':'certo ok','➕':'mais adicionar','➖':'menos remover','⭐':'estrela favorito','🌟':'estrela brilho',
+  '✨':'brilho novo','💥':'explosao','💫':'tontura estrela','💦':'suor agua','💨':'rapido vento',
+  '🔔':'sino notificacao aviso','📌':'fixar pin','📍':'local pin','📎':'clipe anexo','📝':'anotar nota escrever',
+  '📅':'calendario data','⏰':'alarme hora','⏳':'tempo ampulheta','⌛':'tempo','💰':'dinheiro saco','💵':'dinheiro nota',
+  '📈':'grafico subindo alta','📉':'grafico caindo baixa','📊':'grafico barras','🧾':'recibo nota fiscal',
+  '📦':'caixa container pacote','📁':'pasta arquivo','🔒':'cadeado bloqueado','🔑':'chave','🔧':'chave ferramenta',
+  '🛠️':'ferramentas','🚛':'caminhao carreta','🚚':'caminhao entrega','🚗':'carro','🚢':'navio','⚓':'ancora porto',
+  '✈️':'aviao','🛳️':'navio cruzeiro','🏭':'fabrica industria','🏗️':'construcao obra','🚧':'obras atencao',
+  '🛑':'parar stop','🟢':'verde ok','🟡':'amarelo atencao','🔴':'vermelho parar','🔵':'azul',
+  '⚡':'energia rapido raio','🌊':'onda mar','🧊':'gelo frio','☑️':'marcado ok','🆗':'ok',
+  '😀':'sorriso feliz','😃':'feliz','😄':'feliz risada','😁':'sorriso dentes','😆':'rindo','🥲':'sorriso lagrima',
+  '🙈':'macaco vergonha nao vejo','🙉':'macaco nao ouço','🙊':'macaco nao falo','👀':'olhos olhando atento',
+  '🫥':'sumindo invisivel','🫰':'dedos dinheiro coracao','🤌':'italiano dedos','👑':'coroa rei chefe',
+  '🎯':'alvo meta foco','🏆':'trofeu vitoria','🥇':'ouro primeiro medalha','☕':'cafe','🍕':'pizza','⏱️':'cronometro tempo',
+};
+
 const readEmojiUsage = (): Record<string, number> => {
   try { return JSON.parse(localStorage.getItem(EMOJI_USAGE_KEY) || '{}') || {}; }
   catch { return {}; }
@@ -111,24 +149,43 @@ const toggleReactionMap = (
 };
 
 // Texto "quem reagiu" — sempre nomes reais (resolve pelo diretório quando o
-// nome não foi salvo na reação); "Você" para o próprio usuário.
+// nome não foi salvo na reação); "(você)" para o próprio usuário.
 const reactorsLabel = (users: ReactUser[], meId: string, resolveName: NameResolver): string =>
-  users.map(u => (u.id === meId ? 'Você' : (u.name || resolveName(u.id)))).join(', ');
+  users.map(u => (u.id === meId ? '(você)' : (u.name || resolveName(u.id)))).join(', ');
 
-// Popover de seleção de emoji completo (auto-contido, sem libs externas)
-const EmojiPicker: React.FC<{ onPick: (emoji: string) => void; onClose: () => void; align?: 'left' | 'right'; direction?: 'up' | 'down' }> = ({ onPick, onClose, align = 'left', direction = 'up' }) => (
+// Popover de seleção de emoji com pesquisa (auto-contido, sem libs externas)
+const EmojiPicker: React.FC<{ onPick: (emoji: string) => void; onClose: () => void; align?: 'left' | 'right'; direction?: 'up' | 'down' }> = ({ onPick, onClose, align = 'left', direction = 'up' }) => {
+  const [q, setQ] = useState('');
+  const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const query = norm(q.trim());
+  const list = query ? EMOJIS.filter(e => norm(EMOJI_KEYWORDS[e] || '').includes(query)) : EMOJIS;
+  return (
   <>
     <div className="fixed inset-0 z-[60]" onMouseDown={onClose} />
-    <div className={`absolute z-[61] ${direction === 'down' ? 'top-full mt-2' : 'bottom-full mb-2'} ${align === 'right' ? 'right-0' : 'left-0'} bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 grid grid-cols-8 gap-0.5 w-72 max-h-60 overflow-y-auto`}>
-      {EMOJIS.map((e, i) => (
+    <div className={`absolute z-[61] ${direction === 'down' ? 'top-full mt-2' : 'bottom-full mb-2'} ${align === 'right' ? 'right-0' : 'left-0'} bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 w-72`}>
+      <input
+        type="text"
+        value={q}
+        onChange={e => setQ(e.target.value)}
+        onMouseDown={e => e.stopPropagation()}
+        placeholder="Pesquisar emoji..."
+        autoFocus
+        className="w-full mb-2 px-3 py-1.5 rounded-lg border border-slate-200 text-[11px] font-medium outline-none focus:border-blue-400"
+      />
+      <div className="grid grid-cols-8 gap-0.5 max-h-52 overflow-y-auto">
+      {list.length === 0 ? (
+        <p className="col-span-8 text-center text-[9px] font-bold text-slate-400 uppercase py-4">Nenhum emoji</p>
+      ) : list.map((e, i) => (
         <button key={`${e}-${i}`} type="button" onMouseDown={ev => { ev.preventDefault(); onPick(e); }}
           className="w-8 h-8 rounded-lg hover:bg-slate-100 text-[18px] leading-none flex items-center justify-center transition-colors">
           {e}
         </button>
       ))}
+      </div>
     </div>
   </>
-);
+  );
+};
 
 // Barra de reações: chips existentes (com contagem + quem reagiu no tooltip),
 // atalho dos 3 emojis mais usados e "Outros" para abrir o seletor completo.
@@ -306,15 +363,17 @@ const PostCard: React.FC<{
   // Carrega os comentários ao montar para sempre exibir os últimos 3
   useEffect(() => { loadComments(); }, [loadComments]);
 
-  const submitComment = async (parentId?: string, stickerUrl?: string) => {
+  const submitComment = async (parentId?: string, extra?: { stickerUrl?: string; attachments?: HandoverAttachment[] }) => {
     const text = (parentId ? replyText : commentText).trim();
-    if (!text && !stickerUrl) return;
+    const atts = extra?.attachments || (parentId ? [] : pendingAtts);
+    if (!text && !extra?.stickerUrl && atts.length === 0) return;
     setIsPostingComment(true);
     await db.saveHandoverComment({
       postId:      post.id,
       parentId,
       content:     text,
-      stickerUrl,
+      stickerUrl:  extra?.stickerUrl,
+      attachments: atts.length ? atts : undefined,
       authorId:    currentUser.id,
       authorName:  currentUser.displayName,
       authorPhoto: currentUser.photo,
@@ -322,27 +381,56 @@ const PostCard: React.FC<{
       authorPosition: currentUser.position,
     });
     if (parentId) { setReplyText(''); setReplyingTo(null); }
-    else setCommentText('');
+    else { setCommentText(''); setPendingAtts([]); }
     await loadComments();
     setIsPostingComment(false);
   };
 
-  // Envia um GIF/figurinha como comentário (upload → comentário com sticker)
-  const [uploadingSticker, setUploadingSticker] = useState<string | null>(null); // parentId|'root'|null
-  const stickerInputRef = useRef<HTMLInputElement>(null);
-  const stickerTargetRef = useRef<string | undefined>(undefined);
-  const openStickerPicker = (parentId?: string) => {
-    stickerTargetRef.current = parentId;
-    stickerInputRef.current?.click();
-  };
-  const handleStickerSelected = async (file: File | undefined) => {
-    if (!file) return;
-    const parentId = stickerTargetRef.current;
-    setUploadingSticker(parentId || 'root');
+  // ── Anexos (imagens/documentos) do comentário: colar ou anexar ─────────────
+  const [pendingAtts, setPendingAtts] = useState<HandoverAttachment[]>([]);
+  const [uploadingAtt, setUploadingAtt] = useState(false);
+  const [uploadingSticker, setUploadingSticker] = useState<string | null>(null); // parentId de resposta
+  const attInputRef = useRef<HTMLInputElement>(null);
+  const replyStickerRef = useRef<HTMLInputElement>(null);
+  const replyTargetRef = useRef<string | undefined>(undefined);
+
+  const uploadAsAttachment = async (file: File): Promise<HandoverAttachment | null> => {
     const url = await onUploadFile(file);
+    if (!url) return null;
+    return { url, kind: file.type.startsWith('image/') ? 'image' : 'file', name: file.name };
+  };
+  const addPendingFiles = async (files: File[]) => {
+    if (files.length === 0) return;
+    setUploadingAtt(true);
+    for (const f of files) {
+      const att = await uploadAsAttachment(f);
+      if (att) setPendingAtts(prev => [...prev, att]);
+      else showToast('Erro ao anexar arquivo');
+    }
+    setUploadingAtt(false);
+  };
+  const handleCommentPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files = Array.from(items).filter(it => it.kind === 'file').map(it => it.getAsFile()).filter(Boolean) as File[];
+    if (files.length === 0) return;
+    e.preventDefault();
+    addPendingFiles(files);
+  };
+  const setAttWidth = (idx: number, width?: number) =>
+    setPendingAtts(prev => prev.map((a, i) => i === idx ? { ...a, width } : a));
+  const removeAtt = (idx: number) => setPendingAtts(prev => prev.filter((_, i) => i !== idx));
+
+  // Resposta: anexa uma imagem/GIF e envia de imediato
+  const openReplyAttach = (parentId: string) => { replyTargetRef.current = parentId; replyStickerRef.current?.click(); };
+  const handleReplyAttach = async (file: File | undefined) => {
+    if (!file) return;
+    const parentId = replyTargetRef.current;
+    setUploadingSticker(parentId || null);
+    const att = await uploadAsAttachment(file);
     setUploadingSticker(null);
-    if (url) await submitComment(parentId, url);
-    else showToast('Erro ao enviar GIF');
+    if (att) await submitComment(parentId, { attachments: [att] });
+    else showToast('Erro ao anexar');
   };
 
   const deleteComment = async (commentId: string) => {
@@ -428,6 +516,22 @@ const PostCard: React.FC<{
                 )}
                 {c.stickerUrl && (
                   <img src={c.stickerUrl} alt="GIF" loading="lazy" className={`${c.content ? 'mt-1.5' : ''} max-h-[140px] max-w-[160px] rounded-xl object-contain`} />
+                )}
+                {(c.attachments || []).length > 0 && (
+                  <div className={`${c.content || c.stickerUrl ? 'mt-1.5' : ''} flex flex-col gap-1.5`}>
+                    {(c.attachments || []).map((a, i) => a.kind === 'image' ? (
+                      <a key={i} href={a.url} target="_blank" rel="noopener" className="block">
+                        <img src={a.url} alt={a.name} loading="lazy" style={a.width ? { width: a.width } : undefined}
+                          className="max-w-full rounded-xl object-contain border border-slate-100" />
+                      </a>
+                    ) : (
+                      <a key={i} href={a.url} target="_blank" rel="noopener"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[9px] font-black text-slate-600 hover:bg-slate-100 transition-all w-fit">
+                        <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                        {a.name}
+                      </a>
+                    ))}
+                  </div>
                 )}
               </>
             )}
@@ -576,11 +680,11 @@ const PostCard: React.FC<{
                             rows={1}
                             autoFocus
                           />
-                          <button type="button" onClick={() => openStickerPicker(c.id)} title="Enviar GIF/figurinha"
+                          <button type="button" onClick={() => openReplyAttach(c.id)} title="Anexar imagem, GIF ou documento"
                             className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-300 hover:text-emerald-500 transition-colors">
                             {uploadingSticker === c.id
                               ? <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"/>
-                              : <span className="text-[8px] font-black border border-current rounded px-1 py-0.5 leading-none">GIF</span>}
+                              : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>}
                           </button>
                           <button type="button" onClick={() => setReplyEmojiOpen(v => !v)} title="Emoji"
                             className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-blue-500 transition-colors">
@@ -618,14 +722,11 @@ const PostCard: React.FC<{
                 </button>
               )}
 
-              {/* Input escondido para GIF/figurinha */}
-              <input
-                ref={stickerInputRef}
-                type="file"
-                accept="image/gif,image/*"
-                className="hidden"
-                onChange={e => { handleStickerSelected(e.target.files?.[0]); e.target.value = ''; }}
-              />
+              {/* Inputs escondidos: anexo do comentário raiz e da resposta */}
+              <input ref={attInputRef} type="file" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" multiple className="hidden"
+                onChange={e => { addPendingFiles(Array.from(e.target.files || [])); e.target.value = ''; }} />
+              <input ref={replyStickerRef} type="file" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" className="hidden"
+                onChange={e => { handleReplyAttach(e.target.files?.[0]); e.target.value = ''; }} />
 
               {/* New comment input */}
               <div className="flex gap-2.5 pt-2 border-t border-slate-100">
@@ -635,22 +736,59 @@ const PostCard: React.FC<{
                     : <div className="w-full h-full flex items-center justify-center text-slate-400 font-black text-[9px]">{currentUser.displayName.charAt(0)}</div>
                   }
                 </div>
-                <div className="flex-1 flex gap-2">
+                <div className="flex-1 min-w-0">
+                  {/* Bandeja de anexos pendentes (com redimensionamento de imagem) */}
+                  {(pendingAtts.length > 0 || uploadingAtt) && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {pendingAtts.map((a, i) => (
+                        <div key={i} className="relative border border-slate-200 rounded-lg p-1 bg-white">
+                          {a.kind === 'image' ? (
+                            <img src={a.url} alt={a.name} className="h-16 w-16 object-cover rounded" />
+                          ) : (
+                            <div className="h-16 w-16 flex flex-col items-center justify-center gap-1 text-slate-400">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                              <span className="text-[6px] font-bold uppercase truncate max-w-[56px]">{a.name}</span>
+                            </div>
+                          )}
+                          <button type="button" onClick={() => removeAtt(i)} title="Remover"
+                            className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[8px] shadow">
+                            ✕
+                          </button>
+                          {a.kind === 'image' && (
+                            <div className="flex items-center justify-center gap-0.5 mt-1">
+                              {[['P',160],['M',280],['G',420],['○',undefined]].map(([lbl, w]) => (
+                                <button key={String(lbl)} type="button" onClick={() => setAttWidth(i, w as number | undefined)}
+                                  title={w ? `Redimensionar (${w}px)` : 'Tamanho original'}
+                                  className={`px-1 rounded text-[7px] font-black uppercase transition-all ${a.width === w ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                                  {lbl}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {uploadingAtt && (
+                        <div className="h-16 w-16 flex items-center justify-center border border-slate-200 rounded-lg">
+                          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"/>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
                   <div className="flex-1 relative">
                     <textarea
                       value={commentText}
                       onChange={e => setCommentText(e.target.value)}
+                      onPaste={handleCommentPaste}
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(); } }}
-                      placeholder="Escrever comentário... (Enter para enviar)"
+                      placeholder="Escrever... (cole imagens ou anexe)"
                       className="w-full pl-3 pr-14 py-2 bg-white rounded-2xl border border-slate-200 text-[10px] font-medium resize-none outline-none focus:border-blue-300 transition-colors"
                       rows={1}
                     />
-                    {/* GIF/figurinha */}
-                    <button type="button" onClick={() => openStickerPicker()} title="Enviar GIF/figurinha"
+                    {/* Anexar imagem/doc */}
+                    <button type="button" onClick={() => attInputRef.current?.click()} title="Anexar imagem ou documento"
                       className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-300 hover:text-emerald-500 transition-colors">
-                      {uploadingSticker === 'root'
-                        ? <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"/>
-                        : <span className="text-[8px] font-black border border-current rounded px-1 py-0.5 leading-none">GIF</span>}
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
                     </button>
                     <button type="button" onClick={() => setCommentEmojiOpen(v => !v)} title="Emoji"
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-blue-500 transition-colors">
@@ -662,7 +800,7 @@ const PostCard: React.FC<{
                   </div>
                   <button
                     onClick={() => submitComment()}
-                    disabled={!commentText.trim() || isPostingComment}
+                    disabled={(!commentText.trim() && pendingAtts.length === 0) || isPostingComment}
                     className="px-3 py-2 bg-blue-600 rounded-2xl text-[9px] font-black text-white uppercase hover:bg-blue-700 disabled:opacity-40 transition-all shrink-0 flex items-center"
                   >
                     {isPostingComment
@@ -670,6 +808,7 @@ const PostCard: React.FC<{
                       : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                     }
                   </button>
+                  </div>
                 </div>
               </div>
             </>
@@ -969,6 +1108,21 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
       }
     });
   }, [uploadAndInsert]);
+
+  // Clique numa imagem do editor: cicla o tamanho (redimensionar na publicação)
+  const IMG_SIZES = ['100%', '75%', '50%', '25%'];
+  const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName !== 'IMG') return;
+    const img = target as HTMLImageElement;
+    const cur = img.style.width || '100%';
+    const idx = IMG_SIZES.indexOf(cur);
+    const nextSize = IMG_SIZES[(idx + 1) % IMG_SIZES.length];
+    img.style.width = nextSize;
+    img.style.height = 'auto';
+    showToast(`Tamanho da imagem: ${nextSize}`);
+    checkEmpty();
+  };
 
   const execCmd = (cmd: string, value?: string) => {
     document.execCommand(cmd, false, value);
@@ -1305,8 +1459,10 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
                 suppressContentEditableWarning
                 onInput={checkEmpty}
                 onPaste={handleEditorPaste}
+                onClick={handleEditorClick}
                 onKeyUp={updateActiveFormats}
                 onMouseUp={updateActiveFormats}
+                title="Dica: clique numa imagem para mudar o tamanho"
                 className="min-h-[140px] px-6 py-4 outline-none text-slate-800 text-[13px] leading-relaxed handover-editor"
               />
             </div>

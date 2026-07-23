@@ -1710,6 +1710,7 @@ export const db = {
       parentId: c.parent_id || undefined,
       content: c.content || '',
       stickerUrl: c.sticker_url || undefined,
+      attachments: Array.isArray(c.attachments) ? c.attachments : [],
       authorId: c.author_id || '',
       authorName: c.author_name || '',
       authorPhoto: c.author_photo,
@@ -1734,12 +1735,14 @@ export const db = {
     if (comment.parentId) row.parent_id = comment.parentId;
     if (comment.authorPosition) row.author_position = comment.authorPosition;
     if (comment.stickerUrl) row.sticker_url = comment.stickerUrl;
+    if (comment.attachments && comment.attachments.length) row.attachments = comment.attachments;
     let { data, error } = await supabase.from('handover_comments').insert(row).select('id').single();
     // Colunas opcionais podem não existir ainda — refaz sem elas
-    if (error && /(parent_id|author_position|sticker_url)/i.test(error.message)) {
+    if (error && /(parent_id|author_position|sticker_url|attachments)/i.test(error.message)) {
       delete row.parent_id;
       delete row.author_position;
       delete row.sticker_url;
+      delete row.attachments;
       ({ data, error } = await supabase.from('handover_comments').insert(row).select('id').single());
     }
     if (error) { console.error('[saveHandoverComment]', error.message); return null; }
