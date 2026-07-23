@@ -59,23 +59,30 @@ const relativeTime = (iso: string): string => {
 const EMOJIS = ['👍','❤️','😂','🎉','😮','😢','🙏','🔥','✅','❌','👀','💪','👏','🙌','🤝','👌','🫡','😅','😉','🤔','💯','⚠️','⏰','📌','📦','🚛','⚓','🛑','✔️','⭐','😍','🥳'];
 const QUICK_REACTIONS = ['👍','❤️','😂','🎉','👀','✅'];
 
+type ReactUser = { id: string; name: string };
+type ReactionMap = Record<string, ReactUser[]>;
+
 const toggleReactionMap = (
-  reactions: Record<string, string[]> = {},
+  reactions: ReactionMap = {},
   emoji: string,
-  userId: string
-): Record<string, string[]> => {
-  const next: Record<string, string[]> = {};
+  user: ReactUser
+): ReactionMap => {
+  const next: ReactionMap = {};
   for (const k of Object.keys(reactions)) next[k] = [...(reactions[k] || [])];
   const arr = next[emoji] || [];
-  if (arr.includes(userId)) {
-    const filtered = arr.filter(u => u !== userId);
+  if (arr.some(u => u.id === user.id)) {
+    const filtered = arr.filter(u => u.id !== user.id);
     if (filtered.length === 0) delete next[emoji];
     else next[emoji] = filtered;
   } else {
-    next[emoji] = [...arr, userId];
+    next[emoji] = [...arr, user];
   }
   return next;
 };
+
+// Texto "quem reagiu" para o tooltip
+const reactorsLabel = (users: ReactUser[], meId: string): string =>
+  users.map(u => (u.id === meId ? 'Você' : (u.name || 'Alguém'))).join(', ');
 
 // Popover de seleção de emoji (auto-contido, sem libs externas)
 const EmojiPicker: React.FC<{ onPick: (emoji: string) => void; onClose: () => void; align?: 'left' | 'right'; direction?: 'up' | 'down' }> = ({ onPick, onClose, align = 'left', direction = 'up' }) => (
@@ -94,7 +101,7 @@ const EmojiPicker: React.FC<{ onPick: (emoji: string) => void; onClose: () => vo
 
 // Barra de reações (chips com contagem + botão de reagir)
 const ReactionBar: React.FC<{
-  reactions: Record<string, string[]>;
+  reactions: ReactionMap;
   userId: string;
   onToggle: (emoji: string) => void;
 }> = ({ reactions, userId, onToggle }) => {
@@ -103,10 +110,10 @@ const ReactionBar: React.FC<{
   return (
     <div className="flex items-center gap-1 flex-wrap">
       {entries.map(([emoji, users]) => {
-        const mine = users.includes(userId);
+        const mine = users.some(u => u.id === userId);
         return (
           <button key={emoji} type="button" onClick={() => onToggle(emoji)}
-            title={`${users.length} reaç${users.length > 1 ? 'ões' : 'ão'}`}
+            title={reactorsLabel(users, userId)}
             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-black transition-all ${mine ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>
             <span className="text-[12px] leading-none">{emoji}</span>{users.length}
           </button>
@@ -131,9 +138,20 @@ const PostCard: React.FC<{
   currentUser: User;
   editWindowMinutes: number; // 0 = unlimited, -1 = disabled
   isAdmin: boolean;
+  staffList: Staff[];
   onDelete: (id: string) => void;
   onEdited: (id: string, newContent: string) => void;
-}> = ({ post, currentUser, editWindowMinutes, isAdmin, onDelete, onEdited }) => {
+}> = ({ post, currentUser, editWindowMinutes, isAdmin, staffList, onDelete, onEdited }) => {
+
+  // Função/cargo do autor: usa o salvo no post; senão tenta casar pelo nome na
+  // equipe; por fim cai no rótulo da permissão. (Mostra função, não permissão.)
+  const resolveFuncao = (authorName: string, authorPosition?: string, authorRole?: string): string => {
+    if (authorPosition) return authorPosition;
+    const staff = staffList.find(s => (s.name || '').trim().toLowerCase() === (authorName || '').trim().toLowerCase());
+    if (staff?.position) return staff.position;
+    return authorRole ? (roleLabel[authorRole] || authorRole) : 'Equipe';
+  };
+  const me: ReactUser = { id: currentUser.id, name: currentUser.displayName };
 
   // ── Edit window check ──────────────────────────────────────────────────────
   const withinWindow = (createdAt: string, authorId: string) => {
@@ -190,26 +208,26 @@ const PostCard: React.FC<{
   const [replyEmojiOpen,    setReplyEmojiOpen]    = useState(false);
 
   // ── Reações do post ──────────────────────────────────────────────────────────
-  const [postReactions, setPostReactions] = useState<Record<string, string[]>>(post.reactions || {});
+  const [postReactions, setPostReactions] = useState<ReactionMap>(post.reactions || {});
   const [postEmojiOpen, setPostEmojiOpen] = useState(false);
   // Mantém as reações sincronizadas quando o feed recarrega (realtime)
   useEffect(() => { setPostReactions(post.reactions || {}); }, [post.reactions]);
   const togglePostReaction = async (emoji: string) => {
-    const next = toggleReactionMap(postReactions, emoji, currentUser.id);
+    const next = toggleReactionMap(postReactions, emoji, me);
     setPostReactions(next);
     const ok = await db.updateHandoverReactions('post', post.id, next);
     if (!ok) { setPostReactions(post.reactions || {}); showToast('Erro ao reagir'); }
   };
 
   const toggleCommentReaction = async (commentId: string, emoji: string) => {
-    let previous: Record<string, string[]> = {};
+    let previous: ReactionMap = {};
     setComments(prev => prev.map(c => {
       if (c.id !== commentId) return c;
       previous = c.reactions || {};
-      return { ...c, reactions: toggleReactionMap(c.reactions || {}, emoji, currentUser.id) };
+      return { ...c, reactions: toggleReactionMap(c.reactions || {}, emoji, me) };
     }));
     const target = comments.find(c => c.id === commentId);
-    const next = toggleReactionMap(target?.reactions || {}, emoji, currentUser.id);
+    const next = toggleReactionMap(target?.reactions || {}, emoji, me);
     const ok = await db.updateHandoverReactions('comment', commentId, next);
     if (!ok) {
       setComments(prev => prev.map(c => c.id === commentId ? { ...c, reactions: previous } : c));
@@ -243,6 +261,7 @@ const PostCard: React.FC<{
       authorName:  currentUser.displayName,
       authorPhoto: currentUser.photo,
       authorRole:  currentUser.role,
+      authorPosition: currentUser.position,
     });
     if (parentId) { setReplyText(''); setReplyingTo(null); }
     else setCommentText('');
@@ -289,8 +308,11 @@ const PostCard: React.FC<{
         <div className="flex-1 min-w-0">
           <div className="bg-white rounded-2xl px-3 py-2 border border-slate-100">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[9px] font-black text-slate-600 uppercase">{c.authorName}</span>
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="text-[9px] font-black text-slate-600 uppercase truncate">
+                {c.authorName}
+                <span className="ml-1 text-[7px] font-bold text-slate-400 normal-case">· {resolveFuncao(c.authorName, c.authorPosition, c.authorRole)}</span>
+              </span>
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                 {cCanEdit && editingCommentId !== c.id && (
                   <button onClick={() => { setEditingCommentId(c.id); setEditCommentText(c.content); }} title="Editar" className="p-1 text-slate-300 hover:text-blue-500 rounded-lg transition-all">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -358,7 +380,7 @@ const PostCard: React.FC<{
           <div>
             <p className="text-[11px] font-black text-slate-800 leading-none">{post.authorName}</p>
             <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-              {post.authorRole ? (roleLabel[post.authorRole] || post.authorRole) : 'Equipe'} · {relativeTime(post.createdAt)}
+              {resolveFuncao(post.authorName, post.authorPosition, post.authorRole)} · {relativeTime(post.createdAt)}
               {post.updatedAt && <span className="text-slate-300 ml-1">· editado</span>}
             </p>
           </div>
@@ -425,9 +447,10 @@ const PostCard: React.FC<{
           <div className="flex items-center gap-1.5 flex-wrap pt-1">
             {QUICK_REACTIONS.map(e => {
               const users = postReactions[e] || [];
-              const mine = users.includes(currentUser.id);
+              const mine = users.some(u => u.id === currentUser.id);
               return (
                 <button key={e} type="button" onClick={() => togglePostReaction(e)}
+                  title={users.length ? reactorsLabel(users, currentUser.id) : 'Reagir'}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-black transition-all ${mine ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:border-blue-300 hover:text-blue-500'}`}>
                   <span className="text-[13px] leading-none">{e}</span>{users.length > 0 && users.length}
                 </button>
@@ -435,9 +458,10 @@ const PostCard: React.FC<{
             })}
             {/* reações extras já aplicadas que não estão na barra rápida */}
             {Object.entries(postReactions).filter(([e, u]) => !QUICK_REACTIONS.includes(e) && (u || []).length > 0).map(([e, users]) => {
-              const mine = users.includes(currentUser.id);
+              const mine = users.some(u => u.id === currentUser.id);
               return (
                 <button key={e} type="button" onClick={() => togglePostReaction(e)}
+                  title={reactorsLabel(users, currentUser.id)}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-black transition-all ${mine ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>
                   <span className="text-[13px] leading-none">{e}</span>{users.length}
                 </button>
@@ -576,10 +600,17 @@ const PostCard: React.FC<{
 const HandoverTab: React.FC<HandoverTabProps> = ({
   user, trips, drivers, customers, ports, staffList,
 }) => {
-  // ── Feed state
+  // ── Feed state (paginado — carrega só os recentes e vai buscando ao rolar)
+  const PAGE_SIZE = 8;
   const [posts,     setPosts]     = useState<HandoverPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
+  const [hasMore,   setHasMore]   = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const postsRef = useRef<HandoverPost[]>([]);
+  const loadingMoreRef = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { postsRef.current = posts; }, [posts]);
 
   // ── Composer state
   const [isComposerOpen, setIsComposerOpen] = useState(false);
@@ -614,12 +645,37 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
   const isAdmin        = user.role === 'admin';
   const currentStaffId = (user as any).staffId as string | undefined | null;
 
-  // ── Load posts ───────────────────────────────────────────────────────────────
+  // ── Load posts (primeira página) ─────────────────────────────────────────────
   const load = useCallback(async () => {
     setIsLoading(true);
-    const data = await db.getHandoverPosts();
+    const data = await db.getHandoverPosts(PAGE_SIZE, 0);
     setPosts(data);
+    setHasMore(data.length === PAGE_SIZE);
     setIsLoading(false);
+  }, []);
+
+  // Carrega mais posts antigos ao chegar no fim do feed
+  const loadMore = useCallback(async () => {
+    if (loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    setIsLoadingMore(true);
+    const offset = postsRef.current.length;
+    const more = await db.getHandoverPosts(PAGE_SIZE, offset);
+    setPosts(prev => {
+      const seen = new Set(prev.map(p => p.id));
+      return [...prev, ...more.filter(p => !seen.has(p.id))];
+    });
+    setHasMore(more.length === PAGE_SIZE);
+    setIsLoadingMore(false);
+    loadingMoreRef.current = false;
+  }, []);
+
+  // Recarrega mantendo o que já estava carregado (para o realtime não "encolher" o feed)
+  const refreshLoaded = useCallback(async () => {
+    const count = Math.max(PAGE_SIZE, postsRef.current.length);
+    const data = await db.getHandoverPosts(count, 0);
+    setPosts(data);
+    setHasMore(data.length === count);
   }, []);
 
   // ── Load duty roster + edit window ──────────────────────────────────────────
@@ -643,12 +699,23 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
     const channelId = `handover-${Math.random().toString(36).substr(2, 6)}`;
     const channel = supabase
       .channel(channelId)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'handover_posts' },     () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'handover_posts' },     () => refreshLoaded())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'duty_swap_requests' }, () => loadRoster())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'system_settings' },    () => loadRoster())
       .subscribe();
     return () => { channel.unsubscribe(); supabase?.removeChannel(channel); };
-  }, [load, loadRoster]);
+  }, [load, loadRoster, refreshLoaded]);
+
+  // Scroll infinito: carrega mais ao aproximar do fim do feed
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const io = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) loadMore();
+    }, { rootMargin: '300px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loadMore, posts.length]);
 
   // ── Ordered staff for roster ─────────────────────────────────────────────────
   const orderedStaff = useMemo(() => {
@@ -879,6 +946,7 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
       authorName:  user.displayName,
       authorPhoto: user.photo,
       authorRole:  user.role,
+      authorPosition: user.position || staffList.find(s => s.id === currentStaffId)?.position,
       mentions,
     });
     if (!id) {
@@ -891,7 +959,7 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
     setTitle('');
     setMentions([]);
     setIsComposerOpen(false);
-    await load();
+    await refreshLoaded();
     setIsPosting(false);
   };
 
@@ -1183,10 +1251,26 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
                 currentUser={user}
                 editWindowMinutes={editWindowMinutes}
                 isAdmin={isAdmin}
+                staffList={staffList}
                 onDelete={handleDelete}
                 onEdited={handleEdited}
               />
             ))}
+            {/* Sentinela + indicador de carregamento incremental */}
+            {hasMore && (
+              <div ref={sentinelRef} className="flex items-center justify-center py-6">
+                {isLoadingMore ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"/>
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Carregando mais...</span>
+                  </div>
+                ) : (
+                  <button onClick={loadMore} className="text-[9px] font-black text-slate-400 hover:text-blue-500 uppercase tracking-widest transition-colors">
+                    Carregar mais
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
