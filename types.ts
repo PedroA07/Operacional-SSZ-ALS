@@ -343,6 +343,7 @@ export interface HandoverComment {
   postId: string;
   parentId?: string; // resposta a outro comentário
   content: string;
+  stickerUrl?: string; // GIF/figurinha (renderizado em tamanho pequeno)
   authorId: string;
   authorName: string;
   authorPhoto?: string;

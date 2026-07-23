@@ -56,11 +56,41 @@ const relativeTime = (iso: string): string => {
 };
 
 // ── Emojis / Reações ───────────────────────────────────────────────────────────
-const EMOJIS = ['👍','❤️','😂','🎉','😮','😢','🙏','🔥','✅','❌','👀','💪','👏','🙌','🤝','👌','🫡','😅','😉','🤔','💯','⚠️','⏰','📌','📦','🚛','⚓','🛑','✔️','⭐','😍','🥳'];
-const QUICK_REACTIONS = ['👍','❤️','😂','🎉','👀','✅'];
+// Conjunto amplo ("global") de emojis para o seletor completo
+const EMOJIS = [
+  '👍','👎','❤️','🔥','🎉','😂','🤣','😅','😊','😍','🥰','😘','😎','🤩','🥳','😇','🙂','😉','😌','😴',
+  '🤔','🤨','😐','😑','😶','🙄','😏','😥','😮','😯','😲','😳','🥺','😢','😭','😤','😡','🤬','🤯','😱',
+  '😨','😰','😓','🤗','🤭','🤫','🤥','😬','🙃','😜','😝','🤪','🤢','🤮','🤧','😷','🤒','🤕','🥴','🤠',
+  '👏','🙌','🤝','🙏','💪','👌','✌️','🤞','🤙','👊','✊','🫡','🫠','🫶','👋','✋','👇','👈','👉','👆',
+  '☝️','💯','✅','❌','❗','❓','⚠️','⛔','🚫','✔️','➕','➖','⭐','🌟','✨','💥','💫','💦','💨','🔔',
+  '📌','📍','📎','📝','📅','⏰','⏳','⌛','💰','💵','📈','📉','📊','🧾','📦','📁','🔒','🔑','🔧','🛠️',
+  '🚛','🚚','🚗','🚢','⚓','✈️','🛳️','🏭','🏗️','🚧','🛑','🟢','🟡','🔴','🔵','⚡','🌊','🧊','☑️','🆗',
+  '😀','😃','😄','😁','😆','🥲','🙈','🙉','🙊','👀','🫥','🫰','🤌','👑','🎯','🏆','🥇','☕','🍕','⏱️',
+];
+const DEFAULT_TOP = ['👍','❤️','😂'];
+const EMOJI_USAGE_KEY = 'als_emoji_usage';
+
+const readEmojiUsage = (): Record<string, number> => {
+  try { return JSON.parse(localStorage.getItem(EMOJI_USAGE_KEY) || '{}') || {}; }
+  catch { return {}; }
+};
+const recordEmojiUse = (emoji: string) => {
+  const u = readEmojiUsage();
+  u[emoji] = (u[emoji] || 0) + 1;
+  try { localStorage.setItem(EMOJI_USAGE_KEY, JSON.stringify(u)); } catch { /* ignore */ }
+};
+// 3 emojis mais usados (completa com os padrões se faltar)
+const getTopEmojis = (): string[] => {
+  const u = readEmojiUsage();
+  const sorted = Object.keys(u).sort((a, b) => u[b] - u[a]);
+  const top = [...sorted];
+  for (const d of DEFAULT_TOP) if (!top.includes(d)) top.push(d);
+  return top.slice(0, 3);
+};
 
 type ReactUser = { id: string; name: string };
 type ReactionMap = Record<string, ReactUser[]>;
+type NameResolver = (id: string) => string;
 
 const toggleReactionMap = (
   reactions: ReactionMap = {},
@@ -80,18 +110,19 @@ const toggleReactionMap = (
   return next;
 };
 
-// Texto "quem reagiu" para o tooltip
-const reactorsLabel = (users: ReactUser[], meId: string): string =>
-  users.map(u => (u.id === meId ? 'Você' : (u.name || 'Alguém'))).join(', ');
+// Texto "quem reagiu" — sempre nomes reais (resolve pelo diretório quando o
+// nome não foi salvo na reação); "Você" para o próprio usuário.
+const reactorsLabel = (users: ReactUser[], meId: string, resolveName: NameResolver): string =>
+  users.map(u => (u.id === meId ? 'Você' : (u.name || resolveName(u.id)))).join(', ');
 
-// Popover de seleção de emoji (auto-contido, sem libs externas)
+// Popover de seleção de emoji completo (auto-contido, sem libs externas)
 const EmojiPicker: React.FC<{ onPick: (emoji: string) => void; onClose: () => void; align?: 'left' | 'right'; direction?: 'up' | 'down' }> = ({ onPick, onClose, align = 'left', direction = 'up' }) => (
   <>
     <div className="fixed inset-0 z-[60]" onMouseDown={onClose} />
-    <div className={`absolute z-[61] ${direction === 'down' ? 'top-full mt-2' : 'bottom-full mb-2'} ${align === 'right' ? 'right-0' : 'left-0'} bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 grid grid-cols-8 gap-0.5 w-64 max-h-52 overflow-y-auto`}>
-      {EMOJIS.map(e => (
-        <button key={e} type="button" onMouseDown={ev => { ev.preventDefault(); onPick(e); }}
-          className="w-7 h-7 rounded-lg hover:bg-slate-100 text-[17px] leading-none flex items-center justify-center transition-colors">
+    <div className={`absolute z-[61] ${direction === 'down' ? 'top-full mt-2' : 'bottom-full mb-2'} ${align === 'right' ? 'right-0' : 'left-0'} bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 grid grid-cols-8 gap-0.5 w-72 max-h-60 overflow-y-auto`}>
+      {EMOJIS.map((e, i) => (
+        <button key={`${e}-${i}`} type="button" onMouseDown={ev => { ev.preventDefault(); onPick(e); }}
+          className="w-8 h-8 rounded-lg hover:bg-slate-100 text-[18px] leading-none flex items-center justify-center transition-colors">
           {e}
         </button>
       ))}
@@ -99,30 +130,44 @@ const EmojiPicker: React.FC<{ onPick: (emoji: string) => void; onClose: () => vo
   </>
 );
 
-// Barra de reações (chips com contagem + botão de reagir)
+// Barra de reações: chips existentes (com contagem + quem reagiu no tooltip),
+// atalho dos 3 emojis mais usados e "Outros" para abrir o seletor completo.
 const ReactionBar: React.FC<{
   reactions: ReactionMap;
   userId: string;
+  topEmojis: string[];
+  resolveName: NameResolver;
   onToggle: (emoji: string) => void;
-}> = ({ reactions, userId, onToggle }) => {
+}> = ({ reactions, userId, topEmojis, resolveName, onToggle }) => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const entries = Object.entries(reactions || {}).filter(([, u]) => (u || []).length > 0);
+  const present = new Set(entries.map(([e]) => e));
+  const quick = topEmojis.filter(e => !present.has(e)).slice(0, 3);
   return (
     <div className="flex items-center gap-1 flex-wrap">
       {entries.map(([emoji, users]) => {
         const mine = users.some(u => u.id === userId);
         return (
           <button key={emoji} type="button" onClick={() => onToggle(emoji)}
-            title={reactorsLabel(users, userId)}
+            title={reactorsLabel(users, userId, resolveName)}
             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-black transition-all ${mine ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>
             <span className="text-[12px] leading-none">{emoji}</span>{users.length}
           </button>
         );
       })}
+      {/* 3 mais usados (atalho rápido) */}
+      {quick.map(e => (
+        <button key={`q-${e}`} type="button" onClick={() => onToggle(e)} title="Reagir"
+          className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-slate-200 text-[13px] leading-none text-slate-500 hover:bg-slate-50 hover:border-blue-300 transition-all">
+          {e}
+        </button>
+      ))}
+      {/* Outros — abre o seletor completo */}
       <div className="relative">
-        <button type="button" onClick={() => setPickerOpen(v => !v)} title="Reagir"
-          className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-slate-200 text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-all">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <button type="button" onClick={() => setPickerOpen(v => !v)} title="Outros emojis"
+          className="inline-flex items-center justify-center h-6 px-2 rounded-full border border-slate-200 text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-all text-[9px] font-black uppercase gap-0.5">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 12h.01M12 12h.01M19 12h.01"/></svg>
+          Outros
         </button>
         {pickerOpen && (
           <EmojiPicker onPick={e => { onToggle(e); setPickerOpen(false); }} onClose={() => setPickerOpen(false)} />
@@ -139,9 +184,13 @@ const PostCard: React.FC<{
   editWindowMinutes: number; // 0 = unlimited, -1 = disabled
   isAdmin: boolean;
   staffList: Staff[];
+  topEmojis: string[];
+  userNames: Record<string, string>;
+  onEmojiUsed: (emoji: string) => void;
+  onUploadFile: (file: File) => Promise<string | null>;
   onDelete: (id: string) => void;
   onEdited: (id: string, newContent: string) => void;
-}> = ({ post, currentUser, editWindowMinutes, isAdmin, staffList, onDelete, onEdited }) => {
+}> = ({ post, currentUser, editWindowMinutes, isAdmin, staffList, topEmojis, userNames, onEmojiUsed, onUploadFile, onDelete, onEdited }) => {
 
   // Função/cargo do autor: usa o salvo no post; senão tenta casar pelo nome na
   // equipe; por fim cai no rótulo da permissão. (Mostra função, não permissão.)
@@ -209,24 +258,35 @@ const PostCard: React.FC<{
 
   // ── Reações do post ──────────────────────────────────────────────────────────
   const [postReactions, setPostReactions] = useState<ReactionMap>(post.reactions || {});
-  const [postEmojiOpen, setPostEmojiOpen] = useState(false);
   // Mantém as reações sincronizadas quando o feed recarrega (realtime)
   useEffect(() => { setPostReactions(post.reactions || {}); }, [post.reactions]);
+  // Resolve o nome de quem reagiu, mesmo sem nome salvo na reação (posts antigos)
+  const resolveName: NameResolver = (id) =>
+    (id === currentUser.id ? currentUser.displayName : '') ||
+    userNames[id] ||
+    comments.find(c => c.authorId === id)?.authorName ||
+    (post.authorId === id ? post.authorName : '') ||
+    'Usuário';
+
   const togglePostReaction = async (emoji: string) => {
+    const isAdding = !(postReactions[emoji] || []).some(u => u.id === me.id);
     const next = toggleReactionMap(postReactions, emoji, me);
     setPostReactions(next);
+    if (isAdding) onEmojiUsed(emoji);
     const ok = await db.updateHandoverReactions('post', post.id, next);
     if (!ok) { setPostReactions(post.reactions || {}); showToast('Erro ao reagir'); }
   };
 
   const toggleCommentReaction = async (commentId: string, emoji: string) => {
     let previous: ReactionMap = {};
+    const target = comments.find(c => c.id === commentId);
+    const isAdding = !((target?.reactions || {})[emoji] || []).some(u => u.id === me.id);
     setComments(prev => prev.map(c => {
       if (c.id !== commentId) return c;
       previous = c.reactions || {};
       return { ...c, reactions: toggleReactionMap(c.reactions || {}, emoji, me) };
     }));
-    const target = comments.find(c => c.id === commentId);
+    if (isAdding) onEmojiUsed(emoji);
     const next = toggleReactionMap(target?.reactions || {}, emoji, me);
     const ok = await db.updateHandoverReactions('comment', commentId, next);
     if (!ok) {
@@ -246,14 +306,15 @@ const PostCard: React.FC<{
   // Carrega os comentários ao montar para sempre exibir os últimos 3
   useEffect(() => { loadComments(); }, [loadComments]);
 
-  const submitComment = async (parentId?: string) => {
+  const submitComment = async (parentId?: string, stickerUrl?: string) => {
     const text = (parentId ? replyText : commentText).trim();
-    if (!text) return;
+    if (!text && !stickerUrl) return;
     setIsPostingComment(true);
     await db.saveHandoverComment({
       postId:      post.id,
       parentId,
       content:     text,
+      stickerUrl,
       authorId:    currentUser.id,
       authorName:  currentUser.displayName,
       authorPhoto: currentUser.photo,
@@ -264,6 +325,24 @@ const PostCard: React.FC<{
     else setCommentText('');
     await loadComments();
     setIsPostingComment(false);
+  };
+
+  // Envia um GIF/figurinha como comentário (upload → comentário com sticker)
+  const [uploadingSticker, setUploadingSticker] = useState<string | null>(null); // parentId|'root'|null
+  const stickerInputRef = useRef<HTMLInputElement>(null);
+  const stickerTargetRef = useRef<string | undefined>(undefined);
+  const openStickerPicker = (parentId?: string) => {
+    stickerTargetRef.current = parentId;
+    stickerInputRef.current?.click();
+  };
+  const handleStickerSelected = async (file: File | undefined) => {
+    if (!file) return;
+    const parentId = stickerTargetRef.current;
+    setUploadingSticker(parentId || 'root');
+    const url = await onUploadFile(file);
+    setUploadingSticker(null);
+    if (url) await submitComment(parentId, url);
+    else showToast('Erro ao enviar GIF');
   };
 
   const deleteComment = async (commentId: string) => {
@@ -341,9 +420,16 @@ const PostCard: React.FC<{
                 </div>
               </div>
             ) : (
-              <p className="text-[10px] text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">{c.content}
-                {c.updatedAt && <span className="text-[7px] text-slate-300 ml-1">· editado</span>}
-              </p>
+              <>
+                {c.content && (
+                  <p className="text-[10px] text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">{c.content}
+                    {c.updatedAt && !c.stickerUrl && <span className="text-[7px] text-slate-300 ml-1">· editado</span>}
+                  </p>
+                )}
+                {c.stickerUrl && (
+                  <img src={c.stickerUrl} alt="GIF" loading="lazy" className={`${c.content ? 'mt-1.5' : ''} max-h-[140px] max-w-[160px] rounded-xl object-contain`} />
+                )}
+              </>
             )}
           </div>
           {/* Meta + ações do comentário */}
@@ -355,7 +441,7 @@ const PostCard: React.FC<{
                 Responder
               </button>
             )}
-            <ReactionBar reactions={c.reactions || {}} userId={currentUser.id} onToggle={(e) => toggleCommentReaction(c.id, e)} />
+            <ReactionBar reactions={c.reactions || {}} userId={currentUser.id} topEmojis={topEmojis} resolveName={resolveName} onToggle={(e) => toggleCommentReaction(c.id, e)} />
           </div>
         </div>
       </div>
@@ -441,38 +527,8 @@ const PostCard: React.FC<{
       {!isEditingPost && (
         <div className="px-6 pb-3 pt-1 border-t border-slate-50 space-y-2">
           {/* Reações do post */}
-          <div className="flex items-center gap-1.5 flex-wrap pt-1">
-            {QUICK_REACTIONS.map(e => {
-              const users = postReactions[e] || [];
-              const mine = users.some(u => u.id === currentUser.id);
-              return (
-                <button key={e} type="button" onClick={() => togglePostReaction(e)}
-                  title={users.length ? reactorsLabel(users, currentUser.id) : 'Reagir'}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-black transition-all ${mine ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:border-blue-300 hover:text-blue-500'}`}>
-                  <span className="text-[13px] leading-none">{e}</span>{users.length > 0 && users.length}
-                </button>
-              );
-            })}
-            {/* reações extras já aplicadas que não estão na barra rápida */}
-            {Object.entries(postReactions).filter(([e, u]) => !QUICK_REACTIONS.includes(e) && (u || []).length > 0).map(([e, users]) => {
-              const mine = users.some(u => u.id === currentUser.id);
-              return (
-                <button key={e} type="button" onClick={() => togglePostReaction(e)}
-                  title={reactorsLabel(users, currentUser.id)}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-black transition-all ${mine ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>
-                  <span className="text-[13px] leading-none">{e}</span>{users.length}
-                </button>
-              );
-            })}
-            <div className="relative">
-              <button type="button" onClick={() => setPostEmojiOpen(v => !v)} title="Mais emojis"
-                className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-slate-200 text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-all">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-              </button>
-              {postEmojiOpen && (
-                <EmojiPicker onPick={e => { togglePostReaction(e); setPostEmojiOpen(false); }} onClose={() => setPostEmojiOpen(false)} />
-              )}
-            </div>
+          <div className="pt-1">
+            <ReactionBar reactions={postReactions} userId={currentUser.id} topEmojis={topEmojis} resolveName={resolveName} onToggle={togglePostReaction} />
           </div>
           <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-slate-400">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -496,23 +552,6 @@ const PostCard: React.FC<{
             </div>
           ) : (
             <>
-              {/* Botão para ver comentários anteriores (além dos últimos 3) */}
-              {!showAllComments && topLevelComments.length > 3 && (
-                <button
-                  onClick={() => setShowAllComments(true)}
-                  className="text-[9px] font-black text-slate-500 hover:text-blue-500 uppercase tracking-wide transition-colors"
-                >
-                  Ver {topLevelComments.length - 3} comentário{topLevelComments.length - 3 !== 1 ? 's' : ''} anterior{topLevelComments.length - 3 !== 1 ? 'es' : ''}
-                </button>
-              )}
-              {showAllComments && topLevelComments.length > 3 && (
-                <button
-                  onClick={() => setShowAllComments(false)}
-                  className="text-[9px] font-black text-slate-400 hover:text-blue-500 uppercase tracking-wide transition-colors"
-                >
-                  Mostrar menos
-                </button>
-              )}
               {/* Comment list (com respostas aninhadas) — últimos 3 por padrão */}
               {(showAllComments ? topLevelComments : topLevelComments.slice(-3)).map(c => (
                 <div key={c.id} className="space-y-2">
@@ -533,10 +572,16 @@ const PostCard: React.FC<{
                             onChange={e => setReplyText(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(c.id); } }}
                             placeholder={`Responder a ${c.authorName}...`}
-                            className="w-full pl-3 pr-8 py-2 bg-white rounded-2xl border border-slate-200 text-[10px] font-medium resize-none outline-none focus:border-blue-300 transition-colors"
+                            className="w-full pl-3 pr-14 py-2 bg-white rounded-2xl border border-slate-200 text-[10px] font-medium resize-none outline-none focus:border-blue-300 transition-colors"
                             rows={1}
                             autoFocus
                           />
+                          <button type="button" onClick={() => openStickerPicker(c.id)} title="Enviar GIF/figurinha"
+                            className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-300 hover:text-emerald-500 transition-colors">
+                            {uploadingSticker === c.id
+                              ? <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"/>
+                              : <span className="text-[8px] font-black border border-current rounded px-1 py-0.5 leading-none">GIF</span>}
+                          </button>
                           <button type="button" onClick={() => setReplyEmojiOpen(v => !v)} title="Emoji"
                             className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-blue-500 transition-colors">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -561,6 +606,27 @@ const PostCard: React.FC<{
                 </div>
               ))}
 
+              {/* Ver mais / mostrar menos — abaixo dos últimos 3 comentários */}
+              {topLevelComments.length > 3 && (
+                <button
+                  onClick={() => setShowAllComments(v => !v)}
+                  className="text-[9px] font-black text-slate-500 hover:text-blue-500 uppercase tracking-wide transition-colors"
+                >
+                  {showAllComments
+                    ? 'Mostrar menos'
+                    : `Ver mais ${topLevelComments.length - 3} comentário${topLevelComments.length - 3 !== 1 ? 's' : ''}`}
+                </button>
+              )}
+
+              {/* Input escondido para GIF/figurinha */}
+              <input
+                ref={stickerInputRef}
+                type="file"
+                accept="image/gif,image/*"
+                className="hidden"
+                onChange={e => { handleStickerSelected(e.target.files?.[0]); e.target.value = ''; }}
+              />
+
               {/* New comment input */}
               <div className="flex gap-2.5 pt-2 border-t border-slate-100">
                 <div className="w-7 h-7 rounded-xl overflow-hidden bg-slate-100 shrink-0 mt-0.5 border border-slate-100">
@@ -576,9 +642,16 @@ const PostCard: React.FC<{
                       onChange={e => setCommentText(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(); } }}
                       placeholder="Escrever comentário... (Enter para enviar)"
-                      className="w-full pl-3 pr-8 py-2 bg-white rounded-2xl border border-slate-200 text-[10px] font-medium resize-none outline-none focus:border-blue-300 transition-colors"
+                      className="w-full pl-3 pr-14 py-2 bg-white rounded-2xl border border-slate-200 text-[10px] font-medium resize-none outline-none focus:border-blue-300 transition-colors"
                       rows={1}
                     />
+                    {/* GIF/figurinha */}
+                    <button type="button" onClick={() => openStickerPicker()} title="Enviar GIF/figurinha"
+                      className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-300 hover:text-emerald-500 transition-colors">
+                      {uploadingSticker === 'root'
+                        ? <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"/>
+                        : <span className="text-[8px] font-black border border-current rounded px-1 py-0.5 leading-none">GIF</span>}
+                    </button>
                     <button type="button" onClick={() => setCommentEmojiOpen(v => !v)} title="Emoji"
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-blue-500 transition-colors">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -622,6 +695,17 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
   const loadingMoreRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => { postsRef.current = posts; }, [posts]);
+
+  // 3 emojis mais usados (para o atalho de reação) — atualiza ao reagir
+  const [topEmojis, setTopEmojis] = useState<string[]>(getTopEmojis());
+  const bumpEmoji = useCallback((emoji: string) => { recordEmojiUse(emoji); setTopEmojis(getTopEmojis()); }, []);
+
+  // Diretório id→nome (autores de posts) para resolver quem reagiu
+  const userNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    posts.forEach(p => { if (p.authorId) map[p.authorId] = p.authorName; });
+    return map;
+  }, [posts]);
 
   // ── Composer state
   const [isComposerOpen, setIsComposerOpen] = useState(false);
@@ -857,6 +941,18 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
     if (!files || files.length === 0) return;
     for (const f of Array.from(files)) await uploadAndInsert(f);
   };
+
+  // Upload simples que devolve a URL (usado para GIF/figurinha nos comentários)
+  const uploadFileToR2 = useCallback(async (file: File): Promise<string | null> => {
+    try {
+      const safe = (file.name || 'gif').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const fileName = `${Date.now()}-${safe}`;
+      return await r2Service.upload(file, fileName, 'handover');
+    } catch (e) {
+      console.error('[handover sticker upload]', e);
+      return null;
+    }
+  }, []);
 
   const handleEditorPaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
     const items = e.clipboardData?.items;
@@ -1263,6 +1359,10 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
                 editWindowMinutes={editWindowMinutes}
                 isAdmin={isAdmin}
                 staffList={staffList}
+                topEmojis={topEmojis}
+                userNames={userNames}
+                onEmojiUsed={bumpEmoji}
+                onUploadFile={uploadFileToR2}
                 onDelete={handleDelete}
                 onEdited={handleEdited}
               />
