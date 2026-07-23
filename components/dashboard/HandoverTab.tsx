@@ -4,6 +4,7 @@ import { User, Trip, Driver, Customer, Port, HandoverPost, HandoverComment, Hand
 import { db, supabase } from '../../utils/storage';
 import { showToast } from '../shared/SimpleToast';
 import CustomSelect from '../shared/CustomSelect';
+import { r2Service } from '../../utils/r2Service';
 
 interface HandoverTabProps {
   user: User;
@@ -221,7 +222,12 @@ const PostCard: React.FC<{
           </div>
         </div>
       ) : (
-        <div className="px-6 pb-4 text-slate-800 handover-content" dangerouslySetInnerHTML={{ __html: post.content }} />
+        <>
+          {post.title && (
+            <h3 className="px-6 pt-1 pb-2 text-[15px] font-black text-slate-900 leading-tight">{post.title}</h3>
+          )}
+          <div className="px-6 pb-4 text-slate-800 handover-content" dangerouslySetInnerHTML={{ __html: post.content }} />
+        </>
       )}
 
       {/* Mentions */}
@@ -372,7 +378,10 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
   // ── Composer state
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isEmpty,   setIsEmpty]   = useState(true);
+  const [title,     setTitle]     = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const [mentions,  setMentions]  = useState<HandoverMention[]>([]);
 
   // ── Mention picker state
@@ -520,8 +529,65 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
   // ── Editor helpers ───────────────────────────────────────────────────────────
   const checkEmpty = () => {
     const el = editorRef.current;
-    if (el) setIsEmpty(el.innerText.trim() === '');
+    if (!el) return;
+    // Considera com conteúdo se houver texto OU mídia/anexo (imagem, link de arquivo)
+    const hasText = el.innerText.trim() !== '';
+    const hasMedia = !!el.querySelector('img, a[data-attachment], .handover-attachment');
+    setIsEmpty(!hasText && !hasMedia);
   };
+
+  // ── Anexos (imagens / documentos) + colar prints ────────────────────────────
+  const insertHtmlAtCursor = (html: string) => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    document.execCommand('insertHTML', false, html);
+    checkEmpty();
+  };
+
+  const uploadAndInsert = useCallback(async (file: File) => {
+    setIsUploading(true);
+    try {
+      const safe = (file.name || 'arquivo').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const fileName = `${Date.now()}-${safe}`;
+      const url = await r2Service.upload(file, fileName, 'handover');
+      if (file.type.startsWith('image/')) {
+        insertHtmlAtCursor(
+          `<img src="${url}" alt="${file.name}" style="max-width:100%;border-radius:10px;margin:6px 0;display:block"/><br/>`
+        );
+      } else {
+        insertHtmlAtCursor(
+          `<a href="${url}" target="_blank" rel="noopener" data-attachment="1" class="handover-attachment" contenteditable="false">📎 ${file.name}</a>&nbsp;`
+        );
+      }
+    } catch (e) {
+      console.error('[handover upload]', e);
+      showToast('Erro ao enviar anexo. Tente novamente.');
+    } finally {
+      setIsUploading(false);
+    }
+  }, []);
+
+  const handleFilesSelected = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    for (const f of Array.from(files)) await uploadAndInsert(f);
+  };
+
+  const handleEditorPaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageItems = Array.from(items).filter(it => it.kind === 'file' && it.type.startsWith('image/'));
+    if (imageItems.length === 0) return; // deixa o paste normal de texto seguir
+    e.preventDefault();
+    imageItems.forEach(it => {
+      const blob = it.getAsFile();
+      if (blob) {
+        const ext = (blob.type.split('/')[1] || 'png').replace('+xml', '');
+        const named = new File([blob], `print-${Date.now()}.${ext}`, { type: blob.type });
+        uploadAndInsert(named);
+      }
+    });
+  }, [uploadAndInsert]);
 
   const execCmd = (cmd: string, value?: string) => {
     document.execCommand(cmd, false, value);
@@ -593,9 +659,14 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
 
   const handlePost = async () => {
     const el = editorRef.current;
-    if (!el || el.innerText.trim() === '') return;
+    if (!el) return;
+    const hasText = el.innerText.trim() !== '';
+    const hasMedia = !!el.querySelector('img, a[data-attachment], .handover-attachment');
+    // Permite publicar com texto, título, ou apenas mídia/anexo
+    if (!hasText && !hasMedia && !title.trim()) return;
     setIsPosting(true);
-    await db.saveHandoverPost({
+    const id = await db.saveHandoverPost({
+      title:       title.trim() || undefined,
       content:     el.innerHTML,
       authorId:    user.id,
       authorName:  user.displayName,
@@ -603,8 +674,14 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
       authorRole:  user.role,
       mentions,
     });
+    if (!id) {
+      showToast('Erro ao publicar. Verifique sua conexão e tente novamente.');
+      setIsPosting(false);
+      return;
+    }
     el.innerHTML = '';
     setIsEmpty(true);
+    setTitle('');
     setMentions([]);
     setIsComposerOpen(false);
     await load();
@@ -637,7 +714,7 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
         {/* Page header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-[13px] font-black text-slate-800 uppercase tracking-widest">Passagem de Serviço</h1>
+            <h1 className="text-[13px] font-black text-slate-800 uppercase tracking-widest">Feed de Atividades</h1>
             <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5 tracking-wider">Feed de comunicação da equipe</p>
           </div>
           <div className="flex items-center gap-2">
@@ -680,7 +757,7 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
                 <p className="text-[10px] font-black text-slate-600 uppercase tracking-wide">{user.displayName}</p>
               </div>
               <button
-                onClick={() => { setIsComposerOpen(false); if (editorRef.current) editorRef.current.innerHTML = ''; setIsEmpty(true); setMentions([]); }}
+                onClick={() => { setIsComposerOpen(false); if (editorRef.current) editorRef.current.innerHTML = ''; setIsEmpty(true); setTitle(''); setMentions([]); }}
                 className="p-1.5 text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all"
                 title="Fechar"
               >
@@ -746,6 +823,25 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
               <div className="w-px h-5 bg-slate-200 mx-1" />
               <button
                 type="button"
+                title="Anexar imagem ou documento"
+                onMouseDown={e => { e.preventDefault(); fileInputRef.current?.click(); }}
+                className={`px-2 h-7 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 transition-all ${isUploading ? 'bg-slate-100 text-slate-400' : 'text-emerald-600 hover:bg-emerald-50 border border-emerald-200'}`}
+              >
+                {isUploading
+                  ? <><div className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"/>Enviando</>
+                  : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>Anexar</>}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                multiple
+                className="hidden"
+                onChange={e => { handleFilesSelected(e.target.files); e.target.value = ''; }}
+              />
+              <div className="w-px h-5 bg-slate-200 mx-1" />
+              <button
+                type="button"
                 title="Citar"
                 onMouseDown={e => { e.preventDefault(); setShowMentionPicker(v => !v); }}
                 className={`px-2 h-7 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 transition-all ${showMentionPicker ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-50 border border-blue-200'}`}
@@ -790,11 +886,22 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
               </div>
             )}
 
+            {/* Título */}
+            <div className="px-6 pt-3">
+              <input
+                type="text"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="Título (opcional)"
+                className="w-full px-0 py-1 border-0 border-b border-transparent focus:border-slate-200 outline-none text-slate-800 text-[15px] font-black placeholder:text-slate-300 placeholder:font-bold bg-transparent transition-colors"
+              />
+            </div>
+
             {/* Editor */}
             <div className="relative">
               {isEmpty && (
                 <div className="absolute top-4 left-6 text-slate-300 text-[13px] font-medium pointer-events-none select-none">
-                  Escreva sua passagem de serviço...
+                  Escreva sua atualização... (cole prints com Ctrl+V)
                 </div>
               )}
               <div
@@ -802,6 +909,7 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
                 contentEditable
                 suppressContentEditableWarning
                 onInput={checkEmpty}
+                onPaste={handleEditorPaste}
                 onKeyUp={updateActiveFormats}
                 onMouseUp={updateActiveFormats}
                 className="min-h-[140px] px-6 py-4 outline-none text-slate-800 text-[13px] leading-relaxed handover-editor"
@@ -818,7 +926,7 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
               </p>
               <button
                 onClick={handlePost}
-                disabled={isEmpty || isPosting}
+                disabled={(isEmpty && !title.trim()) || isPosting || isUploading}
                 className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wide transition-all hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isPosting
@@ -843,8 +951,8 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
               </svg>
             </div>
-            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Nenhuma passagem registrada</p>
-            <p className="text-[9px] text-slate-300 font-medium">Clique em "+ Novo" para publicar a primeira passagem</p>
+            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Nenhuma atividade registrada</p>
+            <p className="text-[9px] text-slate-300 font-medium">Clique em "+ Novo" para publicar a primeira atividade</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -1050,6 +1158,8 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
         .handover-editor p,  .handover-content p  { margin: 2px 0; }
         .handover-editor hr, .handover-content hr { border: none; border-top: 2px solid #e2e8f0; margin: 12px 0; }
         .handover-editor pre, .handover-content pre { background: #1e293b; color: #a5f3fc; padding: 10px 14px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.6; margin: 8px 0; white-space: pre-wrap; }
+        .handover-editor img, .handover-content img { max-width: 100%; border-radius: 10px; margin: 6px 0; display: block; }
+        .handover-editor .handover-attachment, .handover-content .handover-attachment, .handover-editor a[data-attachment], .handover-content a[data-attachment] { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 8px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 10px; font-weight: 800; text-decoration: none; margin: 2px; }
         .mention-chip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 900; text-transform: uppercase; border: 1px solid; margin: 0 2px; cursor: default; }
         .mention-trip     { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
         .mention-driver   { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }

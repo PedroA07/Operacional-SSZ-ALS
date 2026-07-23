@@ -1616,6 +1616,7 @@ export const db = {
     if (error) { console.error('[getHandoverPosts]', error.message); return []; }
     return (data || []).map(p => ({
       id: String(p.id),
+      title: p.title || '',
       content: p.content || '',
       authorId: p.author_id || '',
       authorName: p.author_name || '',
@@ -1629,14 +1630,21 @@ export const db = {
 
   saveHandoverPost: async (post: Omit<HandoverPost, 'id' | 'createdAt'>): Promise<string | null> => {
     if (!supabase) return null;
-    const { data, error } = await supabase.from('handover_posts').insert({
+    const row: any = {
       content: post.content,
       author_id: post.authorId,
       author_name: post.authorName,
       author_photo: post.authorPhoto,
       author_role: post.authorRole,
       mentions: post.mentions,
-    }).select('id').single();
+    };
+    if (post.title !== undefined) row.title = post.title;
+    let { data, error } = await supabase.from('handover_posts').insert(row).select('id').single();
+    // Coluna 'title' pode não existir ainda em produção — refaz sem ela
+    if (error && /title/i.test(error.message) && row.title !== undefined) {
+      delete row.title;
+      ({ data, error } = await supabase.from('handover_posts').insert(row).select('id').single());
+    }
     if (error) { console.error('[saveHandoverPost]', error.message); return null; }
     return String(data?.id);
   },
