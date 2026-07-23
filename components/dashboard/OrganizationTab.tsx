@@ -12,6 +12,7 @@ import PreStackingForm from './forms/PreStackingForm';
 import OrdemColetaForm from './forms/OrdemColetaForm';
 import DevolucaoVazioForm from './forms/DevolucaoVazioForm';
 import LiberacaoVazioForm from './forms/LiberacaoVazioForm';
+import RetiradaCheioForm from './forms/RetiradaCheioForm';
 import EmailGeneratorModal from './email/EmailGeneratorModal';
 import CteAttachmentsModal from './emissoes/CteAttachmentsModal';
 import { localDateStr, localDateTimeStr, formatDateTimePtBR } from '../../utils/dateHelpers';
@@ -558,6 +559,8 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [savingDevAdd, setSavingDevAdd] = useState(false);
   const [liberacoes, setLiberacoes] = useState<Liberacao[]>([]);
   const [libMinuta, setLibMinuta] = useState<Liberacao | null>(null);
+  // Gerar minuta de retirada (vazio → Liberação; cheio → Retirada) a partir da viagem
+  const [retiradaGerar, setRetiradaGerar] = useState<{ trip: Trip; kind: 'liberacao' | 'retirada' } | null>(null);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [selectedTripForScheduling, setSelectedTripForScheduling] = useState<Trip | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Record<string, { data: Partial<Trip>, timestamp: number }>>({});
@@ -1615,6 +1618,21 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const handleRetiradaCheioChange = useCallback(makeRetiradaChangeHandler('retiradaCheio'), [activeView, logAudit]);
   const handleRetiradaVazioChange = useCallback(makeRetiradaChangeHandler('retiradaVazio'), [activeView, logAudit]);
 
+  // Marca a retirada como realizada (registra a data/hora atual) ou desfaz
+  const handleMarcarRetirada = useCallback(async (trip: Trip, field: 'retiradaCheioRealizadaEm' | 'retiradaVazioRealizadaEm') => {
+    const jaFeita = !!trip[field];
+    const iso = jaFeita ? '' : new Date().toISOString();
+    const now = Date.now();
+    setPendingUpdates(prev => ({ ...prev, [trip.id]: { data: { ...(prev[trip.id]?.data || {}), [field]: iso || undefined }, timestamp: now } }));
+    try {
+      await db.saveTrip({ ...trip, [field]: iso || null } as any);
+      logAudit(activeView, 'RETIRADA', jaFeita ? 'Retirada desmarcada' : 'Retirada marcada como realizada', trip.os, undefined, trip.id);
+    } catch {
+      setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao marcar retirada', type: 'error' } }));
+    }
+  }, [activeView, logAudit]);
+
   // Data/hora de agendamento da retirada (cheio/vazio)
   const handleRetiradaDataChange = useCallback(async (trip: Trip, field: 'retiradaCheioData' | 'retiradaVazioData', dateTime: string) => {
     const iso = dateTime ? new Date(dateTime).toISOString() : '';
@@ -2134,6 +2152,39 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     ...customers.map((c: any) => ({ id: c.id, name: c.name, legalName: c.legalName, cnpj: c.cnpj, city: c.city, state: c.state, kind: 'CLIENTE' })),
   ], [ports, preStacking, customers]);
 
+  // Controles de status (realizada + data/hora) e botão Gerar da retirada
+  const renderRetiradaStatus = (t: Trip, kind: 'vazio' | 'cheio') => {
+    const realizadaField = kind === 'vazio' ? 'retiradaVazioRealizadaEm' : 'retiradaCheioRealizadaEm';
+    const realizadaEm = t[realizadaField];
+    const gerarKind = kind === 'vazio' ? 'liberacao' : 'retirada';
+    const gerarLabel = kind === 'vazio' ? 'Gerar Liberação' : 'Gerar Retirada';
+    return (
+      <>
+        <button
+          onClick={(e) => { e.stopPropagation(); handleMarcarRetirada(t, realizadaField); }}
+          className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border transition-all ${realizadaEm ? 'bg-emerald-100 border-emerald-500 text-emerald-700' : 'bg-white border-slate-200 text-slate-400 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
+          title={realizadaEm ? 'Retirada realizada — clique para desmarcar' : 'Marcar retirada como realizada (registra data/hora)'}
+        >
+          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+          {realizadaEm ? 'Realizada ✓' : 'Marcar Retirada'}
+        </button>
+        {realizadaEm && (
+          <p className="text-[7px] font-black text-emerald-600 uppercase text-center">
+            {new Date(realizadaEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+          </p>
+        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); setRetiradaGerar({ trip: t, kind: gerarKind }); }}
+          className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border bg-violet-50 border-violet-200 text-violet-700 hover:bg-violet-100 transition-all"
+          title={`${gerarLabel} pré-preenchida`}
+        >
+          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          {gerarLabel}
+        </button>
+      </>
+    );
+  };
+
   const columns = useMemo(() => [
     // Entrega/Import: 1ª coluna = retirada do CHEIO (terminal/porto/cliente) + agendamento
     ...(activeView === 'ENTREGA' ? [{
@@ -2149,6 +2200,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
             placeholder="Agendar retirada..."
             inputClassName="!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !border-slate-200 !bg-slate-50"
           />
+          {t.retiradaCheio && renderRetiradaStatus(t, 'cheio')}
         </div>
       )
     }] : []),
@@ -2161,7 +2213,19 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         const isReut = t.status === 'Reutilização';
         return (
           <div className="flex flex-col gap-1.5 min-w-[170px]">
-            {!isReut && (
+            {isReut ? (
+              // Reutilização: destaca o cliente e mostra o tipo (coleta/entrega) embaixo
+              <div className="w-full rounded-xl border-2 border-emerald-400 bg-emerald-50 px-2.5 py-2 shadow-sm">
+                <span className="text-[7px] font-black text-emerald-600 uppercase tracking-tighter flex items-center gap-1">
+                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  Reutilização — Cliente
+                </span>
+                <p className="text-[11px] font-black text-emerald-800 uppercase leading-tight break-words mt-0.5">{t.customer?.name || '—'}</p>
+                <span className="inline-block mt-1 text-[7px] px-1.5 py-0.5 bg-emerald-600 text-white rounded font-black uppercase">
+                  {isEntregaViewType(t.type || '') ? 'ENTREGA' : 'COLETA'}
+                </span>
+              </div>
+            ) : (
               <>
                 <RetiradaCheioSelect trip={t} options={retiradaOptions} onSelect={handleRetiradaVazioChange} field="retiradaVazio" />
                 <DateTimePicker
@@ -2170,6 +2234,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                   placeholder="Agendar retirada..."
                   inputClassName="!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !border-slate-200 !bg-slate-50"
                 />
+                {t.retiradaVazio && renderRetiradaStatus(t, 'vazio')}
               </>
             )}
             <button
@@ -2855,7 +2920,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao, tiposViagem, isColetaSemEmail, isMercosul, handleToggleColetaEmail, handleToggleColetaDoc, retiradaOptions, handleRetiradaCheioChange, handleRetiradaVazioChange, handleRetiradaDataChange, handleTripAgendamentoUpload, handleReutComprovanteUpload, uploadingTripDoc, isEntregaConcluida, hasBaixaConfirmada, handleToggleCteEmitido, handleCteEmitidoUpload, handleRemoveCteEmitidoAnexo]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao, tiposViagem, isColetaSemEmail, isMercosul, handleToggleColetaEmail, handleToggleColetaDoc, retiradaOptions, handleRetiradaCheioChange, handleRetiradaVazioChange, handleRetiradaDataChange, handleMarcarRetirada, handleTripAgendamentoUpload, handleReutComprovanteUpload, uploadingTripDoc, isEntregaConcluida, hasBaixaConfirmada, handleToggleCteEmitido, handleCteEmitidoUpload, handleRemoveCteEmitidoAnexo]);
 
   const handleDeleteDevolucao = useCallback((d: Devolucao) => {
     setConfirmModal({
@@ -3795,6 +3860,73 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                   agendamentoDateTime: formatToLocalInput(devMinutaTrip.scheduledDateTime || devMinutaTrip.scheduling?.dateTime || ''),
                 }}
               />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Gerar minuta de retirada (vazio → Liberação de Vazio; cheio → Retirada de Cheio) */}
+      {retiradaGerar && createPortal(
+        <div className="fixed inset-0 z-[9050] animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-white flex flex-col animate-in slide-in-from-bottom duration-400">
+            <div className="px-8 py-5 bg-slate-700 flex items-center justify-between shrink-0 shadow-lg">
+              <div>
+                <p className="text-[8px] font-black text-white/60 uppercase tracking-widest mb-0.5">Organização Operacional</p>
+                <h3 className="font-black text-white text-sm uppercase tracking-widest">{retiradaGerar.kind === 'liberacao' ? 'Liberação de Vazio' : 'Retirada de Cheio'}</h3>
+                <p className="text-[9px] text-white/60 font-bold uppercase tracking-widest mt-0.5">OS: {retiradaGerar.trip.os}</p>
+              </div>
+              <button onClick={() => setRetiradaGerar(null)} className="w-10 h-10 flex items-center justify-center bg-white/15 border border-white/20 text-white/80 hover:text-white hover:bg-white/30 rounded-full transition-all active:scale-90">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              {retiradaGerar.kind === 'liberacao' ? (
+                <LiberacaoVazioForm
+                  drivers={drivers}
+                  customers={customers}
+                  ports={ports}
+                  preStackings={preStacking}
+                  onClose={() => setRetiradaGerar(null)}
+                  initialFormData={{
+                    date: localDateStr(),
+                    driverId: retiradaGerar.trip.driver?.id || '',
+                    remetenteId: retiradaGerar.trip.customer?.id || '',
+                    destinatarioId: retiradaGerar.trip.retiradaVazio?.id || '',
+                    booking: retiradaGerar.trip.booking || '',
+                    ship: retiradaGerar.trip.ship || '',
+                    agencia: retiradaGerar.trip.agencia || '',
+                    pod: 'SANTOS',
+                    qtdContainer: '01',
+                    tipo: retiradaGerar.trip.containerType || '40HC',
+                    padrao: 'CARGA GERAL',
+                    obs: '',
+                    manualLocal: retiradaGerar.trip.retiradaVazio?.name || '',
+                  }}
+                />
+              ) : (
+                <RetiradaCheioForm
+                  drivers={drivers}
+                  customers={customers}
+                  ports={ports}
+                  onClose={() => setRetiradaGerar(null)}
+                  initialFormData={{
+                    date: localDateStr(),
+                    displayDate: new Date().toLocaleDateString('pt-BR'),
+                    driverId: retiradaGerar.trip.driver?.id || '',
+                    clienteId: retiradaGerar.trip.customer?.id || '',
+                    terminalId: retiradaGerar.trip.retiradaCheio?.id || '',
+                    container: retiradaGerar.trip.container || '',
+                    tipo: retiradaGerar.trip.containerType || '40HC',
+                    ship: retiradaGerar.trip.ship || '',
+                    agencia: retiradaGerar.trip.agencia || '',
+                    pod: 'SANTOS',
+                    booking: retiradaGerar.trip.booking || '',
+                    obs: '',
+                    manualTerminal: retiradaGerar.trip.retiradaCheio?.name || '',
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>,

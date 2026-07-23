@@ -717,6 +717,8 @@ export interface Trip {
     fileName: string;
     uploadDate: string;
   };
+  retiradaCheioRealizadaEm?: string; // data/hora em que a retirada do cheio foi realizada (ISO)
+  retiradaVazioRealizadaEm?: string; // data/hora em que a retirada do vazio foi realizada (ISO)
   importPendente?: boolean;   // criada por importação em massa e ainda pendente (gerar minutas / editar)
   cteEmitido?: boolean;       // CT-e emitido (painel Organização)
   cteEmitidoAnexos?: {        // PDFs do CT-e emitido (anexo opcional, um ou mais)
