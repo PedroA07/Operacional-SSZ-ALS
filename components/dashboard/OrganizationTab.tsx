@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Trip, Port, PreStacking, TripStatus, StatusHistoryEntry, TerminalVessel, Driver, Customer, Devolucao, Liberacao, OrgAuditEntry, EmailTemplate, ColetaTipoViagemOption } from '../../types';
+import { Trip, Port, PreStacking, TripStatus, StatusHistoryEntry, TerminalVessel, Driver, Customer, Devolucao, Liberacao, OrgAuditEntry, EmailTemplate, ColetaTipoViagemOption, CustomStatus } from '../../types';
+import { statusService } from '../../utils/statusService';
 import SmartOperationTable from './operations/SmartOperationTable';
 import { organizationService } from '../../services/organizationService';
 import { advanceService } from '../../services/advanceService';
@@ -530,6 +531,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [activeView, setActiveView] = useState<'COLETA' | 'ENTREGA' | 'DEVOLUÇÕES' | 'LIBERAÇÕES'>('COLETA');
   const [devolucoes, setDevolucoes] = useState<Devolucao[]>([]);
+  const [customStatuses, setCustomStatuses] = useState<CustomStatus[]>([]);
   const [devMinutaDev, setDevMinutaDev] = useState<Devolucao | null>(null);
   // Minuta de Devolução aberta a partir de uma viagem de Entrega/Import
   const [devMinutaTrip, setDevMinutaTrip] = useState<Trip | null>(null);
@@ -1130,6 +1132,20 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  // Status customizados (por cliente/modalidade/destino) — usados para saber
+  // quando o status atualizado pelo motorista marca a viagem como concluída
+  useEffect(() => {
+    db.getCustomStatuses().then(setCustomStatuses).catch(() => {});
+    if (!supabase) return;
+    const ch = supabase
+      .channel('org-custom-status')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_statuses' }, () => {
+        db.getCustomStatuses().then(setCustomStatuses).catch(() => {});
+      })
+      .subscribe();
+    return () => { supabase!.removeChannel(ch); };
   }, []);
 
   const loadDevolucoes = useCallback(async () => {
@@ -2077,11 +2093,21 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   }, []);
 
   // Baixa do vazio confirmada via status: a própria viagem foi concluída
-  // (status "Viagem concluída" ou "Devolução do cheio"), OU há uma devolução
+  // (status final atualizado pelo motorista — inclui status customizados como
+  // "BAIXA ...", "Viagem concluída" ou "Devolução do cheio"), OU há uma devolução
   // vinculada à viagem (mesma OS ou mesmo container) com status Agendado/Realizado
   const hasBaixaConfirmada = useCallback((t: Trip) => {
-    // Quando a viagem está concluída, a baixa do vazio já foi efetivada
-    if (t.status === 'Viagem concluída' || t.status === 'Devolução do cheio') return true;
+    // Viagem já marcada como concluída (flag persistida)
+    if (t.isCompleted) return true;
+    // Status atual marca a viagem como concluída — respeita os status
+    // customizados (isFinal) configurados por cliente/modalidade/destino,
+    // então uma baixa registrada pelo motorista passa a contabilizar
+    if (t.status === 'Devolução do cheio') return true;
+    // Status de baixa (ex.: "BAIXA CRAGEA") atualizado pelo motorista já
+    // representa a devolução do vazio efetuada, mesmo sem flag isFinal
+    const statusNorm = (t.status || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    if (/\bbaix(a|ou|ado)\b/.test(statusNorm)) return true;
+    if (statusService.isTripCompleted(t.status, t, customStatuses)) return true;
     const os = (t.os || '').trim().toUpperCase();
     const cont = (t.container || '').replace(/\s/g, '').toUpperCase();
     return devolucoes.some(d => {
@@ -2090,7 +2116,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       const dCont = (d.container || '').replace(/\s/g, '').toUpperCase();
       return (os && dOs === os) || (cont && dCont === cont);
     });
-  }, [devolucoes]);
+  }, [devolucoes, customStatuses]);
 
   // Entrega/Import: a viagem está concluída quando a baixa do vazio foi
   // confirmada via status, ou está agendada, ou o container foi reutilizado
@@ -2253,37 +2279,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       }
     }] : []),
     {
-      key: 'dateTime',
-      label: 'Data',
-      render: (t: Trip) => {
-        const d = parseDate(t.dateTime);
-        const displayDate = d ? new Intl.DateTimeFormat('pt-BR', { 
-          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-        }).format(d) : (t.dateTime || '---');
-        
-        let colorClass = 'bg-slate-100 text-slate-700 border-slate-200';
-        
-        if (d) {
-          const now = new Date();
-          now.setHours(0, 0, 0, 0);
-          const tripDate = new Date(d);
-          tripDate.setHours(0, 0, 0, 0);
-          
-          if (tripDate < now) {
-            colorClass = 'bg-red-100 text-red-700 border-red-300';
-          } else if (tripDate > now) {
-            colorClass = 'bg-blue-100 text-blue-700 border-blue-300';
-          }
-        }
-        
-        return (
-          <div className={`px-2 py-1 rounded-md border font-black text-[10px] text-center ${colorClass}`}>
-            {displayDate}
-          </div>
-        );
-      }
-    },
-    {
       key: 'os',
       label: 'OS',
       sortValue: (t: Trip) => t.os,
@@ -2428,71 +2423,32 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       )
     },
     {
-      key: 'scheduledDateTime',
-      label: 'Data/Hora Agend.',
+      key: 'dateTime',
+      label: 'Data',
       render: (t: Trip) => {
-        const rawDT = t.scheduling?.dateTime || t.scheduledDateTime || '';
-        const displayValue = formatToLocalInput(rawDT);
-        const hasMinuta = !!t.preStackingFormData;
+        const d = parseDate(t.dateTime);
+        const displayDate = d ? new Intl.DateTimeFormat('pt-BR', { 
+          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        }).format(d) : (t.dateTime || '---');
+        
+        let colorClass = 'bg-slate-100 text-slate-700 border-slate-200';
+        
+        if (d) {
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          const tripDate = new Date(d);
+          tripDate.setHours(0, 0, 0, 0);
+          
+          if (tripDate < now) {
+            colorClass = 'bg-red-100 text-red-700 border-red-300';
+          } else if (tripDate > now) {
+            colorClass = 'bg-blue-100 text-blue-700 border-blue-300';
+          }
+        }
+        
         return (
-          <div className="flex flex-col gap-1.5 min-w-[9rem]">
-            <DateTimePicker
-              value={displayValue}
-              onChange={(v) => handleDateTimeChange(t, v)}
-              placeholder="Selecionar..."
-              inputClassName={`!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !min-w-[9rem] ${isTripScheduled(t) ? '!border-emerald-300 !bg-emerald-50' : '!border-slate-200 !bg-slate-50'}`}
-            />
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); activeView === 'ENTREGA' ? setDevMinutaTrip(t) : setMinutaTrip(t); }}
-              className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${hasMinuta ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
-              title={activeView === 'ENTREGA' ? 'Gerar Minuta de Devolução de Vazio (data/hora obrigatória)' : (hasMinuta ? 'Minuta gerada — clique para reeditar' : 'Gerar Minuta de Pré-Stacking')}
-            >
-              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
-              {activeView === 'ENTREGA' ? 'Minuta Devolução' : (hasMinuta ? 'Minuta ✓' : 'Gerar Minuta')}
-            </button>
-            {hasMinuta && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleCancelMinutaScheduling(t); }}
-                className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border bg-white border-red-200 text-red-500 hover:bg-red-50 hover:border-red-400"
-                title="Cancelar o agendamento gerado pela minuta (ex.: emitida por engano)"
-              >
-                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-                Cancelar Agend.
-              </button>
-            )}
-            {/* Entrega/Import sem minuta de devolução: anexa o comprovante do
-                agendamento (a data/hora acima é obrigatória antes de anexar) */}
-            {activeView === 'ENTREGA' && !hasMinuta && (
-              <>
-                {t.agendamentoAnexo && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setViewingDoc({ url: t.agendamentoAnexo!.url, fileName: t.agendamentoAnexo!.fileName }); }}
-                    className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 transition-all"
-                    title={`Ver agendamento anexado (${t.agendamentoAnexo.fileName})`}
-                  >
-                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    Ver Agendamento
-                  </button>
-                )}
-                <label
-                  onClick={(e) => e.stopPropagation()}
-                  className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border cursor-pointer transition-all ${uploadingTripDoc === `${t.id}:agend` ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50 hover:border-blue-400'}`}
-                  title="Anexar comprovante de agendamento (quando não há minuta de devolução) — exige data/hora preenchida"
-                >
-                  {uploadingTripDoc === `${t.id}:agend`
-                    ? <><div className="w-2.5 h-2.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"/>Enviando...</>
-                    : <><svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>{t.agendamentoAnexo ? 'Substituir Anexo' : 'Anexar Agendamento'}</>}
-                  <input type="file" accept=".pdf,image/*" className="hidden" disabled={uploadingTripDoc === `${t.id}:agend`} onChange={e => { const f = e.target.files?.[0]; if (f) { handleTripAgendamentoUpload(t, f); e.target.value = ''; } }} />
-                </label>
-              </>
-            )}
+          <div className={`px-2 py-1 rounded-md border font-black text-[10px] text-center ${colorClass}`}>
+            {displayDate}
           </div>
         );
       }
@@ -2877,14 +2833,84 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 </label>
               </div>
             )}
-            {activeView === 'ENTREGA' && !isReutilizacao && (t.status === 'Viagem concluída' || t.status === 'Devolução do cheio') && (
+            {activeView === 'ENTREGA' && !isReutilizacao && hasBaixaConfirmada(t) && (
               <span
                 className="w-full inline-flex items-center justify-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 border border-emerald-500 text-[7px] font-black text-emerald-700 uppercase tracking-tight"
-                title={`Baixa do vazio confirmada — viagem com status "${t.status}"`}
+                title={`Baixa do vazio confirmada — status da viagem: "${t.status}"`}
               >
                 <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
                 Baixa Confirmada
               </span>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      key: 'scheduledDateTime',
+      label: 'Data/Hora Agend.',
+      render: (t: Trip) => {
+        const rawDT = t.scheduling?.dateTime || t.scheduledDateTime || '';
+        const displayValue = formatToLocalInput(rawDT);
+        const hasMinuta = !!t.preStackingFormData;
+        return (
+          <div className="flex flex-col gap-1.5 min-w-[9rem]">
+            <DateTimePicker
+              value={displayValue}
+              onChange={(v) => handleDateTimeChange(t, v)}
+              placeholder="Selecionar..."
+              inputClassName={`!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !min-w-[9rem] ${isTripScheduled(t) ? '!border-emerald-300 !bg-emerald-50' : '!border-slate-200 !bg-slate-50'}`}
+            />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); activeView === 'ENTREGA' ? setDevMinutaTrip(t) : setMinutaTrip(t); }}
+              className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${hasMinuta ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
+              title={activeView === 'ENTREGA' ? 'Gerar Minuta de Devolução de Vazio (data/hora obrigatória)' : (hasMinuta ? 'Minuta gerada — clique para reeditar' : 'Gerar Minuta de Pré-Stacking')}
+            >
+              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              {activeView === 'ENTREGA' ? 'Minuta Devolução' : (hasMinuta ? 'Minuta ✓' : 'Gerar Minuta')}
+            </button>
+            {hasMinuta && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleCancelMinutaScheduling(t); }}
+                className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border bg-white border-red-200 text-red-500 hover:bg-red-50 hover:border-red-400"
+                title="Cancelar o agendamento gerado pela minuta (ex.: emitida por engano)"
+              >
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                Cancelar Agend.
+              </button>
+            )}
+            {/* Entrega/Import sem minuta de devolução: anexa o comprovante do
+                agendamento (a data/hora acima é obrigatória antes de anexar) */}
+            {activeView === 'ENTREGA' && !hasMinuta && (
+              <>
+                {t.agendamentoAnexo && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setViewingDoc({ url: t.agendamentoAnexo!.url, fileName: t.agendamentoAnexo!.fileName }); }}
+                    className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 transition-all"
+                    title={`Ver agendamento anexado (${t.agendamentoAnexo.fileName})`}
+                  >
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Ver Agendamento
+                  </button>
+                )}
+                <label
+                  onClick={(e) => e.stopPropagation()}
+                  className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border cursor-pointer transition-all ${uploadingTripDoc === `${t.id}:agend` ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50 hover:border-blue-400'}`}
+                  title="Anexar comprovante de agendamento (quando não há minuta de devolução) — exige data/hora preenchida"
+                >
+                  {uploadingTripDoc === `${t.id}:agend`
+                    ? <><div className="w-2.5 h-2.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"/>Enviando...</>
+                    : <><svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>{t.agendamentoAnexo ? 'Substituir Anexo' : 'Anexar Agendamento'}</>}
+                  <input type="file" accept=".pdf,image/*" className="hidden" disabled={uploadingTripDoc === `${t.id}:agend`} onChange={e => { const f = e.target.files?.[0]; if (f) { handleTripAgendamentoUpload(t, f); e.target.value = ''; } }} />
+                </label>
+              </>
             )}
           </div>
         );
