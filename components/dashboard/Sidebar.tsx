@@ -16,6 +16,7 @@ interface SidebarProps {
   availableOps: OperationDefinition[];
   setOpsView: (view: any) => void;
   staffList: Staff[];
+  handoverUnread?: number;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -28,14 +29,16 @@ const Sidebar: React.FC<SidebarProps> = ({
   setExpandedMenus,
   availableOps,
   setOpsView,
-  staffList
+  staffList,
+  handoverUnread = 0
 }) => {
-  
-  const MenuItem = ({ tab, label, icon, adminOnly, thirdPartyOnly, children, forceActive = false }: any) => {
+
+  const MenuItem = ({ tab, label, icon, adminOnly, thirdPartyOnly, children, forceActive = false, badge = 0 }: any) => {
     if (adminOnly && user.role !== 'admin') return null;
     if (thirdPartyOnly && user.role !== 'third_party') return null;
     const isActive = forceActive || (tab ? activeTab === tab : false);
     const isExpanded = expandedMenus[label];
+    const badgeCount = Number(badge) || 0;
 
     return (
       <div className="w-full">
@@ -56,8 +59,20 @@ const Sidebar: React.FC<SidebarProps> = ({
               }`}
           >
             {isActive && <span className="absolute left-0 inset-y-1.5 w-0.5 bg-white/50 rounded-full" />}
-            <div className={`shrink-0 transition-transform duration-200 ${isActive ? 'text-white scale-105' : 'text-slate-400 group-hover:text-slate-200'}`}>{icon}</div>
-            {sidebarState === 'open' && <span className="truncate">{label}</span>}
+            <div className={`shrink-0 relative transition-transform duration-200 ${isActive ? 'text-white scale-105' : 'text-slate-400 group-hover:text-slate-200'}`}>
+              {icon}
+              {badgeCount > 0 && sidebarState !== 'open' && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[15px] h-[15px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[8px] font-black leading-none ring-2 ring-[#0b1120]">
+                  {badgeCount > 9 ? '9+' : badgeCount}
+                </span>
+              )}
+            </div>
+            {sidebarState === 'open' && <span className="truncate flex-1 text-left">{label}</span>}
+            {sidebarState === 'open' && badgeCount > 0 && (
+              <span className={`min-w-[18px] h-[18px] px-1.5 flex items-center justify-center rounded-full text-[9px] font-black leading-none shrink-0 ${isActive ? 'bg-white text-blue-600' : 'bg-red-500 text-white'}`}>
+                {badgeCount > 99 ? '99+' : badgeCount}
+              </span>
+            )}
           </button>
           {children && sidebarState === 'open' && (
             <button
@@ -103,7 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto overflow-x-hidden custom-scrollbar">
         <MenuItem tab={DashboardTab.INICIO} label="Início" icon={<Icons.Inicio />} />
-        <MenuItem tab={DashboardTab.HANDOVER} label="Feed de Atividades" icon={
+        <MenuItem tab={DashboardTab.HANDOVER} label="Feed de Atividades" badge={handoverUnread} icon={
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
         } />
         <MenuItem tab={DashboardTab.OPERACOES} label="Operações" icon={<Icons.Operacoes />} forceActive={activeTab === DashboardTab.OPERACOES}>
