@@ -703,6 +703,8 @@ export interface Trip {
     state?: string;
     kind?: string;
   };
+  retiradaCheioData?: string; // data/hora de agendamento da retirada do cheio (ISO)
+  retiradaVazioData?: string; // data/hora de agendamento da retirada do vazio (ISO)
   agendamentoAnexo?: {       // comprovante de agendamento anexado (quando não há minuta)
     id: string;
     url: string;
