@@ -117,13 +117,17 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
   const navioCampoMatch = full.match(/Navio\s*\/\s*Viagem:?\s+(.+?)(?:\s+Programa[çc][ãa]o|\s+Data emiss|\n|$)/i);
   if (navioCampoMatch) result.navioViagemCampo = cleanShip(navioCampoMatch[1]);
 
-  // Regra: quando as Demais Observações trazem "NAVIO: X", esse é o navio real
-  // (o campo Navio/Viagem pode vir com o navio-mãe errado, ex.: Maersk Cap Carmel)
-  const obsSplit = full.split(/Demais Observa[çc][õo]es/i);
+  // Regra: as "Demais Observações" / "Demais Informações" trazem o navio real —
+  // o campo Navio/Viagem pode vir com o navio-mãe errado (ex.: Maersk Cap Carmel).
+  const obsSplit = full.split(/Demais\s+(?:Observa[çc][õo]es|Informa[çc][õo]es)/i);
   const obsText = obsSplit.length > 1 ? obsSplit[obsSplit.length - 1].trim() : '';
   if (obsText) result.observacoes = obsText.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
 
-  const navioObsMatch = obsText.match(/NAVIO\s*:?\s*([A-ZÀ-Ú][A-ZÀ-Ú0-9 .\-]*?\s*\/\s*[A-Z0-9]+)/i);
+  // 1) "NAVIO: NOME/123N"  2) sem rótulo, um padrão navio/viagem (NOME / 123N)
+  let navioObsMatch = obsText.match(/NAVIO\s*:?\s*([A-ZÀ-Ú][A-ZÀ-Ú0-9 .\-]*?\s*\/\s*[A-Z0-9]+)/i);
+  if (!navioObsMatch) {
+    navioObsMatch = obsText.match(/\b([A-ZÀ-Ú][A-ZÀ-Ú0-9 .\-]{2,}?\s*\/\s*\d{1,4}[A-Z])\b/);
+  }
   if (navioObsMatch) {
     result.ship = cleanShip(navioObsMatch[1]);
     result.shipFromObs = true;
@@ -177,18 +181,19 @@ export function parseAliancaOsText(text: string): ParsedAliancaOs | null {
         const ctacTok = tokens.slice(numIdx[1] + 1, numIdx[2]).find(t => /^[A-Z0-9]{5,}$/i.test(t));
         if (ctacTok) result.ctacBl = ctacTok.toUpperCase();
       }
-      // Aut. coleta/entrega: após o valor NF — pode ter letras E espaços
-      // (ex.: MSKF000485, "AB 123456"). Remove as flags IMO/Reut (N/S) das
-      // pontas e junta o restante; valores duplicados (Aut = Ped. Cliente)
-      // viram um só.
+      // Aut. coleta/entrega: após o valor NF — pode ter letras, números e espaços,
+      // inclusive SÓ letras (ex.: MSKF000485, "AB 123456", "MAERSK"). Remove as
+      // flags IMO/Reut (N/S) das pontas e junta o restante; valores duplicados
+      // (Aut = Ped. Cliente) viram um só.
       const tail = numIdx.length >= 3 ? [...tokens.slice(numIdx[2] + 1)] : [...tokens];
       while (tail.length && /^[NS]$/i.test(tail[0])) tail.shift();
       while (tail.length && /^[NS]$/i.test(tail[tail.length - 1])) tail.pop();
-      const autTokens = tail.filter(t => /^[A-Z0-9./-]+$/i.test(t));
+      const autTokens = tail.filter(t => /^[A-ZÀ-Ú0-9./-]+$/i.test(t));
       if (autTokens.length) {
         const uniq = Array.from(new Set(autTokens.map(t => t.toUpperCase())));
         const aut = (uniq.length === 1 ? uniq[0] : autTokens.join(' ')).toUpperCase();
-        if (aut.replace(/[^A-Z0-9]/gi, '').length >= 4) result.autColeta = aut;
+        // aceita letras, números ou ambos — exige apenas 3+ caracteres úteis
+        if (aut.replace(/[^A-ZÀ-Ú0-9]/gi, '').length >= 3) result.autColeta = aut;
       }
       break;
     }
