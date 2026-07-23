@@ -103,7 +103,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto overflow-x-hidden custom-scrollbar">
         <MenuItem tab={DashboardTab.INICIO} label="Início" icon={<Icons.Inicio />} />
-        <MenuItem tab={DashboardTab.HANDOVER} label="Passagem de Serviço" icon={
+        <MenuItem tab={DashboardTab.HANDOVER} label="Feed de Atividades" icon={
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
         } />
         <MenuItem tab={DashboardTab.OPERACOES} label="Operações" icon={<Icons.Operacoes />} forceActive={activeTab === DashboardTab.OPERACOES}>

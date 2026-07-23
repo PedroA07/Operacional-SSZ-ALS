@@ -320,6 +320,7 @@ export interface DutySwapRequest {
 
 export interface HandoverPost {
   id: string;
+  title?: string; // Título opcional do post
   content: string; // HTML rich text
   authorId: string;
   authorName: string;

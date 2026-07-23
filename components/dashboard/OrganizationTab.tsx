@@ -2092,22 +2092,24 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return !!t.isScheduled || !!t.preStackingFormData;
   }, []);
 
-  // Baixa do vazio confirmada via status: a própria viagem foi concluída
-  // (status final atualizado pelo motorista — inclui status customizados como
-  // "BAIXA ...", "Viagem concluída" ou "Devolução do cheio"), OU há uma devolução
-  // vinculada à viagem (mesma OS ou mesmo container) com status Agendado/Realizado
-  const hasBaixaConfirmada = useCallback((t: Trip) => {
-    // Viagem já marcada como concluída (flag persistida)
+  // Baixa do vazio confirmada pelo STATUS atualizado pelo motorista:
+  // viagem concluída (flag), "Devolução do cheio", status de baixa
+  // (ex.: "BAIXA CRAGEA") ou status final customizado (isFinal).
+  const hasBaixaViaStatus = useCallback((t: Trip) => {
     if (t.isCompleted) return true;
-    // Status atual marca a viagem como concluída — respeita os status
-    // customizados (isFinal) configurados por cliente/modalidade/destino,
-    // então uma baixa registrada pelo motorista passa a contabilizar
     if (t.status === 'Devolução do cheio') return true;
-    // Status de baixa (ex.: "BAIXA CRAGEA") atualizado pelo motorista já
-    // representa a devolução do vazio efetuada, mesmo sem flag isFinal
+    // Status de baixa (ex.: "BAIXA CRAGEA") já representa a devolução do vazio
+    // efetuada, mesmo sem flag isFinal configurada no cadastro de status
     const statusNorm = (t.status || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     if (/\bbaix(a|ou|ado)\b/.test(statusNorm)) return true;
-    if (statusService.isTripCompleted(t.status, t, customStatuses)) return true;
+    // Respeita os status customizados (isFinal) por cliente/modalidade/destino
+    return statusService.isTripCompleted(t.status, t, customStatuses);
+  }, [customStatuses]);
+
+  // Baixa confirmada via status OU por uma devolução vinculada à viagem
+  // (mesma OS ou mesmo container) com status Agendado/Realizado
+  const hasBaixaConfirmada = useCallback((t: Trip) => {
+    if (hasBaixaViaStatus(t)) return true;
     const os = (t.os || '').trim().toUpperCase();
     const cont = (t.container || '').replace(/\s/g, '').toUpperCase();
     return devolucoes.some(d => {
@@ -2116,13 +2118,63 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       const dCont = (d.container || '').replace(/\s/g, '').toUpperCase();
       return (os && dOs === os) || (cont && dCont === cont);
     });
-  }, [devolucoes, customStatuses]);
+  }, [devolucoes, hasBaixaViaStatus]);
+
+  // Horário do status atual (baixa) registrado pelo motorista — usado para
+  // preencher a data/hora do agendamento quando a baixa é confirmada sem agenda
+  const getStatusEventTime = useCallback((t: Trip): string => {
+    const hist = t.statusHistory || [];
+    const match = [...hist].reverse().find(h => h.status === t.status);
+    const last = hist[hist.length - 1];
+    return match?.dateTime || match?.createdAt || last?.dateTime || last?.createdAt || new Date().toISOString();
+  }, []);
 
   // Entrega/Import: a viagem está concluída quando a baixa do vazio foi
   // confirmada via status, ou está agendada, ou o container foi reutilizado
   const isEntregaConcluida = useCallback((t: Trip) =>
     t.status === 'Reutilização' || isTripScheduled(t) || hasBaixaConfirmada(t),
   [isTripScheduled, hasBaixaConfirmada]);
+
+  // Quando a baixa é confirmada pelo status do motorista e ainda não há
+  // agendamento, confirma automaticamente o local sugerido (programação) e
+  // grava a data/hora do agendamento da baixa com o horário do status enviado.
+  const autoBaixaRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (activeView !== 'ENTREGA') return;
+    // Status de encerramento que NÃO representam baixa/devolução do vazio
+    const naoBaixa = new Set(['Cancelado', 'Viagem cancelada', 'Frete Morto', 'Reutilização']);
+    trips.forEach(t => {
+      if (autoBaixaRef.current.has(t.id)) return;
+      if (naoBaixa.has(t.status)) return;
+      // Já agendado ou já tem data → nada a preencher
+      if (isTripScheduled(t) || t.scheduledDateTime || t.scheduling?.dateTime) return;
+      // Só age quando a baixa foi confirmada pelo próprio status do motorista
+      if (!hasBaixaViaStatus(t)) return;
+      // Local sugerido pela programação: destino → cliente
+      const suggestedId = t.destination?.id || t.customer?.id || '';
+      const loc = locations.find(l => l.id === suggestedId);
+      if (!loc) return;
+      const when = getStatusEventTime(t);
+      autoBaixaRef.current.add(t.id);
+      const data = {
+        isScheduled: true,
+        scheduledLocationId: suggestedId,
+        scheduledDateTime: when,
+        destination: { id: loc.id, name: loc.name, legalName: loc.legalName, cnpj: loc.cnpj, city: loc.city, state: loc.state },
+        scheduling: { locationId: suggestedId, location: loc.name || '', dateTime: when, obs: t.scheduling?.obs || '' },
+      };
+      setPendingUpdates(prev => ({
+        ...prev,
+        [t.id]: { data: { ...(prev[t.id]?.data || {}), ...data }, timestamp: Date.now() },
+      }));
+      db.saveTrip({ ...t, ...data })
+        .then(() => logAudit('ENTREGA', 'AGENDAMENTO', `Baixa confirmada pelo status "${t.status}" — agendamento auto-preenchido (${loc.name})`, t.os, [
+          { field: 'Local', from: '', to: loc.name || '' },
+          { field: 'Data/Hora', from: '', to: when },
+        ], t.id))
+        .catch(() => { autoBaixaRef.current.delete(t.id); });
+    });
+  }, [trips, activeView, locations, hasBaixaViaStatus, isTripScheduled, getStatusEventTime, logAudit]);
 
   const isTripReadyToFinalize = useCallback((t: Trip) => {
     // Frete Morto não tem CT-e — pode limpar só com o adiantamento marcado
