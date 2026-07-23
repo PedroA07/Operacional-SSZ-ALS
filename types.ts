@@ -323,6 +323,13 @@ export interface HandoverReactionUser {
   name: string; // nome de exibição de quem reagiu
 }
 
+export interface HandoverAttachment {
+  url: string;
+  kind: 'image' | 'file';
+  name: string;
+  width?: number; // largura de exibição em px (imagens redimensionáveis)
+}
+
 export interface HandoverPost {
   id: string;
   title?: string; // Título opcional do post
@@ -344,6 +351,7 @@ export interface HandoverComment {
   parentId?: string; // resposta a outro comentário
   content: string;
   stickerUrl?: string; // GIF/figurinha (renderizado em tamanho pequeno)
+  attachments?: HandoverAttachment[]; // imagens/documentos anexados
   authorId: string;
   authorName: string;
   authorPhoto?: string;
