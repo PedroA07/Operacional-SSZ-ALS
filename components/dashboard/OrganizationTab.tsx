@@ -2428,6 +2428,76 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       )
     },
     {
+      key: 'scheduledDateTime',
+      label: 'Data/Hora Agend.',
+      render: (t: Trip) => {
+        const rawDT = t.scheduling?.dateTime || t.scheduledDateTime || '';
+        const displayValue = formatToLocalInput(rawDT);
+        const hasMinuta = !!t.preStackingFormData;
+        return (
+          <div className="flex flex-col gap-1.5 min-w-[9rem]">
+            <DateTimePicker
+              value={displayValue}
+              onChange={(v) => handleDateTimeChange(t, v)}
+              placeholder="Selecionar..."
+              inputClassName={`!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !min-w-[9rem] ${isTripScheduled(t) ? '!border-emerald-300 !bg-emerald-50' : '!border-slate-200 !bg-slate-50'}`}
+            />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); activeView === 'ENTREGA' ? setDevMinutaTrip(t) : setMinutaTrip(t); }}
+              className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${hasMinuta ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
+              title={activeView === 'ENTREGA' ? 'Gerar Minuta de Devolução de Vazio (data/hora obrigatória)' : (hasMinuta ? 'Minuta gerada — clique para reeditar' : 'Gerar Minuta de Pré-Stacking')}
+            >
+              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              {activeView === 'ENTREGA' ? 'Minuta Devolução' : (hasMinuta ? 'Minuta ✓' : 'Gerar Minuta')}
+            </button>
+            {hasMinuta && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleCancelMinutaScheduling(t); }}
+                className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border bg-white border-red-200 text-red-500 hover:bg-red-50 hover:border-red-400"
+                title="Cancelar o agendamento gerado pela minuta (ex.: emitida por engano)"
+              >
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                Cancelar Agend.
+              </button>
+            )}
+            {/* Entrega/Import sem minuta de devolução: anexa o comprovante do
+                agendamento (a data/hora acima é obrigatória antes de anexar) */}
+            {activeView === 'ENTREGA' && !hasMinuta && (
+              <>
+                {t.agendamentoAnexo && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setViewingDoc({ url: t.agendamentoAnexo!.url, fileName: t.agendamentoAnexo!.fileName }); }}
+                    className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 transition-all"
+                    title={`Ver agendamento anexado (${t.agendamentoAnexo.fileName})`}
+                  >
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Ver Agendamento
+                  </button>
+                )}
+                <label
+                  onClick={(e) => e.stopPropagation()}
+                  className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border cursor-pointer transition-all ${uploadingTripDoc === `${t.id}:agend` ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50 hover:border-blue-400'}`}
+                  title="Anexar comprovante de agendamento (quando não há minuta de devolução) — exige data/hora preenchida"
+                >
+                  {uploadingTripDoc === `${t.id}:agend`
+                    ? <><div className="w-2.5 h-2.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"/>Enviando...</>
+                    : <><svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>{t.agendamentoAnexo ? 'Substituir Anexo' : 'Anexar Agendamento'}</>}
+                  <input type="file" accept=".pdf,image/*" className="hidden" disabled={uploadingTripDoc === `${t.id}:agend`} onChange={e => { const f = e.target.files?.[0]; if (f) { handleTripAgendamentoUpload(t, f); e.target.value = ''; } }} />
+                </label>
+              </>
+            )}
+          </div>
+        );
+      }
+    },
+    {
       key: 'customer',
       // Cliente conforme o tipo: coleta/export = Local de Coleta; entrega/import = Local de Entrega
       label: activeView === 'ENTREGA' ? 'Local de Entrega' : 'Local de Coleta',
@@ -2815,76 +2885,6 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                 <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
                 Baixa Confirmada
               </span>
-            )}
-          </div>
-        );
-      }
-    },
-    {
-      key: 'scheduledDateTime',
-      label: 'Data/Hora Agend.',
-      render: (t: Trip) => {
-        const rawDT = t.scheduling?.dateTime || t.scheduledDateTime || '';
-        const displayValue = formatToLocalInput(rawDT);
-        const hasMinuta = !!t.preStackingFormData;
-        return (
-          <div className="flex flex-col gap-1.5 min-w-[9rem]">
-            <DateTimePicker
-              value={displayValue}
-              onChange={(v) => handleDateTimeChange(t, v)}
-              placeholder="Selecionar..."
-              inputClassName={`!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !min-w-[9rem] ${isTripScheduled(t) ? '!border-emerald-300 !bg-emerald-50' : '!border-slate-200 !bg-slate-50'}`}
-            />
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); activeView === 'ENTREGA' ? setDevMinutaTrip(t) : setMinutaTrip(t); }}
-              className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${hasMinuta ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
-              title={activeView === 'ENTREGA' ? 'Gerar Minuta de Devolução de Vazio (data/hora obrigatória)' : (hasMinuta ? 'Minuta gerada — clique para reeditar' : 'Gerar Minuta de Pré-Stacking')}
-            >
-              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
-              {activeView === 'ENTREGA' ? 'Minuta Devolução' : (hasMinuta ? 'Minuta ✓' : 'Gerar Minuta')}
-            </button>
-            {hasMinuta && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleCancelMinutaScheduling(t); }}
-                className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border bg-white border-red-200 text-red-500 hover:bg-red-50 hover:border-red-400"
-                title="Cancelar o agendamento gerado pela minuta (ex.: emitida por engano)"
-              >
-                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-                Cancelar Agend.
-              </button>
-            )}
-            {/* Entrega/Import sem minuta de devolução: anexa o comprovante do
-                agendamento (a data/hora acima é obrigatória antes de anexar) */}
-            {activeView === 'ENTREGA' && !hasMinuta && (
-              <>
-                {t.agendamentoAnexo && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setViewingDoc({ url: t.agendamentoAnexo!.url, fileName: t.agendamentoAnexo!.fileName }); }}
-                    className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 transition-all"
-                    title={`Ver agendamento anexado (${t.agendamentoAnexo.fileName})`}
-                  >
-                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    Ver Agendamento
-                  </button>
-                )}
-                <label
-                  onClick={(e) => e.stopPropagation()}
-                  className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight border cursor-pointer transition-all ${uploadingTripDoc === `${t.id}:agend` ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50 hover:border-blue-400'}`}
-                  title="Anexar comprovante de agendamento (quando não há minuta de devolução) — exige data/hora preenchida"
-                >
-                  {uploadingTripDoc === `${t.id}:agend`
-                    ? <><div className="w-2.5 h-2.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"/>Enviando...</>
-                    : <><svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>{t.agendamentoAnexo ? 'Substituir Anexo' : 'Anexar Agendamento'}</>}
-                  <input type="file" accept=".pdf,image/*" className="hidden" disabled={uploadingTripDoc === `${t.id}:agend`} onChange={e => { const f = e.target.files?.[0]; if (f) { handleTripAgendamentoUpload(t, f); e.target.value = ''; } }} />
-                </label>
-              </>
             )}
           </div>
         );
