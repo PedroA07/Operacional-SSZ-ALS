@@ -2076,9 +2076,12 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     return !!t.isScheduled || !!t.preStackingFormData;
   }, []);
 
-  // Baixa do vazio confirmada via status: devolução vinculada à viagem
-  // (mesma OS ou mesmo container) com status Agendado ou Realizado
+  // Baixa do vazio confirmada via status: a própria viagem foi concluída
+  // (status "Viagem concluída" ou "Devolução do cheio"), OU há uma devolução
+  // vinculada à viagem (mesma OS ou mesmo container) com status Agendado/Realizado
   const hasBaixaConfirmada = useCallback((t: Trip) => {
+    // Quando a viagem está concluída, a baixa do vazio já foi efetivada
+    if (t.status === 'Viagem concluída' || t.status === 'Devolução do cheio') return true;
     const os = (t.os || '').trim().toUpperCase();
     const cont = (t.container || '').replace(/\s/g, '').toUpperCase();
     return devolucoes.some(d => {
@@ -2803,6 +2806,15 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
                   <input type="file" accept=".pdf,image/*" className="hidden" disabled={uploadingTripDoc === `${t.id}:reut`} onChange={e => { const f = e.target.files?.[0]; if (f) { handleReutComprovanteUpload(t, f); e.target.value = ''; } }} />
                 </label>
               </div>
+            )}
+            {activeView === 'ENTREGA' && !isReutilizacao && (t.status === 'Viagem concluída' || t.status === 'Devolução do cheio') && (
+              <span
+                className="w-full inline-flex items-center justify-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 border border-emerald-500 text-[7px] font-black text-emerald-700 uppercase tracking-tight"
+                title={`Baixa do vazio confirmada — viagem com status "${t.status}"`}
+              >
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                Baixa Confirmada
+              </span>
             )}
           </div>
         );
