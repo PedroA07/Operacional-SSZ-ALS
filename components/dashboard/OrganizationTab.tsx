@@ -387,10 +387,13 @@ const RetiradaCheioSelect: React.FC<{
   trip: Trip;
   options: RetiradaCheioOption[];
   onSelect: (trip: Trip, option: RetiradaCheioOption | null) => void;
-}> = ({ trip, options, onSelect }) => {
+  field?: 'retiradaCheio' | 'retiradaVazio';
+  label?: string;
+}> = ({ trip, options, onSelect, field = 'retiradaCheio', label }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [search, setSearch] = useState('');
-  const value = trip.retiradaCheio;
+  const value = trip[field];
+  const titulo = label || (field === 'retiradaVazio' ? 'Retirada do Vazio:' : 'Retirada do Cheio:');
 
   const filtered = useMemo(() => {
     if (!search) return options;
@@ -403,8 +406,10 @@ const RetiradaCheioSelect: React.FC<{
     );
   }, [search, options]);
 
-  // Sugestão: campo "Retirar Cheio" da OS; sem ele, o Local Coleta (terminal)
-  const sugestao = trip.osImportData?.retirarCheio || trip.osImportData?.embarcador || trip.osImportData?.cliente || '';
+  // Sugestão: campo "Retirar Cheio/Vazio" da OS
+  const sugestao = field === 'retiradaVazio'
+    ? (trip.osImportData?.retirarVazio || '')
+    : (trip.osImportData?.retirarCheio || trip.osImportData?.embarcador || trip.osImportData?.cliente || '');
 
   return (
     <div className="relative min-w-[170px]">
@@ -426,7 +431,7 @@ const RetiradaCheioSelect: React.FC<{
             </div>
           ) : (
             <div className="flex flex-col gap-0.5">
-              <span className="text-[7px] font-black text-cyan-500 uppercase tracking-tighter">Retirada do Cheio:</span>
+              <span className="text-[7px] font-black text-cyan-500 uppercase tracking-tighter">{titulo}</span>
               <p className="text-[8px] font-black text-slate-400 uppercase break-words leading-tight">
                 {sugestao ? `Sugestão (OS): ${sugestao}` : 'Selecionar local...'}
               </p>
@@ -1589,22 +1594,38 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
     }
   }, [loadDevolucoes, logAudit, getAuditUser]);
 
-  // ── Fluxo de Entrega/Import: Retirada do Cheio, anexo de agendamento e reutilização ──
-  const handleRetiradaCheioChange = useCallback(async (trip: Trip, option: RetiradaCheioOption | null) => {
-    const data: Partial<Trip> = {
-      retiradaCheio: option ? {
+  // ── Fluxo de retiradas: local (cheio p/ entrega, vazio p/ coleta) + data/hora ──
+  const makeRetiradaChangeHandler = (field: 'retiradaCheio' | 'retiradaVazio') =>
+    async (trip: Trip, option: RetiradaCheioOption | null) => {
+      const value = option ? {
         id: option.id, name: option.name, legalName: option.legalName,
         cnpj: option.cnpj, city: option.city, state: option.state, kind: option.kind,
-      } : undefined,
+      } : undefined;
+      const rotulo = field === 'retiradaVazio' ? 'Retirada do vazio' : 'Retirada do cheio';
+      const now = Date.now();
+      setPendingUpdates(prev => ({ ...prev, [trip.id]: { data: { ...(prev[trip.id]?.data || {}), [field]: value }, timestamp: now } }));
+      try {
+        await db.saveTrip({ ...trip, [field]: value || null } as any);
+        logAudit(activeView, 'RETIRADA', `${rotulo} ${option ? `definida: ${option.name} (${option.kind})` : 'removida'}`, trip.os, [{ field: rotulo, from: (trip[field]?.name) || '', to: option?.name || '' }], trip.id);
+      } catch {
+        setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
+        window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: `Erro ao salvar ${rotulo.toLowerCase()}`, type: 'error' } }));
+      }
     };
+  const handleRetiradaCheioChange = useCallback(makeRetiradaChangeHandler('retiradaCheio'), [activeView, logAudit]);
+  const handleRetiradaVazioChange = useCallback(makeRetiradaChangeHandler('retiradaVazio'), [activeView, logAudit]);
+
+  // Data/hora de agendamento da retirada (cheio/vazio)
+  const handleRetiradaDataChange = useCallback(async (trip: Trip, field: 'retiradaCheioData' | 'retiradaVazioData', dateTime: string) => {
+    const iso = dateTime ? new Date(dateTime).toISOString() : '';
     const now = Date.now();
-    setPendingUpdates(prev => ({ ...prev, [trip.id]: { data: { ...(prev[trip.id]?.data || {}), ...data }, timestamp: now } }));
+    setPendingUpdates(prev => ({ ...prev, [trip.id]: { data: { ...(prev[trip.id]?.data || {}), [field]: iso || undefined }, timestamp: now } }));
     try {
-      await db.saveTrip({ ...trip, retiradaCheio: data.retiradaCheio || null } as any);
-      logAudit(activeView, 'RETIRADA', `Retirada do cheio ${option ? `definida: ${option.name} (${option.kind})` : 'removida'}`, trip.os, [{ field: 'Retirada do Cheio', from: trip.retiradaCheio?.name || '', to: option?.name || '' }], trip.id);
+      await db.saveTrip({ ...trip, [field]: iso || null } as any);
+      logAudit(activeView, 'RETIRADA', dateTime ? 'Data/hora da retirada definida' : 'Data/hora da retirada removida', trip.os, undefined, trip.id);
     } catch {
       setPendingUpdates(prev => { const next = { ...prev }; delete next[trip.id]; return next; });
-      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar retirada do cheio', type: 'error' } }));
+      window.dispatchEvent(new CustomEvent('als_show_toast', { detail: { message: 'Erro ao salvar data da retirada', type: 'error' } }));
     }
   }, [activeView, logAudit]);
 
@@ -2114,14 +2135,54 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
   ], [ports, preStacking, customers]);
 
   const columns = useMemo(() => [
-    // Entrega/Import: primeira coluna é a retirada do cheio (terminal, porto ou cliente)
+    // Entrega/Import: 1ª coluna = retirada do CHEIO (terminal/porto/cliente) + agendamento
     ...(activeView === 'ENTREGA' ? [{
       key: 'retiradaCheio',
       label: 'Retirada do Cheio',
       sortValue: (t: Trip) => t.retiradaCheio?.name || '',
       render: (t: Trip) => (
-        <RetiradaCheioSelect trip={t} options={retiradaOptions} onSelect={handleRetiradaCheioChange} />
+        <div className="flex flex-col gap-1.5 min-w-[170px]">
+          <RetiradaCheioSelect trip={t} options={retiradaOptions} onSelect={handleRetiradaCheioChange} field="retiradaCheio" />
+          <DateTimePicker
+            value={formatToLocalInput(t.retiradaCheioData || '')}
+            onChange={(v) => handleRetiradaDataChange(t, 'retiradaCheioData', v)}
+            placeholder="Agendar retirada..."
+            inputClassName="!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !border-slate-200 !bg-slate-50"
+          />
+        </div>
       )
+    }] : []),
+    // Coleta/Export: 1ª coluna = retirada do VAZIO (porto/pré-stacking) ou Reutilização + agendamento
+    ...(activeView === 'COLETA' ? [{
+      key: 'retiradaVazio',
+      label: 'Retirada do Vazio / Reut.',
+      sortValue: (t: Trip) => t.retiradaVazio?.name || '',
+      render: (t: Trip) => {
+        const isReut = t.status === 'Reutilização';
+        return (
+          <div className="flex flex-col gap-1.5 min-w-[170px]">
+            {!isReut && (
+              <>
+                <RetiradaCheioSelect trip={t} options={retiradaOptions} onSelect={handleRetiradaVazioChange} field="retiradaVazio" />
+                <DateTimePicker
+                  value={formatToLocalInput(t.retiradaVazioData || '')}
+                  onChange={(v) => handleRetiradaDataChange(t, 'retiradaVazioData', v)}
+                  placeholder="Agendar retirada..."
+                  inputClassName="!px-2 !py-1 !rounded-lg !border !text-[9px] !font-bold !border-slate-200 !bg-slate-50"
+                />
+              </>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); handleToggleReutilizacao(t, !isReut); }}
+              className={`w-full flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[7px] font-black uppercase tracking-tight transition-all border ${isReut ? 'bg-emerald-100 border-emerald-500 text-emerald-700' : 'bg-white border-slate-200 text-slate-400 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
+              title={isReut ? 'Reutilização — clique para reverter (usar retirada de vazio)' : 'Marcar como Reutilização (container reaproveitado, sem retirada de vazio)'}
+            >
+              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              {isReut ? 'Reutilização ✓' : 'Reutilização'}
+            </button>
+          </div>
+        );
+      }
     }] : []),
     {
       key: 'dateTime',
@@ -2794,7 +2855,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
         </div>
       )
     }
-  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao, tiposViagem, isColetaSemEmail, isMercosul, handleToggleColetaEmail, handleToggleColetaDoc, retiradaOptions, handleRetiradaCheioChange, handleTripAgendamentoUpload, handleReutComprovanteUpload, uploadingTripDoc, isEntregaConcluida, hasBaixaConfirmada, handleToggleCteEmitido, handleCteEmitidoUpload, handleRemoveCteEmitidoAnexo]);
+  ], [locations, handleToggleNF, handleToggleScheduled, handleLocationChange, handleDateTimeChange, handleCancelMinutaScheduling, handleToggleAdvance, handleRemoveFromOrg, isTripScheduled, categories, operationTypes, pendingUpdates, renderGateTag, renderVesselDates, mapTripToMinuta, activeView, handleToggleFreteMorto, handleToggleReutilizacao, tiposViagem, isColetaSemEmail, isMercosul, handleToggleColetaEmail, handleToggleColetaDoc, retiradaOptions, handleRetiradaCheioChange, handleRetiradaVazioChange, handleRetiradaDataChange, handleTripAgendamentoUpload, handleReutComprovanteUpload, uploadingTripDoc, isEntregaConcluida, hasBaixaConfirmada, handleToggleCteEmitido, handleCteEmitidoUpload, handleRemoveCteEmitidoAnexo]);
 
   const handleDeleteDevolucao = useCallback((d: Devolucao) => {
     setConfirmModal({
@@ -3520,7 +3581,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               componentId="org-coleta-export"
               columns={columns}
               data={trips}
-              forceVisibleKeys={['cteEmitido']}
+              forceVisibleKeys={['retiradaVazio', 'cteEmitido']}
               hideInternalSearch={false}
               getRowStyle={(t: Trip) => {
                 if (isTripReadyToFinalize(t)) return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #10b981' };
