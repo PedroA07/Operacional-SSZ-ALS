@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -64,23 +65,35 @@ const SmartDateInput: React.FC<SmartDateInputProps> = ({ value, onChange, placeh
   const [showCal, setShowCal] = useState(false);
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [calYear, setCalYear] = useState(new Date().getFullYear());
-  const [openUp, setOpenUp] = useState(false);
-  const [openLeft, setOpenLeft] = useState(false);
+  const [calPos, setCalPos] = useState<React.CSSProperties>({});
   const wrapRef = useRef<HTMLDivElement>(null);
+  const calRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setShowCal(false);
+      const target = e.target as Node;
+      if (wrapRef.current?.contains(target) || calRef.current?.contains(target)) return;
+      setShowCal(false);
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
+  // Posiciona o calendário via portal (position: fixed) para não ser cortado
+  // por containers com overflow — igual ao sistema personalizado de data/hora.
   const openCalendar = () => {
     if (wrapRef.current) {
       const rect = wrapRef.current.getBoundingClientRect();
-      setOpenUp(rect.bottom + 310 > window.innerHeight - 16);
-      setOpenLeft(rect.right + 290 > window.innerWidth - 16);
+      const CAL_W = 288; // w-72
+      const CAL_H = 330;
+      const openUp = rect.bottom + CAL_H > window.innerHeight - 16;
+      const left = Math.min(rect.left, window.innerWidth - CAL_W - 16);
+      setCalPos({
+        position: 'fixed',
+        left: Math.max(8, left),
+        ...(openUp ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }),
+        zIndex: 9999,
+      });
     }
     setShowCal(v => !v);
   };
@@ -145,12 +158,6 @@ const SmartDateInput: React.FC<SmartDateInputProps> = ({ value, onChange, placeh
     return -1;
   })();
 
-  const posStyle: React.CSSProperties = {
-    position: 'absolute', zIndex: 9999,
-    ...(openUp ? { bottom: '100%', marginBottom: 6 } : { top: '100%', marginTop: 6 }),
-    ...(openLeft ? { right: 0 } : { left: 0 }),
-  };
-
   return (
     <div className="relative w-full" ref={wrapRef}>
       {/* Input + calendar button inline — button INSIDE the input wrapper */}
@@ -175,8 +182,8 @@ const SmartDateInput: React.FC<SmartDateInputProps> = ({ value, onChange, placeh
         </button>
       </div>
 
-      {showCal && (
-        <div style={posStyle} className="bg-white rounded-3xl shadow-2xl border border-slate-100 p-4 w-72 animate-in zoom-in-95 duration-150">
+      {showCal && createPortal(
+        <div ref={calRef} style={calPos} className="bg-white rounded-3xl shadow-2xl border border-slate-100 p-4 w-72 animate-in zoom-in-95 duration-150">
           <div className="flex items-center justify-between mb-3">
             <button
               onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); }}
@@ -213,7 +220,8 @@ const SmartDateInput: React.FC<SmartDateInputProps> = ({ value, onChange, placeh
           >
             Hoje
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

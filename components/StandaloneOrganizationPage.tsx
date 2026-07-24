@@ -95,6 +95,7 @@ const StandaloneOrganizationPage: React.FC<StandaloneOrganizationPageProps> = ({
       <div className="p-3">
         <OrganizationTab
           userId={user.id}
+          user={user}
           trips={trips}
           ports={ports}
           preStacking={preStacking}
