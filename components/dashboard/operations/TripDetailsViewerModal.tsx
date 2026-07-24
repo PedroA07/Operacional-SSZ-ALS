@@ -5,12 +5,13 @@ import { Trip, User } from '../../../types';
 import { db } from '../../../utils/storage';
 import ImageViewer from '../../shared/ImageViewer';
 import DocumentViewerModal from './DocumentViewerModal';
-import DateTimePicker from '../../shared/DateTimePicker';
+import { emailFormatter } from '../../../utils/emailFormatter';
 
 interface TripDetailsViewerModalProps {
   isOpen: boolean;
   onClose: () => void;
   trip: Trip;
+  allTrips?: Trip[];
   user: User;
   onManageHistory?: () => void;
 }
@@ -36,14 +37,12 @@ const CopyBtn: React.FC<{ value: string }> = ({ value }) => {
   );
 };
 
-const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen, onClose, trip, user, onManageHistory }) => {
+const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen, onClose, trip, allTrips = [], user, onManageHistory }) => {
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
   const [docPreview, setDocPreview] = useState<{ url: string; title: string } | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [operationTypes, setOperationTypes] = useState<any[]>([]);
-  const [aeModal, setAeModal] = useState(false);
-  const [aeDateTime, setAeDateTime] = useState('');
-  const [aeCopied, setAeCopied] = useState(false);
+  const [textCopied, setTextCopied] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -63,33 +62,14 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
     const d = new Date(dt);
     return `${d.toLocaleDateString('pt-BR')}, ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
   };
-  const fmtAe = (dt: string) => {
-    if (!dt) return '';
-    const d = new Date(dt);
-    return `${d.toLocaleDateString('pt-BR')}, ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-  };
 
-  const buildAeText = () => {
-    const clientFirst = (trip.customer.name || '').trim().split(/\s+/)[0].toUpperCase();
-    const city = (trip.customer.city || '').toUpperCase();
-    const state = (trip.customer.state || '').toUpperCase();
-    const location = city && state ? ` - ${city}/${state}` : city ? ` - ${city}` : '';
-    return [
-      `> PROGRAMAÇÃO: (${clientFirst}${location})`,
-      `* OS: \`${trip.os || ''}\``,
-      `* Container: \`${trip.container || ''}\``,
-      `* Data e Hora: \`${fmtFull(trip.dateTime)}\``,
-      `* Motorista: \`${trip.driver.name || ''}\``,
-      `* Cavalo: \`${trip.driver.plateHorse || ''}\``,
-      `* Carreta: \`${trip.driver.plateTrailer || ''}\``,
-      `*\`GERAR AE:\` ${fmtAe(aeDateTime)}*`,
-    ].join('\n');
-  };
-
-  const copyAe = () => {
-    navigator.clipboard.writeText(buildAeText()).then(() => {
-      setAeCopied(true);
-      setTimeout(() => setAeCopied(false), 2000);
+  // Copia o texto do Painel Operacional (mesmo formato do "copiar texto":
+  // OS, CONTAINER, MOTORISTA, STATUS, PREVISÃO)
+  const copyOperationalText = () => {
+    const text = emailFormatter.toPlainText(trip, allTrips);
+    navigator.clipboard.writeText(text).then(() => {
+      setTextCopied(true);
+      setTimeout(() => setTextCopied(false), 2000);
     });
   };
 
@@ -155,13 +135,14 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { setAeModal(true); setAeCopied(false); }}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-[9px] font-black uppercase shadow-lg shadow-amber-500/20 transition-all active:scale-95"
+              onClick={copyOperationalText}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase shadow-lg transition-all active:scale-95 ${textCopied ? 'bg-emerald-600 text-white shadow-emerald-500/20' : 'bg-amber-500 hover:bg-amber-400 text-white shadow-amber-500/20'}`}
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-              </svg>
-              Gerar AE
+              {textCopied ? (
+                <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg> Copiado</>
+              ) : (
+                <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg> Copiar Texto</>
+              )}
             </button>
             <span className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase border ${isCompleted ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-blue-600 border-blue-500 text-white'}`}>
               {trip.status}
@@ -336,50 +317,6 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
           </div>
         </div>
       </div>
-
-      {/* SUB-MODAL: GERAR AE */}
-      {aeModal && (
-        <div className="fixed inset-0 z-[9100] flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
-            <div className="px-7 py-5 bg-slate-900 flex items-center justify-between">
-              <div>
-                <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-0.5">Autorização de Entrada</p>
-                <h3 className="text-sm font-black text-white uppercase">Gerar AE</h3>
-              </div>
-              <button onClick={() => setAeModal(false)} className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
-              </button>
-            </div>
-            <div className="p-7 space-y-5">
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-2">Prévia</p>
-                <pre className="text-[10px] font-mono text-slate-700 whitespace-pre leading-relaxed">{buildAeText()}</pre>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Data e Hora para Gerar AE</label>
-                <DateTimePicker value={aeDateTime} onChange={setAeDateTime} placeholder="Selecione a data e hora..." />
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => setAeModal(false)} className="flex-1 py-3.5 border border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-600 hover:bg-slate-50 transition-all">Cancelar</button>
-                <button
-                  onClick={copyAe}
-                  disabled={!aeDateTime}
-                  className={`flex-1 py-3.5 rounded-2xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${
-                    !aeDateTime ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    : aeCopied ? 'bg-emerald-600 text-white'
-                    : 'bg-amber-500 hover:bg-amber-400 text-white active:scale-95 shadow-lg shadow-amber-500/20'
-                  }`}
-                >
-                  {aeCopied
-                    ? <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg> Copiado</>
-                    : <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg> Copiar texto</>
-                  }
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* PHOTO VIEWER */}
       {activePhoto && (
