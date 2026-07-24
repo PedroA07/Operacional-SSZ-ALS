@@ -6,6 +6,7 @@ import { db } from '../../../utils/storage';
 import { statusService } from '../../../utils/statusService';
 import { showToast } from '../../shared/SimpleToast';
 import CustomSelect from '../../shared/CustomSelect';
+import DateTimePicker from '../../shared/DateTimePicker';
 
 interface StatusHistoryManagerModalProps {
   isOpen: boolean;
@@ -184,13 +185,12 @@ const StatusHistoryManagerModal: React.FC<StatusHistoryManagerModalProps> = ({
                   />
                 </div>
 
-                <div className="w-44 space-y-0.5">
+                <div className="w-48 space-y-0.5">
                   <label className="text-[7px] font-black text-slate-400 uppercase tracking-widest ml-0.5">Data / Hora</label>
-                  <input
-                    type="datetime-local"
-                    className="w-full bg-transparent font-bold text-slate-600 text-[10px] outline-none"
+                  <DateTimePicker
                     value={formatForInput(entry.dateTime)}
-                    onChange={e => handleUpdateEntry(idx, 'dateTime', e.target.value)}
+                    onChange={v => handleUpdateEntry(idx, 'dateTime', v)}
+                    inputClassName="w-full !px-2 !py-1.5 !rounded-lg !border !border-slate-200 bg-white font-bold text-slate-600 text-[10px] outline-none"
                   />
                 </div>
 
