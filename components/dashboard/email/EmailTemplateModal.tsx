@@ -102,8 +102,14 @@ const EmailTemplateModal: React.FC<EmailTemplateModalProps> = ({ isOpen, onClose
         setCustomers(customersData);
         setDestinations([...portsData, ...preStackingData]);
         
-        // Extrair nomes únicos dos status personalizados
-        const uniqueStatusNames = Array.from(new Set(customStatusesData.map(s => s.name)));
+        // Extrair nomes únicos dos status personalizados + status globais de
+        // encerramento (Reutilização, Cancelado, Frete Morto), que não ficam no
+        // banco mas devem aparecer na lista de status dos modelos de e-mail.
+        const GLOBAL_CLOSURE = ['Reutilização', 'Cancelado', 'Frete Morto'];
+        const uniqueStatusNames = Array.from(new Set([
+          ...customStatusesData.map(s => s.name),
+          ...GLOBAL_CLOSURE,
+        ]));
         setCustomStatuses(uniqueStatusNames);
       } catch (error) {
         console.error('Erro ao carregar dados para autocomplete:', error);
