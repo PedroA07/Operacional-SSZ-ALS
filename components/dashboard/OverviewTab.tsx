@@ -10,6 +10,7 @@ import TripsThisMonth from './overview/TripsThisMonth';
 import TripsThisYear from './overview/TripsThisYear';
 import DelayedTrips from './overview/DelayedTrips';
 import DriverStatusCards from './overview/DriverStatusCards';
+import FrequentDriversCard from './overview/FrequentDriversCard';
 import RecentActivitiesCard from './overview/RecentActivitiesCard';
 import KpiVisualizer from './overview/KpiVisualizer';
 import DonutChart from './overview/DonutChart';
@@ -128,6 +129,9 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
             <TripsToday trips={trips} customStatuses={customStatuses} />
             <TripsTomorrow trips={trips} />
           </div>
+
+          {/* MOTORISTAS FREQUENTES */}
+          <FrequentDriversCard trips={trips} />
 
           {/* MONITORES ADMINISTRATIVOS */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
