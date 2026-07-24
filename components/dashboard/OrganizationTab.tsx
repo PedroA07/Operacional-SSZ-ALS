@@ -20,7 +20,6 @@ import EmailGeneratorModal from './email/EmailGeneratorModal';
 import CteAttachmentsModal from './emissoes/CteAttachmentsModal';
 import { localDateStr, localDateTimeStr, formatDateTimePtBR } from '../../utils/dateHelpers';
 import { r2Service } from '../../utils/r2Service';
-import { emailFormatter } from '../../utils/emailFormatter';
 
 interface OrganizationTabProps {
   userId: string;
@@ -529,6 +528,31 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: 
   const [statusMgrTrip, setStatusMgrTrip] = useState<Trip | null>(null);
   const [aeTrip, setAeTrip] = useState<Trip | null>(null);
   const [aeCopied, setAeCopied] = useState(false);
+  const [aeDateTime, setAeDateTime] = useState('');
+
+  // Texto do "Gerar AE" (formato antigo, com a linha GERAR AE: data/hora)
+  const buildAeText = useCallback((t: Trip, aeDt: string) => {
+    const fmt = (dt: string) => {
+      if (!dt) return '';
+      const d = new Date(dt);
+      if (isNaN(d.getTime())) return '';
+      return `${d.toLocaleDateString('pt-BR')}, ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+    };
+    const clientFirst = (t.customer?.name || '').trim().split(/\s+/)[0].toUpperCase();
+    const city = (t.customer?.city || '').toUpperCase();
+    const state = (t.customer?.state || '').toUpperCase();
+    const location = city && state ? ` - ${city}/${state}` : city ? ` - ${city}` : '';
+    return [
+      `> PROGRAMAÇÃO: (${clientFirst}${location})`,
+      `- *OS:* \`${t.os || ''}\``,
+      `- *Container:* \`${t.container || ''}\``,
+      `- *Data e Hora:* \`${fmt(t.dateTime)}\``,
+      `- *Motorista:* \`${t.driver?.name || ''}\``,
+      `- *Cavalo:* \`${t.driver?.plateHorse || ''}\``,
+      `- *Carreta:* \`${t.driver?.plateTrailer || ''}\``,
+      `\`GERAR AE:\` *${fmt(aeDt)}*`,
+    ].join('\n');
+  }, []);
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategoryFilters, setSelectedCategoryFilters] = useState<string[]>([]);
   const [settingsModal, setSettingsModal] = useState(false);
@@ -2384,7 +2408,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: 
                 </button>
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); setAeTrip(t); setAeCopied(false); }}
+                  onClick={(e) => { e.stopPropagation(); setAeTrip(t); setAeCopied(false); setAeDateTime(''); }}
                   className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[6px] font-black uppercase tracking-tight transition-all border w-fit bg-amber-500 border-amber-500 text-white hover:bg-amber-400"
                   title="Gerar AE — ver e copiar o texto do painel operacional"
                 >
@@ -4218,13 +4242,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: 
         />
       )}
 
-      {/* Gerar AE — modal com o texto do painel operacional (ver + copiar) */}
+      {/* Gerar AE — formato antigo (com a linha GERAR AE: data/hora) */}
       {aeTrip && createPortal(
         <div className="fixed inset-0 z-[9100] flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150" onClick={e => { if (e.target === e.currentTarget) setAeTrip(null); }}>
           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
             <div className="px-7 py-5 bg-slate-900 flex items-center justify-between">
               <div>
-                <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-0.5">Painel Operacional</p>
+                <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-0.5">Autorização de Entrada</p>
                 <h3 className="text-sm font-black text-white uppercase">Gerar AE — OS {aeTrip.os}</h3>
               </div>
               <button onClick={() => setAeTrip(null)} className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">
@@ -4234,13 +4258,18 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: 
             <div className="p-7 space-y-5">
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
                 <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-2">Prévia</p>
-                <pre className="text-[10px] font-mono text-slate-700 whitespace-pre-wrap leading-relaxed">{emailFormatter.toPlainText(aeTrip, propTrips)}</pre>
+                <pre className="text-[10px] font-mono text-slate-700 whitespace-pre-wrap leading-relaxed">{buildAeText(aeTrip, aeDateTime)}</pre>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Data e Hora para Gerar AE</label>
+                <DateTimePicker value={aeDateTime} onChange={setAeDateTime} placeholder="Selecione a data e hora..." />
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setAeTrip(null)} className="flex-1 py-3.5 border border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-600 hover:bg-slate-50 transition-all">Fechar</button>
                 <button
-                  onClick={() => { navigator.clipboard.writeText(emailFormatter.toPlainText(aeTrip, propTrips)).then(() => { setAeCopied(true); setTimeout(() => setAeCopied(false), 2000); }); }}
-                  className={`flex-1 py-3.5 rounded-2xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${aeCopied ? 'bg-emerald-600 text-white' : 'bg-amber-500 hover:bg-amber-400 text-white active:scale-95 shadow-lg shadow-amber-500/20'}`}
+                  onClick={() => { navigator.clipboard.writeText(buildAeText(aeTrip, aeDateTime)).then(() => { setAeCopied(true); setTimeout(() => setAeCopied(false), 2000); }); }}
+                  disabled={!aeDateTime}
+                  className={`flex-1 py-3.5 rounded-2xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${!aeDateTime ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : aeCopied ? 'bg-emerald-600 text-white' : 'bg-amber-500 hover:bg-amber-400 text-white active:scale-95 shadow-lg shadow-amber-500/20'}`}
                 >
                   {aeCopied
                     ? <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg> Copiado</>
