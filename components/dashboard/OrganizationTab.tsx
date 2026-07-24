@@ -20,6 +20,7 @@ import EmailGeneratorModal from './email/EmailGeneratorModal';
 import CteAttachmentsModal from './emissoes/CteAttachmentsModal';
 import { localDateStr, localDateTimeStr, formatDateTimePtBR } from '../../utils/dateHelpers';
 import { r2Service } from '../../utils/r2Service';
+import { emailFormatter } from '../../utils/emailFormatter';
 
 interface OrganizationTabProps {
   userId: string;
@@ -526,6 +527,8 @@ const isEntregaViewType = (typeRaw: string): boolean => {
 const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: propTrips, ports, preStacking, drivers, customers, onRefresh, standalone = false }) => {
   const [locations, setLocations] = useState<any[]>([]);
   const [statusMgrTrip, setStatusMgrTrip] = useState<Trip | null>(null);
+  const [aeTrip, setAeTrip] = useState<Trip | null>(null);
+  const [aeCopied, setAeCopied] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategoryFilters, setSelectedCategoryFilters] = useState<string[]>([]);
   const [settingsModal, setSettingsModal] = useState(false);
@@ -3019,7 +3022,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: 
       label: 'Ações',
       sortable: false,
       render: (t: Trip) => (
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center gap-1.5">
+          <button
+            onClick={() => { setAeTrip(t); setAeCopied(false); }}
+            className="flex items-center gap-1 px-2 py-1 bg-amber-500 hover:bg-amber-400 text-white rounded-lg text-[7px] font-black uppercase tracking-tight transition-all active:scale-95"
+            title="Gerar AE — ver e copiar o texto do painel operacional"
+          >
+            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Gerar AE
+          </button>
           <button
             onClick={() => setConfirmRemove(t)}
             className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-all"
@@ -4200,6 +4213,42 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: 
           user={user}
           onSuccess={onRefresh}
         />
+      )}
+
+      {/* Gerar AE — modal com o texto do painel operacional (ver + copiar) */}
+      {aeTrip && createPortal(
+        <div className="fixed inset-0 z-[9100] flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150" onClick={e => { if (e.target === e.currentTarget) setAeTrip(null); }}>
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <div className="px-7 py-5 bg-slate-900 flex items-center justify-between">
+              <div>
+                <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-0.5">Painel Operacional</p>
+                <h3 className="text-sm font-black text-white uppercase">Gerar AE — OS {aeTrip.os}</h3>
+              </div>
+              <button onClick={() => setAeTrip(null)} className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+              </button>
+            </div>
+            <div className="p-7 space-y-5">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-2">Prévia</p>
+                <pre className="text-[10px] font-mono text-slate-700 whitespace-pre-wrap leading-relaxed">{emailFormatter.toPlainText(aeTrip, propTrips)}</pre>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setAeTrip(null)} className="flex-1 py-3.5 border border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-600 hover:bg-slate-50 transition-all">Fechar</button>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(emailFormatter.toPlainText(aeTrip, propTrips)).then(() => { setAeCopied(true); setTimeout(() => setAeCopied(false), 2000); }); }}
+                  className={`flex-1 py-3.5 rounded-2xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${aeCopied ? 'bg-emerald-600 text-white' : 'bg-amber-500 hover:bg-amber-400 text-white active:scale-95 shadow-lg shadow-amber-500/20'}`}
+                >
+                  {aeCopied
+                    ? <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg> Copiado</>
+                    : <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg> Copiar Texto</>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {viewingDoc && (
