@@ -2369,18 +2369,31 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: 
                   </span>
                 )}
               </div>
-              {/* Edit OC button */}
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setOcTrip(t); }}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[6px] font-black uppercase tracking-tight transition-all border w-fit mt-0.5 bg-white border-indigo-200 text-indigo-500 hover:bg-indigo-50 hover:border-indigo-400"
-                title="Editar Ordem de Coleta"
-              >
-                <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                </svg>
-                Editar OC
-              </button>
+              {/* Edit OC + Gerar AE */}
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setOcTrip(t); }}
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[6px] font-black uppercase tracking-tight transition-all border w-fit bg-white border-indigo-200 text-indigo-500 hover:bg-indigo-50 hover:border-indigo-400"
+                  title="Editar Ordem de Coleta"
+                >
+                  <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                  </svg>
+                  Editar OC
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setAeTrip(t); setAeCopied(false); }}
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[6px] font-black uppercase tracking-tight transition-all border w-fit bg-amber-500 border-amber-500 text-white hover:bg-amber-400"
+                  title="Gerar AE — ver e copiar o texto do painel operacional"
+                >
+                  <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                  Gerar AE
+                </button>
+              </div>
             </div>
             {pendingUpdates[t.id] && (
               <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" title="Salvando alterações..."></div>
@@ -3022,17 +3035,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: 
       label: 'Ações',
       sortable: false,
       render: (t: Trip) => (
-        <div className="flex items-center justify-center gap-1.5">
-          <button
-            onClick={() => { setAeTrip(t); setAeCopied(false); }}
-            className="flex items-center gap-1 px-2 py-1 bg-amber-500 hover:bg-amber-400 text-white rounded-lg text-[7px] font-black uppercase tracking-tight transition-all active:scale-95"
-            title="Gerar AE — ver e copiar o texto do painel operacional"
-          >
-            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-            </svg>
-            Gerar AE
-          </button>
+        <div className="flex items-center justify-center">
           <button
             onClick={() => setConfirmRemove(t)}
             className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-all"
