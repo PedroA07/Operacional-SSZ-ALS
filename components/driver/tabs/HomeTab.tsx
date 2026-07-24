@@ -263,8 +263,56 @@ const HomeTab: React.FC<HomeTabProps> = ({ user, trips, onRefresh }) => {
               <input type="file" ref={fileInputRef} className="hidden" accept="image/*" multiple onChange={handleGalleryUpload} />
             </div>
 
+            {/* Etapa atual + próximo passo do caminho */}
+            {(() => {
+              const idx = availableStatuses.findIndex((s: any) => (s.value || '').toString().toLowerCase() === (activeTrip.status || '').toLowerCase());
+              const next = idx >= 0 ? availableStatuses[idx + 1] : availableStatuses[0];
+              if (availableStatuses.length === 0) return null;
+              return (
+                <div className="pt-6 border-t border-white/5">
+                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-3">Etapa da Viagem</p>
+                  {/* Progresso */}
+                  <div className="flex items-center mb-4 overflow-x-auto pb-1 custom-scrollbar">
+                    {availableStatuses.map((s: any, i: number) => (
+                      <React.Fragment key={s.value}>
+                        <div className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-black ${i < idx ? 'bg-emerald-500 text-white' : i === idx ? 'bg-blue-500 text-white ring-4 ring-blue-500/20' : 'bg-white/10 text-slate-500'}`}>
+                          {i < idx ? '✓' : i + 1}
+                        </div>
+                        {i < availableStatuses.length - 1 && <div className={`h-0.5 w-5 shrink-0 ${i < idx ? 'bg-emerald-500' : 'bg-white/10'}`} />}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                  {/* Atual → próximo */}
+                  <div className="bg-white/5 rounded-3xl p-5 border border-white/5 flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Etapa atual</p>
+                      <p className="text-[13px] font-black text-blue-400 uppercase truncate">{activeTrip.status}</p>
+                    </div>
+                    <svg className="w-6 h-6 text-slate-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                    <div className="min-w-0 flex-1 text-right">
+                      <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Próximo passo</p>
+                      {next ? (
+                        <button
+                          disabled={isUpdating}
+                          onClick={() => handleStatusSelect(next.value)}
+                          className="text-[13px] font-black text-emerald-400 uppercase truncate hover:text-emerald-300 active:scale-95 transition-all w-full text-right"
+                        >
+                          {next.label}
+                        </button>
+                      ) : (
+                        <p className="text-[11px] font-black text-emerald-400 uppercase leading-tight">Finalizar<br/>→ próxima programação</p>
+                      )}
+                    </div>
+                  </div>
+                  {next && (
+                    <p className="text-[8px] font-bold text-slate-500 mt-2 text-center uppercase tracking-wide">Toque no próximo passo para registrar com a hora</p>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="space-y-4 pt-6 border-t border-white/5">
-              <button 
+              <button
                 onClick={() => setShowPicker(!showPicker)}
                 className="w-full bg-white/5 rounded-3xl p-6 border border-white/5 flex items-center justify-between group active:scale-[0.98] transition-all"
               >
