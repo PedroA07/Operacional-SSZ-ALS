@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { User, Trip, Driver, Customer, Port, HandoverPost, HandoverComment, HandoverMention, HandoverAttachment, HandoverNotification, Staff, DutySwapRequest } from '../../types';
 import { db, supabase } from '../../utils/storage';
 import { showToast } from '../shared/SimpleToast';
@@ -358,6 +359,28 @@ const PostCard: React.FC<{
     return authorRole ? (roleLabel[authorRole] || authorRole) : 'Equipe';
   };
   const me: ReactUser = { id: currentUser.id, name: currentUser.displayName };
+
+  // ── Visualizador nativo de mídia/documentos da publicação ────────────────────
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [viewer, setViewer] = useState<{ kind: 'image'; images: string[]; index: number } | { kind: 'doc'; url: string; name: string } | null>(null);
+  const isImageUrl = (u: string) => /\.(png|jpe?g|gif|webp|bmp|svg|avif)(\?|$)/i.test(u);
+  const handleContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'IMG') {
+      e.preventDefault();
+      const imgs = Array.from(contentRef.current?.querySelectorAll('img') || []).map(i => (i as HTMLImageElement).src);
+      const idx = imgs.indexOf((target as HTMLImageElement).src);
+      setViewer({ kind: 'image', images: imgs.length ? imgs : [(target as HTMLImageElement).src], index: Math.max(0, idx) });
+      return;
+    }
+    const link = target.closest('a');
+    if (link && (link.hasAttribute('data-attachment') || link.classList.contains('handover-attachment'))) {
+      const href = link.getAttribute('href') || '';
+      if (isImageUrl(href)) { e.preventDefault(); setViewer({ kind: 'image', images: [href], index: 0 }); }
+      else if (/\.pdf(\?|$)/i.test(href)) { e.preventDefault(); setViewer({ kind: 'doc', url: href, name: link.textContent?.trim() || 'Documento' }); }
+      // demais tipos: abre normalmente em nova aba (target=_blank)
+    }
+  };
 
   // ── Edit window check ──────────────────────────────────────────────────────
   const withinWindow = (createdAt: string, authorId: string) => {
@@ -723,7 +746,7 @@ const PostCard: React.FC<{
           {post.title && (
             <h3 className="px-6 pt-1 pb-2 text-[15px] font-black text-slate-900 leading-tight">{post.title}</h3>
           )}
-          <div className="px-6 pb-4 text-slate-800 handover-content" dangerouslySetInnerHTML={{ __html: post.content }} />
+          <div ref={contentRef} onClick={handleContentClick} className="px-6 pb-4 text-slate-800 handover-content cursor-default" dangerouslySetInnerHTML={{ __html: post.content }} />
         </>
       )}
 
@@ -927,6 +950,48 @@ const PostCard: React.FC<{
           )}
         </div>
       )}
+
+      {/* Visualizador de mídia/documento (lightbox nativo) */}
+      {viewer && createPortal(
+        <div className="fixed inset-0 z-[9500] bg-black/90 backdrop-blur-sm flex flex-col animate-in fade-in duration-150" onClick={() => setViewer(null)}>
+          <div className="h-14 flex items-center justify-between px-6 shrink-0" onClick={e => e.stopPropagation()}>
+            <span className="text-white/70 text-[10px] font-black uppercase tracking-widest truncate">
+              {viewer.kind === 'doc' ? viewer.name : (viewer.images.length > 1 ? `Imagem ${viewer.index + 1} de ${viewer.images.length}` : 'Imagem')}
+            </span>
+            <div className="flex items-center gap-2">
+              <a href={viewer.kind === 'doc' ? viewer.url : viewer.images[viewer.index]} target="_blank" rel="noopener" download
+                className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all" title="Baixar / abrir">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              </a>
+              <button onClick={() => setViewer(null)} className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all" title="Fechar">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 flex items-center justify-center px-4 pb-6 min-h-0" onClick={e => e.stopPropagation()}>
+            {viewer.kind === 'image' ? (
+              <>
+                {viewer.images.length > 1 && (
+                  <button onClick={() => setViewer(v => v && v.kind === 'image' ? { ...v, index: (v.index - 1 + v.images.length) % v.images.length } : v)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"/></svg>
+                  </button>
+                )}
+                <img src={viewer.images[viewer.index]} alt="" className="max-h-full max-w-full object-contain rounded-xl shadow-2xl" />
+                {viewer.images.length > 1 && (
+                  <button onClick={() => setViewer(v => v && v.kind === 'image' ? { ...v, index: (v.index + 1) % v.images.length } : v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"/></svg>
+                  </button>
+                )}
+              </>
+            ) : (
+              <iframe src={viewer.url} title={viewer.name} className="w-full h-full bg-white rounded-xl" />
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
@@ -1004,6 +1069,11 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
   const [showMentionPicker, setShowMentionPicker] = useState(false);
   const [mentionSearch,     setMentionSearch]     = useState('');
   const [mentionType,       setMentionType]       = useState<'trip' | 'driver' | 'customer' | 'port' | 'user'>('trip');
+
+  // ── Menção inline por "@"
+  const [atQuery, setAtQuery] = useState<string | null>(null);
+  const [atRect, setAtRect] = useState<{ left: number; top: number } | null>(null);
+  const [atIndex, setAtIndex] = useState(0);
 
   // ── Format state
   const [activeFormats, setActiveFormats] = useState<Record<string, boolean>>({});
@@ -1316,6 +1386,80 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
     setMentionSearch('');
     editorRef.current?.focus();
     checkEmpty();
+  };
+
+  // ── Menção inline "@" ────────────────────────────────────────────────────────
+  // Lê o "@texto" imediatamente antes do cursor (sem espaço) no editor
+  const readAtQuery = (): { node: Text; at: number; end: number; query: string } | null => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) return null;
+    const node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) return null;
+    const text = node.textContent || '';
+    const end = range.startOffset;
+    const before = text.slice(0, end);
+    const at = before.lastIndexOf('@');
+    if (at === -1) return null;
+    const query = before.slice(at + 1);
+    if (/\s/.test(query)) return null;
+    // O "@" precisa estar no início ou logo após um espaço
+    if (at > 0 && !/\s/.test(before[at - 1])) return null;
+    return { node: node as Text, at, end, query };
+  };
+
+  const updateAtMention = () => {
+    const q = readAtQuery();
+    if (!q) { if (atQuery !== null) setAtQuery(null); return; }
+    const sel = window.getSelection();
+    let rect: DOMRect | null = null;
+    if (sel && sel.rangeCount) rect = sel.getRangeAt(0).getBoundingClientRect();
+    const base = editorRef.current?.getBoundingClientRect();
+    const left = rect && (rect.left || rect.top) ? rect.left : (base?.left || 0) + 24;
+    const top = rect && (rect.left || rect.top) ? rect.bottom : (base?.top || 0) + 40;
+    setAtRect({ left, top });
+    setAtQuery(q.query);
+    setAtIndex(0);
+  };
+
+  const atOptions = useMemo<HandoverMention[]>(() => {
+    if (atQuery === null) return [];
+    const q = atQuery.toLowerCase();
+    const opts: HandoverMention[] = [];
+    staffList.filter(s => s.status === 'Ativo' && s.name?.toLowerCase().includes(q)).slice(0, 5).forEach(s => opts.push({ type: 'user', id: s.id, label: s.name }));
+    drivers.filter(d => d.name?.toLowerCase().includes(q)).slice(0, 4).forEach(d => opts.push({ type: 'driver', id: d.id, label: d.name }));
+    customers.filter(c => (c.legalName || c.name || '').toLowerCase().includes(q)).slice(0, 3).forEach(c => opts.push({ type: 'customer', id: c.id, label: c.legalName || c.name }));
+    trips.filter(t => t.os?.toLowerCase().includes(q)).slice(0, 3).forEach(t => opts.push({ type: 'trip', id: t.id, label: `OS ${t.os}` }));
+    ports.filter(p => p.name?.toLowerCase().includes(q)).slice(0, 2).forEach(p => opts.push({ type: 'port', id: p.id, label: p.name }));
+    return opts.slice(0, 8);
+  }, [atQuery, staffList, drivers, customers, trips, ports]);
+
+  const applyAtMention = (item: HandoverMention) => {
+    const q = readAtQuery();
+    if (!q) { setAtQuery(null); return; }
+    // Seleciona do "@" até o cursor e substitui pelo chip
+    const range = document.createRange();
+    range.setStart(q.node, q.at);
+    range.setEnd(q.node, q.end);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    const chip = `<span contenteditable="false" class="mention-chip mention-${item.type}" data-id="${item.id}" data-type="${item.type}">${chipIcons[item.type]} ${item.label}</span>&nbsp;`;
+    document.execCommand('insertHTML', false, chip);
+    setMentions(prev => prev.some(m => m.id === item.id && m.type === item.type) ? prev : [...prev, item]);
+    setAtQuery(null);
+    editorRef.current?.focus();
+    checkEmpty();
+  };
+
+  // Teclado no editor: navega/seleciona a lista do "@"
+  const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (atQuery === null || atOptions.length === 0) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setAtIndex(i => (i + 1) % atOptions.length); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setAtIndex(i => (i - 1 + atOptions.length) % atOptions.length); }
+    else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); applyAtMention(atOptions[atIndex] || atOptions[0]); }
+    else if (e.key === 'Escape') { setAtQuery(null); }
   };
 
   const getMentionOptions = (): HandoverMention[] => {
@@ -1651,14 +1795,32 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
                 ref={editorRef}
                 contentEditable
                 suppressContentEditableWarning
-                onInput={checkEmpty}
+                onInput={() => { checkEmpty(); updateAtMention(); }}
                 onPaste={handleEditorPaste}
                 onClick={handleEditorClick}
-                onKeyUp={updateActiveFormats}
+                onKeyDown={handleEditorKeyDown}
+                onKeyUp={() => { updateActiveFormats(); updateAtMention(); }}
                 onMouseUp={updateActiveFormats}
-                title="Dica: clique numa imagem para mudar o tamanho"
+                title="Dica: digite @ para citar; clique numa imagem para mudar o tamanho"
                 className="min-h-[140px] px-6 py-4 outline-none text-slate-800 text-[13px] leading-relaxed handover-editor"
               />
+              {atQuery !== null && atOptions.length > 0 && atRect && createPortal(
+                <>
+                  <div className="fixed inset-0 z-[70]" onMouseDown={() => setAtQuery(null)} />
+                  <div className="fixed z-[71] w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 p-1.5 max-h-64 overflow-y-auto" style={{ left: Math.min(atRect.left, window.innerWidth - 272), top: atRect.top + 4 }}>
+                    {atOptions.map((item, i) => (
+                      <button key={`${item.type}-${item.id}`} type="button"
+                        onMouseDown={e => { e.preventDefault(); applyAtMention(item); }}
+                        className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition-colors ${i === atIndex ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                        <span className="text-[13px]">{chipIcons[item.type]}</span>
+                        <span className="text-[11px] font-black text-slate-700 uppercase truncate flex-1">{item.label}</span>
+                        <span className="text-[7px] font-black text-slate-400 uppercase">{mentionTabLabels[item.type]}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>,
+                document.body
+              )}
             </div>
 
             {/* Post footer */}
@@ -1924,6 +2086,8 @@ const HandoverTab: React.FC<HandoverTabProps> = ({
         .handover-editor hr, .handover-content hr { border: none; border-top: 2px solid #e2e8f0; margin: 12px 0; }
         .handover-editor pre, .handover-content pre { background: #1e293b; color: #a5f3fc; padding: 10px 14px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.6; margin: 8px 0; white-space: pre-wrap; }
         .handover-editor img, .handover-content img { max-width: 100%; border-radius: 10px; margin: 6px 0; display: block; }
+        .handover-content img { cursor: zoom-in; transition: filter .15s; }
+        .handover-content img:hover { filter: brightness(0.94); }
         .handover-editor .handover-attachment, .handover-content .handover-attachment, .handover-editor a[data-attachment], .handover-content a[data-attachment] { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 8px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 10px; font-weight: 800; text-decoration: none; margin: 2px; }
         .mention-chip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 900; text-transform: uppercase; border: 1px solid; margin: 0 2px; cursor: default; }
         .mention-trip     { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
