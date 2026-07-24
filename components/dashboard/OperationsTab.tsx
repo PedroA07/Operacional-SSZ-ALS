@@ -834,7 +834,7 @@ const OperationsTab: React.FC<OperationsTabProps> = ({
       )}
 
       {isTripDetailsOpen && selectedTrip && (
-        <TripDetailsViewerModal isOpen={isTripDetailsOpen} onClose={() => setIsTripDetailsOpen(false)} trip={selectedTrip} user={user} onManageHistory={() => setIsHistoryModalOpen(true)} />
+        <TripDetailsViewerModal isOpen={isTripDetailsOpen} onClose={() => setIsTripDetailsOpen(false)} trip={selectedTrip} allTrips={trips} user={user} onManageHistory={() => setIsHistoryModalOpen(true)} />
       )}
 
       {isDriverDocsModalOpen && selectedTrip && (
