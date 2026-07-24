@@ -38,6 +38,7 @@ const OrganizationTab    = lazy(() => import('./components/dashboard/Organizatio
 const ColetaDoDiaTab     = lazy(() => import('./components/dashboard/ColetaDoDiaTab'));
 const AutomationsTab     = lazy(() => import('./components/dashboard/AutomationsTab'));
 const HandoverTab        = lazy(() => import('./components/dashboard/HandoverTab'));
+const AuditoriaTab       = lazy(() => import('./components/dashboard/AuditoriaTab'));
 const ExternalUsersManager = lazy(() => import('./components/dashboard/third-party/ExternalUsersManager'));
 const ExternalPortal     = lazy(() => import('./components/dashboard/third-party/ExternalPortal'));
 const NaviosTab          = lazy(() => import('./components/dashboard/ships/NaviosTab'));
@@ -526,6 +527,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             }} onDeletePreStacking={async id => { if(confirm('Excluir unidade?')) { await db.deletePreStacking(id); await loadAllData(false); } }} />}
            {activeTab === DashboardTab.VALORES_PRE_STACKING && <ValoresPreStackingTab />}
            {activeTab === DashboardTab.SISTEMA && <SystemTab onRefresh={() => loadAllData(false)} driversCount={drivers.length} customersCount={customers.length} portsCount={ports.length} />}
+           {activeTab === DashboardTab.AUDITORIA && <AuditoriaTab />}
            {activeTab === DashboardTab.AUTOMACOES && <AutomationsTab />}
            {activeTab === DashboardTab.NAVIOS && <NaviosTab user={user} trips={trips} />}
            {activeTab === DashboardTab.ORGANIZACAO && (

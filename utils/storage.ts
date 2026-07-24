@@ -239,7 +239,11 @@ export const db = {
   },
 
   getDrivers: () => driverRepository.getAll(supabase!),
-  saveDriver: (d: Driver, user?: User) => driverRepository.save(supabase!, d),
+  saveDriver: async (d: Driver, user?: User) => {
+    const res = await driverRepository.save(supabase!, d);
+    if (user) db.logActivity('MOTORISTA', d.id ? 'EDICAO' : 'CRIACAO', `Cadastro de motorista ${d.name || ''}`, { user, entityId: d.id, entityLabel: d.name });
+    return res;
+  },
   deleteDriver: (id: string) => driverRepository.delete(supabase!, id),
 
   updateDriverLastFreightContract: async (driverId: string, date: string, location?: string) => {
@@ -296,6 +300,7 @@ export const db = {
       });
       return false;
     }
+    if (user) db.logActivity('CLIENTE', c.id ? 'EDICAO' : 'CRIACAO', `Cadastro de cliente ${c.name || ''}`, { user, entityId: c.id, entityLabel: c.name });
     return true;
   },
 
@@ -354,6 +359,7 @@ export const db = {
       });
       return false;
     }
+    if (user) db.logActivity('PORTO', p.id ? 'EDICAO' : 'CRIACAO', `Cadastro de porto ${p.name || ''}`, { user, entityId: p.id, entityLabel: p.name });
     return true;
   },
 
@@ -412,6 +418,7 @@ export const db = {
       });
       return false;
     }
+    if (user) db.logActivity('PRE-STACKING', p.id ? 'EDICAO' : 'CRIACAO', `Cadastro de unidade pré-stacking ${p.name || ''}`, { user, entityId: p.id, entityLabel: p.name });
     return true;
   },
 
@@ -426,10 +433,17 @@ export const db = {
   deleteStaff: (id: string) => staffRepository.delete(supabase!, id),
 
   getTrips: () => tripRepository.getAll(supabase!),
-  saveTrip: (t: Trip, user?: User) => tripRepository.save(supabase!, t, user),
+  saveTrip: async (t: Trip, user?: User) => {
+    const res = await tripRepository.save(supabase!, t, user);
+    // Registra na auditoria apenas quando há um usuário responsável explícito
+    // (evita ruído dos autosaves internos que não passam usuário).
+    if (user) db.logActivity('VIAGEM', 'EDICAO', `Viagem OS ${t.os || '—'} — status: ${t.status || '—'}`, { user, entityId: t.id, entityLabel: t.os || t.container });
+    return res;
+  },
   deleteTrip: async (id: string, user?: User) => {
     if (!supabase) return false;
     const { error } = await supabase.from('trips').delete().eq('id', id);
+    if (!error && user) db.logActivity('VIAGEM', 'EXCLUSAO', `Viagem removida`, { user, entityId: id });
     return !error;
   },
 
@@ -697,6 +711,7 @@ export const db = {
       user_id: user?.id || null,
     });
     if (error) console.error('[saveFormHistory] Erro ao salvar histórico:', error.message, error);
+    if (!error) db.logActivity('FORMULARIO', 'CRIACAO', `Formulário ${formType} — ${label || ''}`, { user, entityLabel: label });
     return !error;
   },
 
@@ -1060,6 +1075,28 @@ export const db = {
       userName: r.user_name || 'Sistema', userId: r.user_id || undefined,
       createdAt: r.created_at,
     }));
+  },
+
+  // Registro genérico de atividade/auditoria (quem fez o quê). Reaproveita a
+  // tabela org_audit_log. `area` = tipo da entidade (VIAGEM, FORMULARIO,
+  // CLIENTE, MOTORISTA, PORTO, PRE-STACKING, ...).
+  logActivity: async (
+    area: string,
+    action: string,
+    description: string,
+    opts?: { user?: any; entityId?: string; entityLabel?: string; changes?: { field: string; from?: string; to?: string }[] }
+  ): Promise<void> => {
+    const u = opts?.user;
+    try {
+      await db.saveOrgAudit({
+        area, action, description,
+        entityId: opts?.entityId,
+        entityLabel: opts?.entityLabel,
+        changes: opts?.changes,
+        userName: u?.displayName || u?.name || 'Sistema',
+        userId: u?.id,
+      });
+    } catch (e) { /* auditoria nunca deve quebrar a operação */ }
   },
 
   getAvantidaRecords: async (): Promise<AvantidaRecord[]> => {
