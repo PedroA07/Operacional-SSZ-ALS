@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Trip, Port, PreStacking, TripStatus, StatusHistoryEntry, TerminalVessel, Driver, Customer, Devolucao, Liberacao, OrgAuditEntry, EmailTemplate, ColetaTipoViagemOption, CustomStatus } from '../../types';
+import { Trip, Port, PreStacking, TripStatus, StatusHistoryEntry, TerminalVessel, Driver, Customer, Devolucao, Liberacao, OrgAuditEntry, EmailTemplate, ColetaTipoViagemOption, CustomStatus, User } from '../../types';
 import { statusService } from '../../utils/statusService';
 import SmartOperationTable from './operations/SmartOperationTable';
+import { StatusColumn } from './operations/columns/StatusColumn';
+import StatusHistoryManagerModal from './operations/StatusHistoryManagerModal';
 import { organizationService } from '../../services/organizationService';
 import { advanceService } from '../../services/advanceService';
 import { db, supabase } from '../../utils/storage';
@@ -21,6 +23,7 @@ import { r2Service } from '../../utils/r2Service';
 
 interface OrganizationTabProps {
   userId: string;
+  user?: User;
   trips: Trip[];
   ports: Port[];
   preStacking: PreStacking[];
@@ -520,8 +523,9 @@ const isEntregaViewType = (typeRaw: string): boolean => {
   return /ENTREGA|IMPORTA/.test(t);
 };
 
-const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTrips, ports, preStacking, drivers, customers, onRefresh, standalone = false }) => {
+const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: propTrips, ports, preStacking, drivers, customers, onRefresh, standalone = false }) => {
   const [locations, setLocations] = useState<any[]>([]);
+  const [statusMgrTrip, setStatusMgrTrip] = useState<Trip | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategoryFilters, setSelectedCategoryFilters] = useState<string[]>([]);
   const [settingsModal, setSettingsModal] = useState(false);
@@ -2475,6 +2479,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       )
     },
     {
+      // Status da viagem (histórico) — igual à aba Operacional
+      key: 'status',
+      label: 'Status',
+      sortValue: (t: Trip) => t.status || '',
+      render: (t: Trip) => StatusColumn(t, (trip) => setStatusMgrTrip(trip), (trip) => setStatusMgrTrip(trip)),
+    },
+    {
       key: 'dateTime',
       label: 'Data',
       render: (t: Trip) => {
@@ -3747,7 +3758,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               componentId="org-coleta-export"
               columns={columns}
               data={trips}
-              forceVisibleKeys={['retiradaVazio', 'cteEmitido']}
+              forceVisibleKeys={['status', 'retiradaVazio', 'cteEmitido']}
               hideInternalSearch={false}
               getRowStyle={(t: Trip) => {
                 if (isTripReadyToFinalize(t)) return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #10b981' };
@@ -3768,7 +3779,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
               componentId="org-entrega-import"
               columns={columns}
               data={trips}
-              forceVisibleKeys={['retiradaCheio', 'cteEmitido']}
+              forceVisibleKeys={['status', 'retiradaCheio', 'cteEmitido']}
               hideInternalSearch={false}
               getRowStyle={(t: Trip) => {
                 if (t.status === 'Reutilização') return { backgroundColor: '#ecfdf5', boxShadow: 'inset 4px 0 0 #059669' };
@@ -4180,6 +4191,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       )}
 
       {/* Modal visualizador de comprovantes */}
+      {statusMgrTrip && user && (
+        <StatusHistoryManagerModal
+          isOpen={!!statusMgrTrip}
+          onClose={() => setStatusMgrTrip(null)}
+          trip={statusMgrTrip}
+          allTrips={propTrips}
+          user={user}
+          onSuccess={onRefresh}
+        />
+      )}
+
       {viewingDoc && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[400] flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setViewingDoc(null); }}>
           <div className="bg-white rounded-[2.5rem] w-full max-w-4xl h-[90vh] shadow-2xl flex flex-col overflow-hidden border border-slate-100">

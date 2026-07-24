@@ -531,6 +531,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
            {activeTab === DashboardTab.ORGANIZACAO && (
              <OrganizationTab
                userId={user.id}
+               user={user}
                trips={trips}
                ports={ports}
                preStacking={preStacking}
