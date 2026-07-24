@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { TripStatus } from '../../types';
+import DateTimePicker from '../shared/DateTimePicker';
 
 interface StatusConfirmModalProps {
   isOpen: boolean;
@@ -38,11 +39,11 @@ const StatusConfirmModal: React.FC<StatusConfirmModalProps> = ({ isOpen, onClose
         <div className="p-8 space-y-6">
           <div className="space-y-2">
             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Data e Hora do Evento</label>
-            <input 
-              type="datetime-local" 
-              className="w-full px-6 py-5 rounded-2xl bg-white/5 border-2 border-white/10 text-white font-black text-lg outline-none focus:border-blue-500 transition-all"
+            <DateTimePicker
               value={eventTime}
-              onChange={e => setEventTime(e.target.value)}
+              onChange={setEventTime}
+              placeholder="Selecione a data e hora..."
+              inputClassName="w-full !px-6 !py-5 !rounded-2xl !bg-white/5 !border-2 !border-white/10 !text-white !font-black !text-lg outline-none focus:!border-blue-500 transition-all placeholder:!text-slate-500"
             />
           </div>
 
