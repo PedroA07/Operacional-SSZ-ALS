@@ -43,6 +43,7 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
   const [categories, setCategories] = useState<any[]>([]);
   const [operationTypes, setOperationTypes] = useState<any[]>([]);
   const [textCopied, setTextCopied] = useState(false);
+  const [textModal, setTextModal] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -135,14 +136,13 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
 
           <div className="flex items-center gap-3">
             <button
-              onClick={copyOperationalText}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase shadow-lg transition-all active:scale-95 ${textCopied ? 'bg-emerald-600 text-white shadow-emerald-500/20' : 'bg-amber-500 hover:bg-amber-400 text-white shadow-amber-500/20'}`}
+              onClick={() => { setTextModal(true); setTextCopied(false); }}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-[9px] font-black uppercase shadow-lg shadow-amber-500/20 transition-all active:scale-95"
             >
-              {textCopied ? (
-                <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg> Copiado</>
-              ) : (
-                <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg> Copiar Texto</>
-              )}
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              Copiar Texto
             </button>
             <span className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase border ${isCompleted ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-blue-600 border-blue-500 text-white'}`}>
               {trip.status}
@@ -317,6 +317,41 @@ const TripDetailsViewerModal: React.FC<TripDetailsViewerModalProps> = ({ isOpen,
           </div>
         </div>
       </div>
+
+      {/* SUB-MODAL: TEXTO DO PAINEL OPERACIONAL (ver + copiar/enviar) */}
+      {textModal && (
+        <div className="fixed inset-0 z-[9100] flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <div className="px-7 py-5 bg-slate-900 flex items-center justify-between">
+              <div>
+                <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-0.5">Painel Operacional</p>
+                <h3 className="text-sm font-black text-white uppercase">Previsão / Status</h3>
+              </div>
+              <button onClick={() => setTextModal(false)} className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+              </button>
+            </div>
+            <div className="p-7 space-y-5">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-2">Prévia</p>
+                <pre className="text-[10px] font-mono text-slate-700 whitespace-pre-wrap leading-relaxed">{emailFormatter.toPlainText(trip, allTrips)}</pre>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setTextModal(false)} className="flex-1 py-3.5 border border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-600 hover:bg-slate-50 transition-all">Fechar</button>
+                <button
+                  onClick={copyOperationalText}
+                  className={`flex-1 py-3.5 rounded-2xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${textCopied ? 'bg-emerald-600 text-white' : 'bg-amber-500 hover:bg-amber-400 text-white active:scale-95 shadow-lg shadow-amber-500/20'}`}
+                >
+                  {textCopied
+                    ? <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg> Copiado</>
+                    : <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg> Copiar Texto</>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* PHOTO VIEWER */}
       {activePhoto && (
