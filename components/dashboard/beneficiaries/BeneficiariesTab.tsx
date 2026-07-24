@@ -31,6 +31,32 @@ const BeneficiariesTab: React.FC<BeneficiariesTabProps> = ({ userId, beneficiari
   const [usersMap, setUsersMap] = useState<Record<string, User>>({});
   const [usersLoading, setUsersLoading] = useState(true);
   const [revealedPasswords, setRevealedPasswords] = useState<Set<string>>(new Set());
+  const [resetInfo, setResetInfo] = useState<{ name: string; login: string; password: string } | null>(null);
+  const [resettingId, setResettingId] = useState<string | null>(null);
+  const [resetCopied, setResetCopied] = useState(false);
+
+  const genPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let p = '';
+    for (let i = 0; i < 6; i++) p += chars[Math.floor(Math.random() * chars.length)];
+    return p;
+  };
+
+  const handleResetPassword = async (b: Beneficiary) => {
+    const linkedUser = b.userId ? usersMap[b.userId] : undefined;
+    if (!linkedUser) { setToast({ msg: 'Este beneficiário não tem acesso ao portal.', type: 'err' }); return; }
+    setResettingId(b.id);
+    const newPass = genPassword();
+    const ok = await db.saveUser({ ...linkedUser, password: newPass, isFirstLogin: true });
+    setResettingId(null);
+    if (ok) {
+      setUsersMap(prev => ({ ...prev, [linkedUser.id]: { ...linkedUser, password: newPass, isFirstLogin: true } }));
+      setResetCopied(false);
+      setResetInfo({ name: b.name, login: linkedUser.username, password: newPass });
+    } else {
+      setToast({ msg: 'Erro ao gerar nova senha.', type: 'err' });
+    }
+  };
 
   useEffect(() => {
     const ids = beneficiaries.map(b => b.userId).filter(Boolean) as string[];
@@ -257,6 +283,17 @@ const BeneficiariesTab: React.FC<BeneficiariesTabProps> = ({ userId, beneficiari
                         </div>
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleResetPassword(b); }}
+                      disabled={resettingId === b.id}
+                      className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                      title="Gerar nova senha para o portal do beneficiário"
+                    >
+                      {resettingId === b.id
+                        ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>Gerando...</>
+                        : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>Solicitar Nova Senha</>}
+                    </button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5">
@@ -330,6 +367,41 @@ const BeneficiariesTab: React.FC<BeneficiariesTabProps> = ({ userId, beneficiari
                 className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-[10px] font-black uppercase transition-all disabled:opacity-50"
               >
                 {isDeleting ? 'Removendo...' : 'Remover'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Nova senha gerada */}
+      {resetInfo && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md" onClick={e => { if (e.target === e.currentTarget) setResetInfo(null); }}>
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
+            <div className="px-7 py-5 bg-blue-600 flex items-center justify-between">
+              <h3 className="text-sm font-black text-white uppercase tracking-tight">Nova Senha Gerada</h3>
+              <button onClick={() => setResetInfo(null)} className="w-8 h-8 bg-white/15 rounded-full flex items-center justify-center hover:bg-white/30 transition-all">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
+              </button>
+            </div>
+            <div className="p-7 space-y-4">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Repasse a <span className="text-slate-800 font-black">{resetInfo.name}</span>. No próximo login poderá definir uma senha própria.</p>
+              <div className="bg-slate-900 rounded-2xl p-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[8px] font-black text-slate-500 uppercase">Usuário</span>
+                  <span className="text-[12px] font-mono font-black text-blue-400 break-all">{resetInfo.login}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[8px] font-black text-slate-500 uppercase">Nova senha</span>
+                  <span className="text-[16px] font-mono font-black text-white tracking-widest">{resetInfo.password}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => { navigator.clipboard.writeText(`Usuário: ${resetInfo.login}\nSenha: ${resetInfo.password}`).then(() => { setResetCopied(true); setTimeout(() => setResetCopied(false), 2000); }); }}
+                className={`w-full py-3.5 rounded-2xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${resetCopied ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+              >
+                {resetCopied
+                  ? <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg> Copiado</>
+                  : <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg> Copiar Usuário e Senha</>}
               </button>
             </div>
           </div>
