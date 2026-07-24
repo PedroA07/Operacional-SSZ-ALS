@@ -2829,15 +2829,26 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, trips: propTr
       render: (t: Trip) => {
         const isFreteMorto = t.status === 'Frete Morto';
         const isReutilizacao = t.status === 'Reutilização';
+        // Reutilização (Entrega/Import): o container NÃO é baixado/devolvido —
+        // fica retido para reutilizar em outra programação. Por isso não há
+        // confirmação de local de baixa; mostra só a marcação de reutilização.
+        const ocultarLocalBaixa = activeView === 'ENTREGA' && isReutilizacao;
         return (
           <div className="flex flex-col gap-1.5">
-            <LocationSearchableSelect
-              trip={t}
-              locations={locations}
-              onLocationChange={handleLocationChange}
-              isScheduled={isTripScheduled(t)}
-              isFreteMorto={isFreteMorto}
-            />
+            {ocultarLocalBaixa ? (
+              <span className="w-full inline-flex items-center justify-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[7px] font-black text-emerald-700 uppercase tracking-tight">
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Container reutilizado — sem baixa
+              </span>
+            ) : (
+              <LocationSearchableSelect
+                trip={t}
+                locations={locations}
+                onLocationChange={handleLocationChange}
+                isScheduled={isTripScheduled(t)}
+                isFreteMorto={isFreteMorto}
+              />
+            )}
             {activeView === 'COLETA' ? (
               <button
                 onClick={(e) => { e.stopPropagation(); handleToggleFreteMorto(t, !isFreteMorto); }}

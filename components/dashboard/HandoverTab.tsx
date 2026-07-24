@@ -148,6 +148,33 @@ const toggleReactionMap = (
   return next;
 };
 
+// Reação única por usuário (estilo Facebook): remove a reação anterior do
+// usuário e aplica a nova; se clicar na mesma, remove (descurtir).
+const setSingleReactionMap = (
+  reactions: ReactionMap = {},
+  emoji: string,
+  user: ReactUser
+): ReactionMap => {
+  const already = (reactions[emoji] || []).some(u => u.id === user.id);
+  const next: ReactionMap = {};
+  for (const k of Object.keys(reactions)) {
+    const arr = (reactions[k] || []).filter(u => u.id !== user.id);
+    if (arr.length) next[k] = arr;
+  }
+  if (!already) next[emoji] = [...(next[emoji] || []), user];
+  return next;
+};
+
+// Reações estilo Facebook (uma por usuário)
+const FB_REACTIONS: { emoji: string; label: string }[] = [
+  { emoji: '👍', label: 'Curtir' },
+  { emoji: '❤️', label: 'Amei' },
+  { emoji: '😆', label: 'Haha' },
+  { emoji: '😮', label: 'Uau' },
+  { emoji: '😢', label: 'Triste' },
+  { emoji: '😠', label: 'Grr' },
+];
+
 // Texto "quem reagiu" — sempre nomes reais (resolve pelo diretório quando o
 // nome não foi salvo na reação); "(você)" para o próprio usuário.
 const reactorsLabel = (users: ReactUser[], meId: string, resolveName: NameResolver): string =>
@@ -228,6 +255,79 @@ const ReactionBar: React.FC<{
         </button>
         {pickerOpen && (
           <EmojiPicker onPick={e => { onToggle(e); setPickerOpen(false); }} onClose={() => setPickerOpen(false)} />
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Barra de reação estilo Facebook (para publicações): resumo das reações +
+// botão "Curtir" que abre um popover com as reações ao passar o mouse.
+const FbReactionBar: React.FC<{
+  reactions: ReactionMap;
+  userId: string;
+  resolveName: NameResolver;
+  onReact: (emoji: string) => void;
+}> = ({ reactions, userId, resolveName, onReact }) => {
+  const [open, setOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const show = () => { if (hideTimer.current) clearTimeout(hideTimer.current); setOpen(true); };
+  const hide = () => { hideTimer.current = setTimeout(() => setOpen(false), 260); };
+
+  const entries = Object.entries(reactions || {}).filter(([, u]) => (u || []).length > 0)
+    .sort((a, b) => b[1].length - a[1].length);
+  const total = entries.reduce((s, [, u]) => s + u.length, 0);
+  const myEmoji = entries.find(([, u]) => u.some(x => x.id === userId))?.[0];
+  const myLabel = FB_REACTIONS.find(r => r.emoji === myEmoji)?.label;
+  const summaryTitle = entries.map(([e, u]) => `${e} ${reactorsLabel(u, userId, resolveName)}`).join('\n');
+
+  return (
+    <div className="flex items-center justify-between gap-2 flex-wrap">
+      {/* Resumo das reações (emojis sobrepostos + total) */}
+      {entries.length > 0 ? (
+        <div className="flex items-center gap-1.5" title={summaryTitle}>
+          <div className="flex -space-x-1.5">
+            {entries.slice(0, 3).map(([e]) => (
+              <span key={e} className="w-5 h-5 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[12px] leading-none shadow-sm">{e}</span>
+            ))}
+          </div>
+          <span className="text-[10px] font-black text-slate-500">{total}</span>
+        </div>
+      ) : <span />}
+
+      {/* Botão Curtir/Reagir com popover de reações no hover */}
+      <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
+        <button
+          type="button"
+          onClick={() => onReact(myEmoji || '👍')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${myEmoji ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:text-blue-500 hover:bg-slate-50'}`}
+        >
+          <span className="text-[15px] leading-none">{myEmoji || '👍'}</span>
+          {myEmoji ? (myLabel || 'Reagiu') : 'Curtir'}
+        </button>
+        {open && (
+          <div
+            onMouseEnter={show}
+            onMouseLeave={hide}
+            className="absolute z-[62] bottom-full right-0 mb-2 flex items-center gap-0.5 bg-white rounded-full shadow-2xl border border-slate-200 px-2 py-1.5 animate-in fade-in slide-in-from-bottom-1 duration-150"
+          >
+            {FB_REACTIONS.map(r => (
+              <button key={r.emoji} type="button" title={r.label}
+                onClick={() => { onReact(r.emoji); setOpen(false); }}
+                className={`w-9 h-9 rounded-full flex items-center justify-center text-[24px] leading-none transition-transform hover:scale-125 origin-bottom ${myEmoji === r.emoji ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                {r.emoji}
+              </button>
+            ))}
+            <div className="w-px h-6 bg-slate-200 mx-1" />
+            <button type="button" title="Outros emojis" onClick={() => { setPickerOpen(true); setOpen(false); }}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-50">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 12h.01M12 12h.01M19 12h.01"/></svg>
+            </button>
+          </div>
+        )}
+        {pickerOpen && (
+          <EmojiPicker align="right" onPick={e => { onReact(e); setPickerOpen(false); }} onClose={() => setPickerOpen(false)} />
         )}
       </div>
     </div>
@@ -325,9 +425,10 @@ const PostCard: React.FC<{
     (post.authorId === id ? post.authorName : '') ||
     'Usuário';
 
+  // Reação da publicação: estilo Facebook (uma reação por usuário)
   const togglePostReaction = async (emoji: string) => {
     const isAdding = !(postReactions[emoji] || []).some(u => u.id === me.id);
-    const next = toggleReactionMap(postReactions, emoji, me);
+    const next = setSingleReactionMap(postReactions, emoji, me);
     setPostReactions(next);
     if (isAdding) onEmojiUsed(emoji);
     const ok = await db.updateHandoverReactions('post', post.id, next);
@@ -641,9 +742,9 @@ const PostCard: React.FC<{
       {/* Action bar */}
       {!isEditingPost && (
         <div className="px-6 pb-3 pt-1 border-t border-slate-50 space-y-2">
-          {/* Reações do post */}
+          {/* Reações da publicação — estilo Facebook */}
           <div className="pt-1">
-            <ReactionBar reactions={postReactions} userId={currentUser.id} topEmojis={topEmojis} resolveName={resolveName} onToggle={togglePostReaction} />
+            <FbReactionBar reactions={postReactions} userId={currentUser.id} resolveName={resolveName} onReact={togglePostReaction} />
           </div>
           <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-slate-400">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
