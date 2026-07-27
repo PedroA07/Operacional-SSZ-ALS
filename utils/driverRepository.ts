@@ -50,6 +50,8 @@ export const driverRepository = {
       year_trailer: primaryTrailerYear?.trim() || null,
       plates_horse: platesHorse,
       plates_trailer: platesTrailer,
+      horse_docs: Array.isArray(driver.horseDocs) ? driver.horseDocs : [],
+      trailer_docs: Array.isArray(driver.trailerDocs) ? driver.trailerDocs : [],
       driver_type: driver.driverType || 'Externo',
       status: driver.status || 'Ativo',
       status_last_change_date: driver.statusLastChangeDate || null,
@@ -103,6 +105,8 @@ export const driverRepository = {
       yearTrailer: primaryYear(platesTrailer) || d.year_trailer || d.yearTrailer || '',
       platesHorse,
       platesTrailer,
+      horseDocs: Array.isArray(d.horse_docs) ? d.horse_docs : [],
+      trailerDocs: Array.isArray(d.trailer_docs) ? d.trailer_docs : [],
       driverType: d.driver_type || d.driverType || 'Externo',
       status: d.status || 'Ativo',
       statusLastChangeDate: d.status_last_change_date || d.statusLastChangeDate,
@@ -130,8 +134,15 @@ export const driverRepository = {
   },
 
   async save(supabase: SupabaseClient, driver: Driver) {
-    const payload = this.mapToDb(driver);
-    const { error } = await supabase.from('drivers').upsert(payload);
+    const payload: any = this.mapToDb(driver);
+    let { error } = await supabase.from('drivers').upsert(payload);
+    // Se as colunas de documentos ainda não existem no banco (migração não aplicada),
+    // remove-as e tenta novamente para não bloquear o salvamento do motorista.
+    if (error && /horse_docs|trailer_docs|column/i.test(error.message || '')) {
+      delete payload.horse_docs;
+      delete payload.trailer_docs;
+      ({ error } = await supabase.from('drivers').upsert(payload));
+    }
     if (error) throw error;
     return true;
   },
