@@ -62,6 +62,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
       `CPF: ${onlyDigits(d.cpf)}`,
       d.cnh ? `CNH: ${onlyAlnum(d.cnh)}` : '',
       d.phone ? `TELEFONE: ${onlyDigits(d.phone)}` : '',
+      d.email ? `E-MAIL: ${(d.email || '').trim()}` : '',
       d.plateHorse ? `CAVALO: ${onlyAlnum(d.plateHorse)}` : '',
       d.plateTrailer ? `CARRETA: ${onlyAlnum(d.plateTrailer)}` : '',
       d.beneficiaryName ? `BENEFICIARIO: ${stripSpecials(d.beneficiaryName)}` : '',
@@ -182,7 +183,10 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
             <Icons.Whatsapp />
             {maskPhone(d.phone)}
           </a>
-          <p className="text-[9px] text-slate-400 font-bold lowercase truncate max-w-[150px]">{d.email || 'sem_email@als.com'}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-[9px] text-slate-400 font-bold lowercase truncate max-w-[150px]">{d.email || 'sem_email@als.com'}</p>
+            {d.email && <CopyBtn ck={`email-${d.id}`} value={(d.email || '').trim()} title="Copiar e-mail" />}
+          </div>
         </div>
       ),
     },
@@ -236,12 +240,16 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
           <div className="p-3 bg-slate-900 rounded-2xl border border-white/5 space-y-2 min-w-[200px]">
              <div className="flex justify-between items-center">
                 <span className="text-[7px] font-black text-slate-500 uppercase">Login</span>
-                <span className="text-[10px] font-mono font-black text-blue-400">{(d.cpf || '').replace(/\D/g,'')}</span>
+                <div className="flex items-center gap-1.5">
+                   <span className="text-[10px] font-mono font-black text-blue-400">{(d.cpf || '').replace(/\D/g,'')}</span>
+                   <CopyBtn ck={`login-${d.id}`} value={(d.cpf || '').replace(/\D/g,'')} title="Copiar login" className="!text-slate-500 hover:!text-blue-400" />
+                </div>
              </div>
              <div className="flex justify-between items-center">
                 <span className="text-[7px] font-black text-slate-500 uppercase">Senha</span>
                 <div className="flex items-center gap-2">
                    <span className="text-[10px] font-mono font-black text-white">{passVisible ? (linkedUser?.password || '---') : '••••••••'}</span>
+                   {linkedUser?.password && <CopyBtn ck={`senha-${d.id}`} value={linkedUser.password} title="Copiar senha" className="!text-slate-500 hover:!text-white" />}
                    <button onClick={() => setShowPasswords(prev => ({...prev, [d.id]: !prev[d.id]}))} className="text-slate-600 hover:text-white transition-colors">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="3" d={passVisible ? "M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943-9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" : "M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"}/></svg>
                    </button>
