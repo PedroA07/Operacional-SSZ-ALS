@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Driver, OperationDefinition, Customer, User } from '../../types';
-import { maskPhone, maskCPF, maskRG, maskCNPJ } from '../../utils/masks';
+import { maskPhone, maskCPF, maskRG, maskCNPJ, stripSpecials, normalizeSearch } from '../../utils/masks';
 import { Icons } from '../../constants/icons';
 import { db } from '../../utils/storage';
 import ListFilters from './shared/ListFilters';
@@ -38,6 +38,54 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
   const [resetInfo, setResetInfo] = useState<{ name: string; login: string; password: string } | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [resetCopied, setResetCopied] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Copia um valor já limpo (sem caracteres especiais) para a área de transferência
+  const copyClean = (key: string, text: string) => {
+    const clean = (text || '').trim();
+    if (!clean) return;
+    navigator.clipboard.writeText(clean).then(() => {
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(prev => (prev === key ? null : prev)), 1500);
+    });
+  };
+
+  // Apenas dígitos (CPF, CNPJ, telefone)
+  const onlyDigits = (v?: string | null) => (v || '').replace(/\D/g, '');
+  // Apenas letras/números (CNH, placas)
+  const onlyAlnum = (v?: string | null) => (v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  // Bloco completo de dados do motorista, sem caracteres especiais (pronto para colar)
+  const buildCleanInfo = (d: Driver) => {
+    const lines = [
+      `NOME: ${stripSpecials(d.name)}`,
+      `CPF: ${onlyDigits(d.cpf)}`,
+      d.cnh ? `CNH: ${onlyAlnum(d.cnh)}` : '',
+      d.phone ? `TELEFONE: ${onlyDigits(d.phone)}` : '',
+      d.plateHorse ? `CAVALO: ${onlyAlnum(d.plateHorse)}` : '',
+      d.plateTrailer ? `CARRETA: ${onlyAlnum(d.plateTrailer)}` : '',
+      d.beneficiaryName ? `BENEFICIARIO: ${stripSpecials(d.beneficiaryName)}` : '',
+      d.beneficiaryCnpj ? `CNPJ: ${onlyDigits(d.beneficiaryCnpj)}` : '',
+    ];
+    return lines.filter(Boolean).join('\n');
+  };
+
+  // Botão de copiar reutilizável (ícone que vira "check" ao copiar)
+  const CopyBtn: React.FC<{ ck: string; value: string; title?: string; className?: string }> = ({ ck, value, title, className }) => {
+    const done = copiedKey === ck;
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); copyClean(ck, value); }}
+        title={title || 'Copiar sem caracteres especiais'}
+        className={`inline-flex items-center justify-center shrink-0 transition-colors ${done ? 'text-emerald-500' : 'text-slate-400 hover:text-blue-600'} ${className || ''}`}
+      >
+        {done
+          ? <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+          : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg>}
+      </button>
+    );
+  };
 
   const fetchUsers = async () => {
     const data = await db.getUsers();
@@ -92,12 +140,15 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
   };
 
   const filteredDrivers = useMemo(() => {
-    let result = drivers.filter(d => 
-      d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      d.cpf.includes(searchQuery) ||
-      d.plateHorse.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (d.beneficiaryName && d.beneficiaryName.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    // Busca ignorando acentos, pontuação e caracteres especiais
+    const q = normalizeSearch(searchQuery);
+    let result = !q ? drivers : drivers.filter(d => {
+      const haystack = normalizeSearch(
+        [d.name, d.cpf, d.cnh, d.phone, d.plateHorse, d.plateTrailer, d.beneficiaryName, d.beneficiaryCnpj, d.email]
+          .filter(Boolean).join(' ')
+      );
+      return haystack.includes(q);
+    });
     if (statusFilter !== 'todos') result = result.filter(d => d.status === statusFilter);
     result.sort((a, b) => sortBy === 'name_asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
     return result;
@@ -113,7 +164,7 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
             {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-white"><img src="/logo.jpg" alt="ALS" className="w-6 h-6 object-contain" /></div>}
           </div>
           <div>
-            <p className="font-black text-slate-800 uppercase text-[11px] leading-none">{d.name}</p>
+            <p className="font-black text-slate-800 uppercase text-[11px] leading-none flex items-center gap-1.5">{d.name}<CopyBtn ck={`nome-${d.id}`} value={stripSpecials(d.name)} title="Copiar nome (sem acentos)" /></p>
             <div className="mt-2 p-1.5 bg-blue-50/50 rounded-lg border border-blue-100/50">
                <p className="text-[7px] font-black text-blue-400 uppercase tracking-tighter leading-none">Beneficiário:</p>
                <p className="text-[9px] font-bold text-blue-600 uppercase mt-0.5">{d.beneficiaryName || 'O PRÓPRIO'}</p>
@@ -140,9 +191,9 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
       label: 'Documentação',
       render: (d: Driver) => (
         <div className="space-y-1">
-          <p className="text-[9px] font-black text-slate-500 uppercase">CPF: <span className="text-slate-800 font-mono">{maskCPF(d.cpf)}</span></p>
+          <p className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-1.5">CPF: <span className="text-slate-800 font-mono">{maskCPF(d.cpf)}</span><CopyBtn ck={`cpf-${d.id}`} value={onlyDigits(d.cpf)} title="Copiar CPF (só números)" /></p>
           <div className="flex items-center gap-2 pt-1">
-             <span className="text-[9px] font-black text-slate-500 uppercase">CNH: <span className="text-slate-800">{d.cnh || '---'}</span></span>
+             <span className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-1.5">CNH: <span className="text-slate-800">{d.cnh || '---'}</span>{d.cnh && <CopyBtn ck={`cnh-${d.id}`} value={onlyAlnum(d.cnh)} title="Copiar CNH (sem caracteres especiais)" />}</span>
              {d.cnhPdfUrl && (
                <button onClick={() => { setCurrentCnhUrl(d.cnhPdfUrl!); setIsCnhModalOpen(true); }} className="px-2 py-0.5 bg-red-50 text-red-600 rounded text-[7px] font-black border border-red-100 hover:bg-red-600 hover:text-white transition-all">PDF</button>
              )}
@@ -159,11 +210,13 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
               <span className="text-[7px] font-black text-slate-400 uppercase w-10">Cavalo:</span>
               <span className="bg-slate-900 text-white px-2 py-1 rounded text-[10px] font-mono font-bold shadow-sm">{d.plateHorse}</span>
               <span className="text-[9px] text-slate-500 font-bold">{d.yearHorse || '---'}</span>
+              {d.plateHorse && <CopyBtn ck={`ph-${d.id}`} value={onlyAlnum(d.plateHorse)} title="Copiar placa do cavalo (sem traço)" />}
            </div>
            <div className="flex items-center gap-2">
               <span className="text-[7px] font-black text-slate-400 uppercase w-10">Carreta:</span>
               <span className="bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded text-[10px] font-mono font-bold">{d.plateTrailer}</span>
               <span className="text-[9px] text-slate-500 font-bold">{d.yearTrailer || '---'}</span>
+              {d.plateTrailer && <CopyBtn ck={`pt-${d.id}`} value={onlyAlnum(d.plateTrailer)} title="Copiar placa da carreta (sem traço)" />}
            </div>
         </div>
       ),
@@ -228,13 +281,22 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
       label: 'Ações',
       render: (d: Driver) => (
         <div className="flex justify-end gap-1">
+          <button
+            onClick={() => copyClean(`all-${d.id}`, buildCleanInfo(d))}
+            title="Copiar todos os dados sem caracteres especiais"
+            className={`p-2 rounded-xl transition-all ${copiedKey === `all-${d.id}` ? 'text-emerald-500 bg-emerald-50' : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
+          >
+            {copiedKey === `all-${d.id}`
+              ? <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
+              : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg>}
+          </button>
           <DriverDossierAction driver={d} />
           <button onClick={() => handleOpenModal(d)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732" strokeWidth="2.5"/></svg></button>
           <button onClick={() => { setItemToDelete(d); setIsDeleteModalOpen(true); }} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Icons.Excluir /></button>
         </div>
       ),
     },
-  ], [usersMap, showPasswords, handleOpenModal, resettingId]);
+  ], [usersMap, showPasswords, handleOpenModal, resettingId, copiedKey]);
 
   return (
     <div className="max-w-full mx-auto space-y-6">
