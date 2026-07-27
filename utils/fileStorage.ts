@@ -108,8 +108,16 @@ export const fileStorage = {
     return fileStorage.upload(file, `drivers/${driverId}/foto_perfil/perfil_${timestamp}.jpg`);
   },
 
-  uploadDriverCNH: (file: File | string, driverId: string) => 
+  uploadDriverCNH: (file: File | string, driverId: string) =>
     fileStorage.upload(file, `drivers/${driverId}/cnh/cnh.pdf`),
+
+  // Documento de cavalo/carreta (PDF ou imagem)
+  uploadDriverVehicleDoc: (file: File, driverId: string, vehicle: 'cavalo' | 'carreta') => {
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const ext = isPdf ? 'pdf' : (file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg');
+    const base = file.name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]/gi, '_').slice(0, 50) || 'doc';
+    return fileStorage.upload(file, `drivers/${driverId}/documentos_${vehicle}/${Date.now()}_${base}.${ext}`);
+  },
 
   uploadTripDoc: (file: File | string, os: string, docType: string) => {
     const cleanOS = os.replace(/[^a-z0-9]/gi, '_');

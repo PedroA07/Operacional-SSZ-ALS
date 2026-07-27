@@ -820,6 +820,14 @@ export interface PlateEntry {
   isPrimary: boolean;
 }
 
+export interface VehicleDoc {
+  id: string;
+  url: string;
+  name: string;
+  kind: 'pdf' | 'image';
+  uploadedAt: string;
+}
+
 export interface Driver {
   id: string;
   name: string;
@@ -836,6 +844,8 @@ export interface Driver {
   yearTrailer?: string;
   platesHorse?: PlateEntry[];
   platesTrailer?: PlateEntry[];
+  horseDocs?: VehicleDoc[];
+  trailerDocs?: VehicleDoc[];
   driverType: 'Frota' | 'Externo' | 'Motoboy';
   status: 'Ativo' | 'Inativo';
   statusLastChangeDate?: string;

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Driver, PlateEntry, OperationDefinition, Customer, Beneficiary } from '../../../types';
+import { Driver, PlateEntry, OperationDefinition, Customer, Beneficiary, VehicleDoc } from '../../../types';
 import { maskPhone, maskPlate, maskCPF, maskRG, maskCNPJ } from '../../../utils/masks';
 import { fileStorage } from '../../../utils/fileStorage';
 import { driverAuthService } from '../../../utils/driverAuthService';
@@ -142,6 +142,83 @@ const PlateManager: React.FC<PlateManagerProps> = ({ label, entries, onChange })
     </div>
   );
 };
+// ─── Gerenciador de documentos do veículo (PDF ou imagem) ─────────────────────
+interface VehicleDocManagerProps {
+  label: string;
+  vehicle: 'cavalo' | 'carreta';
+  docs: VehicleDoc[];
+  driverId: string;
+  onChange: (docs: VehicleDoc[]) => void;
+}
+
+const VehicleDocManager: React.FC<VehicleDocManagerProps> = ({ label, vehicle, docs, driverId, onChange }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const added: VehicleDoc[] = [];
+      for (const file of Array.from(files)) {
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        const url = await fileStorage.uploadDriverVehicleDoc(file, driverId, vehicle);
+        added.push({
+          id: `vd-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          url,
+          name: file.name,
+          kind: isPdf ? 'pdf' : 'image',
+          uploadedAt: new Date().toISOString(),
+        });
+      }
+      onChange([...docs, ...added]);
+    } catch (err: any) {
+      alert(`Erro ao anexar documento: ${err.message || err}`);
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  const removeDoc = (id: string) => onChange(docs.filter(d => d.id !== id));
+
+  return (
+    <div className="space-y-3 mt-5 pt-5 border-t border-slate-200/70">
+      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+
+      <div className="space-y-2">
+        {docs.length === 0 && (
+          <p className="text-[10px] text-slate-300 italic px-1">Nenhum documento anexado</p>
+        )}
+        {docs.map(doc => (
+          <div key={doc.id} className="flex items-center gap-2 p-2.5 rounded-2xl border border-slate-100 bg-white">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${doc.kind === 'pdf' ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500'}`}>
+              {doc.kind === 'pdf'
+                ? <span className="text-[8px] font-black">PDF</span>
+                : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>}
+            </div>
+            <a href={doc.url} target="_blank" rel="noreferrer" className="flex-1 min-w-0 text-[10px] font-bold text-slate-600 hover:text-blue-600 truncate" title={doc.name}>{doc.name}</a>
+            <button type="button" onClick={() => removeDoc(doc.id)} className="w-7 h-7 flex items-center justify-center rounded-xl bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all shrink-0">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" /></svg>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="w-full py-3 rounded-2xl bg-white border-2 border-dashed border-slate-200 flex items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 hover:border-blue-400 transition-all disabled:opacity-60 group"
+      >
+        {uploading
+          ? <><div className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"/><span className="text-[8px] font-black text-blue-600 uppercase">Enviando...</span></>
+          : <><svg className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg><span className="text-[8px] font-black text-slate-400 group-hover:text-blue-600 uppercase">Anexar PDF ou Imagem</span></>}
+      </button>
+      <input ref={inputRef} type="file" className="hidden" accept="application/pdf,image/*" multiple onChange={e => handleFiles(e.target.files)} />
+    </div>
+  );
+};
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, editingDriver, availableOps }) => {
@@ -178,9 +255,12 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
     beneficiaryName: '', beneficiaryPhone: '', beneficiaryEmail: '',
     beneficiaryCnpj: '', paymentPreference: 'PIX',
     whatsappGroupName: '', whatsappGroupLink: '',
-    operations: [], hasAccess: true, cnhPdfUrl: ''
+    operations: [], hasAccess: true, cnhPdfUrl: '',
+    horseDocs: [], trailerDocs: []
   };
 
+  // Id estável para o caminho de upload dos documentos (também usado ao salvar)
+  const draftIdRef = useRef<string>(`drv-${Date.now()}`);
   const [form, setForm] = useState<Partial<Driver>>(initialForm);
   const [tempCategory, setTempCategory] = useState(availableOps[0]?.category || '');
   const [tempClient, setTempClient] = useState('Geral');
@@ -218,6 +298,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
 
       setForm({ ...editingDriver, operations: editingDriver.operations || [], platesHorse, platesTrailer });
     } else {
+      draftIdRef.current = `drv-${Date.now()}`;
       setForm(initialForm);
     }
 
@@ -287,7 +368,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
 
     setIsSaving(true);
     try {
-      const drvId = editingDriver?.id || `drv-${Date.now()}`;
+      const drvId = editingDriver?.id || draftIdRef.current;
       let finalPhoto = form.photo || '';
       let finalCnh = form.cnhPdfUrl || '';
 
@@ -434,12 +515,26 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSave, edit
                       entries={form.platesHorse || []}
                       onChange={handlePlatesHorseChange}
                     />
+                    <VehicleDocManager
+                      label="Documentos do Cavalo (CRLV, etc.)"
+                      vehicle="cavalo"
+                      docs={form.horseDocs || []}
+                      driverId={editingDriver?.id || draftIdRef.current}
+                      onChange={docs => setForm(prev => ({ ...prev, horseDocs: docs }))}
+                    />
                   </div>
                   <div className="p-5 bg-slate-50 border border-slate-100 rounded-3xl">
                     <PlateManager
                       label="Placas de Carreta (Reboque)"
                       entries={form.platesTrailer || []}
                       onChange={handlePlatesTrailerChange}
+                    />
+                    <VehicleDocManager
+                      label="Documentos da Carreta (CRLV, etc.)"
+                      vehicle="carreta"
+                      docs={form.trailerDocs || []}
+                      driverId={editingDriver?.id || draftIdRef.current}
+                      onChange={docs => setForm(prev => ({ ...prev, trailerDocs: docs }))}
                     />
                   </div>
                 </div>
