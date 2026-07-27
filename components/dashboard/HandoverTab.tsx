@@ -394,6 +394,43 @@ const PostCard: React.FC<{
   const [isEditingPost, setIsEditingPost] = useState(false);
   const [isSavingPost,  setIsSavingPost]  = useState(false);
   const postEditRef = useRef<HTMLDivElement>(null);
+  const editFileRef = useRef<HTMLInputElement>(null);
+  const [editEmojiOpen, setEditEmojiOpen] = useState(false);
+  const [editUploading, setEditUploading] = useState(false);
+
+  // Ferramentas de edição operam sobre o editor de edição (postEditRef)
+  const editExec = (cmd: string, val?: string) => { postEditRef.current?.focus(); document.execCommand(cmd, false, val); };
+  const editInsert = (html: string) => { postEditRef.current?.focus(); document.execCommand('insertHTML', false, html); };
+  const editUploadFiles = async (files: File[]) => {
+    if (!files.length) return;
+    setEditUploading(true);
+    for (const f of files) {
+      const url = await onUploadFile(f);
+      if (url) {
+        if (f.type.startsWith('image/')) editInsert(`<img src="${url}" alt="${f.name}" style="max-width:100%;border-radius:10px;margin:6px 0;display:block"/><br/>`);
+        else editInsert(`<a href="${url}" target="_blank" rel="noopener" data-attachment="1" class="handover-attachment" contenteditable="false">📎 ${f.name}</a>&nbsp;`);
+      } else showToast('Erro ao anexar');
+    }
+    setEditUploading(false);
+  };
+  const editPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imgs = Array.from(items).filter(it => it.kind === 'file' && it.type.startsWith('image/')).map(it => it.getAsFile()).filter(Boolean) as File[];
+    if (imgs.length === 0) return;
+    e.preventDefault();
+    editUploadFiles(imgs.map((b, i) => new File([b], `print-${Date.now()}-${i}.png`, { type: b.type })));
+  };
+  const editClickImg = (e: React.MouseEvent<HTMLDivElement>) => {
+    const t = e.target as HTMLElement;
+    if (t.tagName !== 'IMG') return;
+    const img = t as HTMLImageElement;
+    const sizes = ['100%', '75%', '50%', '25%'];
+    const cur = img.style.width || '100%';
+    img.style.width = sizes[(sizes.indexOf(cur) + 1) % sizes.length];
+    img.style.height = 'auto';
+  };
+  const EDIT_COLORS = ['#0f172a', '#1e40af', '#047857', '#b91c1c', '#7c3aed', '#b45309'];
 
   const enterEditPost = () => {
     setIsEditingPost(true);
@@ -726,11 +763,44 @@ const PostCard: React.FC<{
       {/* Content / Edit mode */}
       {isEditingPost ? (
         <div className="px-6 pb-4">
+          {/* Barra de ferramentas de edição */}
+          <div className="flex items-center gap-0.5 px-2 py-1.5 border border-slate-200 rounded-t-xl bg-slate-50 flex-wrap">
+            <button type="button" title="Negrito" onMouseDown={e => { e.preventDefault(); editExec('bold'); }} className="w-7 h-7 rounded-lg hover:bg-slate-200 text-slate-600 font-black text-[11px]"><b>B</b></button>
+            <button type="button" title="Itálico" onMouseDown={e => { e.preventDefault(); editExec('italic'); }} className="w-7 h-7 rounded-lg hover:bg-slate-200 text-slate-600 text-[11px]"><i>I</i></button>
+            <button type="button" title="Sublinhado" onMouseDown={e => { e.preventDefault(); editExec('underline'); }} className="w-7 h-7 rounded-lg hover:bg-slate-200 text-slate-600 text-[11px]"><u>S</u></button>
+            <button type="button" title="Tachado" onMouseDown={e => { e.preventDefault(); editExec('strikeThrough'); }} className="w-7 h-7 rounded-lg hover:bg-slate-200 text-slate-600 text-[11px]"><s>T</s></button>
+            <div className="w-px h-5 bg-slate-200 mx-1" />
+            <button type="button" title="Título" onMouseDown={e => { e.preventDefault(); editExec('formatBlock', 'h3'); }} className="w-7 h-7 rounded-lg hover:bg-slate-200 text-slate-600 font-black text-[10px]">H</button>
+            <button type="button" title="Texto pequeno" onMouseDown={e => { e.preventDefault(); editExec('fontSize', '2'); }} className="w-7 h-7 rounded-lg hover:bg-slate-200 text-slate-600"><span className="text-[8px] font-black">A</span></button>
+            <button type="button" title="Texto grande" onMouseDown={e => { e.preventDefault(); editExec('fontSize', '5'); }} className="w-7 h-7 rounded-lg hover:bg-slate-200 text-slate-600"><span className="text-[14px] font-black">A</span></button>
+            <button type="button" title="Lista" onMouseDown={e => { e.preventDefault(); editExec('insertUnorderedList'); }} className="w-7 h-7 rounded-lg hover:bg-slate-200 text-slate-600">
+              <svg className="w-3.5 h-3.5 mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+            </button>
+            <button type="button" title="Separador" onMouseDown={e => { e.preventDefault(); editInsert('<hr style="border:none;border-top:2px solid #e2e8f0;margin:10px 0"/><br/>'); }} className="w-7 h-7 rounded-lg hover:bg-slate-200 text-slate-600">
+              <svg className="w-3.5 h-3.5 mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 12h18"/></svg>
+            </button>
+            <div className="w-px h-5 bg-slate-200 mx-1" />
+            {EDIT_COLORS.map(c => (
+              <button key={c} type="button" title="Cor" onMouseDown={e => { e.preventDefault(); editExec('foreColor', c); }} className="w-4 h-4 rounded-full border border-white shadow-sm hover:scale-110 transition-transform" style={{ backgroundColor: c }} />
+            ))}
+            <div className="w-px h-5 bg-slate-200 mx-1" />
+            <button type="button" title="Anexar imagem/documento" onMouseDown={e => { e.preventDefault(); editFileRef.current?.click(); }} className="w-7 h-7 rounded-lg hover:bg-slate-200 text-emerald-600">
+              {editUploading ? <div className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin mx-auto"/> : <svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>}
+            </button>
+            <input ref={editFileRef} type="file" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" multiple className="hidden" onChange={e => { editUploadFiles(Array.from(e.target.files || [])); e.target.value = ''; }} />
+            <div className="relative">
+              <button type="button" title="Emoji" onMouseDown={e => { e.preventDefault(); setEditEmojiOpen(v => !v); }} className="w-7 h-7 rounded-lg hover:bg-slate-200 text-[15px]">😊</button>
+              {editEmojiOpen && <EmojiPicker direction="down" onPick={em => { editInsert(em); setEditEmojiOpen(false); }} onClose={() => setEditEmojiOpen(false)} />}
+            </div>
+          </div>
           <div
             ref={postEditRef}
             contentEditable
             suppressContentEditableWarning
-            className="min-h-[80px] px-4 py-3 rounded-xl border-2 border-blue-200 bg-blue-50/20 outline-none text-slate-800 text-[13px] leading-relaxed handover-editor"
+            onPaste={editPaste}
+            onClick={editClickImg}
+            title="Cole prints com Ctrl+V; clique numa imagem para mudar o tamanho"
+            className="min-h-[100px] px-4 py-3 rounded-b-xl border-2 border-t-0 border-blue-200 bg-blue-50/20 outline-none text-slate-800 text-[13px] leading-relaxed handover-editor"
           />
           <div className="flex gap-2 mt-2 justify-end">
             <button onClick={() => setIsEditingPost(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-[9px] font-black text-slate-500 uppercase hover:bg-slate-50 transition-all">
