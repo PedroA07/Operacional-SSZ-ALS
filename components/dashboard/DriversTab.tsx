@@ -52,6 +52,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
   const onlyDigits = (v?: string | null) => (v || '').replace(/\D/g, '');
   // Apenas letras/números (CNH, placas)
   const onlyAlnum = (v?: string | null) => (v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // Detecta se a URL é PDF ou imagem (para o visualizador nativo)
+  const kindFromUrl = (url: string): 'pdf' | 'image' => /\.pdf(\?|$)/i.test(url || '') ? 'pdf' : 'image';
 
   // Bloco completo de dados do motorista, sem caracteres especiais (pronto para colar)
   const buildCleanInfo = (d: Driver) => {
@@ -158,29 +160,40 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
     const linkedUser = usersMap.get(d.id) || usersMap.get(onlyDigits(d.cpf));
     const passVisible = showPasswords[d.id];
     const vehicleDocs: { doc: import('../../types').VehicleDoc; label: string }[] = [
-      ...((d.horseDocs || []).map(doc => ({ doc, label: 'Cavalo' }))),
-      ...((d.trailerDocs || []).map(doc => ({ doc, label: 'Carreta' }))),
+      ...((d.horseDocs || []).map(doc => ({ doc, label: `Cavalo${doc.plate ? ' ' + doc.plate : ''}` }))),
+      ...((d.trailerDocs || []).map(doc => ({ doc, label: `Carreta${doc.plate ? ' ' + doc.plate : ''}` }))),
     ];
     return (
       <div key={d.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-blue-200 transition-all flex flex-col overflow-hidden">
-        {/* Cabeçalho */}
-        <div className="p-5 flex items-start gap-4 border-b border-slate-100">
-          <div className="w-16 h-16 rounded-2xl bg-slate-100 border overflow-hidden shrink-0 shadow-inner">
-            {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-white"><img src="/logo.jpg" alt="ALS" className="w-7 h-7 object-contain" /></div>}
+        {/* Cabeçalho com foto em destaque */}
+        <div className="relative">
+          {/* Faixa de fundo */}
+          <div className="h-16 bg-gradient-to-r from-slate-800 to-slate-900" />
+          <div className="absolute top-3 right-3">
+            <span className={`shrink-0 px-2.5 py-1 rounded-full text-[8px] font-black border shadow-sm ${d.status === 'Ativo' ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-red-500 text-white border-red-400'}`}>{d.status}</span>
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <p className="font-black text-slate-800 uppercase text-[12px] leading-tight flex items-center gap-1.5 min-w-0">
-                <span className="truncate">{d.name}</span>
-                <CopyBtn ck={`nome-${d.id}`} value={stripSpecials(d.name)} title="Copiar nome (sem acentos)" />
-              </p>
-              <span className={`shrink-0 px-2 py-0.5 rounded-full text-[8px] font-black border ${d.status === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>{d.status}</span>
-            </div>
-            <div className="mt-2 px-2 py-1 bg-blue-50/60 rounded-lg border border-blue-100/60 inline-flex flex-col">
-              <span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter leading-none">Beneficiário</span>
-              <span className="text-[9px] font-bold text-blue-600 uppercase mt-0.5 truncate max-w-[180px]">{d.beneficiaryName || 'O PRÓPRIO'}</span>
+          <div className="px-5 pb-4 -mt-10 flex flex-col items-center text-center">
+            {/* Foto de perfil em destaque */}
+            <button
+              type="button"
+              onClick={() => d.photo && setDocViewer({ url: d.photo, name: `Foto — ${d.name}`, kind: 'image' })}
+              className="w-24 h-24 rounded-3xl bg-white border-4 border-white overflow-hidden shrink-0 shadow-xl ring-1 ring-slate-200 transition-transform hover:scale-[1.03]"
+              title={d.photo ? 'Ver foto' : undefined}
+            >
+              {d.photo
+                ? <img src={d.photo} className="w-full h-full object-cover" alt={d.name} />
+                : <div className="w-full h-full flex items-center justify-center bg-slate-100"><img src="/logo.jpg" alt="ALS" className="w-10 h-10 object-contain opacity-60" /></div>}
+            </button>
+            <p className="mt-3 font-black text-slate-800 uppercase text-[13px] leading-tight flex items-center justify-center gap-1.5 min-w-0 max-w-full">
+              <span className="truncate">{d.name}</span>
+              <CopyBtn ck={`nome-${d.id}`} value={stripSpecials(d.name)} title="Copiar nome (sem acentos)" />
+            </p>
+            <div className="mt-1.5 px-2.5 py-1 bg-blue-50/60 rounded-lg border border-blue-100/60 inline-flex items-center gap-1.5">
+              <span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter">Beneficiário:</span>
+              <span className="text-[9px] font-bold text-blue-600 uppercase truncate max-w-[180px]">{d.beneficiaryName || 'O PRÓPRIO'}</span>
             </div>
           </div>
+          <div className="border-b border-slate-100" />
         </div>
 
         {/* Corpo */}
@@ -198,12 +211,32 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
           </div>
 
           {/* Documentação */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-            <span className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-1.5">CPF: <span className="text-slate-800 font-mono normal-case">{maskCPF(d.cpf)}</span><CopyBtn ck={`cpf-${d.id}`} value={onlyDigits(d.cpf)} title="Copiar CPF (só números)" /></span>
-            <span className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-1.5">CNH: <span className="text-slate-800">{d.cnh || '---'}</span>{d.cnh && <CopyBtn ck={`cnh-${d.id}`} value={onlyAlnum(d.cnh)} title="Copiar CNH (sem caracteres especiais)" />}</span>
-            {d.cnhPdfUrl && (
-              <button onClick={() => setDocViewer({ url: d.cnhPdfUrl!, name: `CNH — ${d.name}`, kind: 'pdf' })} className="px-2 py-0.5 bg-red-50 text-red-600 rounded text-[7px] font-black border border-red-100 hover:bg-red-600 hover:text-white transition-all">VER CNH</button>
-            )}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <span className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-1.5">CPF: <span className="text-slate-800 font-mono normal-case">{maskCPF(d.cpf)}</span><CopyBtn ck={`cpf-${d.id}`} value={onlyDigits(d.cpf)} title="Copiar CPF (só números)" /></span>
+              <span className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-1.5">CNH: <span className="text-slate-800">{d.cnh || '---'}</span>{d.cnh && <CopyBtn ck={`cnh-${d.id}`} value={onlyAlnum(d.cnh)} title="Copiar CNH (sem caracteres especiais)" />}</span>
+            </div>
+            {d.cnhPdfUrl && (() => {
+              const cnhKind = kindFromUrl(d.cnhPdfUrl);
+              return (
+                <button
+                  onClick={() => setDocViewer({ url: d.cnhPdfUrl!, name: `CNH — ${d.name}`, kind: cnhKind })}
+                  title="Ver CNH em tela cheia"
+                  className="group w-full flex items-center gap-3 p-2 rounded-2xl border border-slate-200 bg-slate-50 hover:border-blue-400 hover:bg-white transition-all text-left"
+                >
+                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-white border border-slate-200 shrink-0 flex items-center justify-center">
+                    {cnhKind === 'image'
+                      ? <img src={d.cnhPdfUrl} className="w-full h-full object-cover" alt="CNH" />
+                      : <span className="text-[9px] font-black text-red-500">PDF</span>}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Documento CNH</p>
+                    <p className="text-[10px] font-black text-slate-700 uppercase group-hover:text-blue-600 transition-colors">Ver em tela cheia</p>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">{cnhKind === 'image' ? 'Imagem' : 'PDF'}</p>
+                  </div>
+                </button>
+              );
+            })()}
           </div>
 
           {/* Frota */}
