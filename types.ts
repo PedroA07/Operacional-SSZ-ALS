@@ -873,9 +873,23 @@ export interface Driver {
   lastLocationAt?: string;
 }
 
-export interface Customer { 
-  id: string; 
-  name: string; 
+export interface DeliveryPost {
+  id: string;
+  name: string;
+  address?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  phone?: string;
+  hours?: string;
+  notes?: string;
+  registrationDate?: string;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
   legalName?: string;
   cnpj: string; 
   city: string; 

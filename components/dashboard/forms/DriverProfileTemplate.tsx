@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Driver } from '../../../types';
+import { Driver, DeliveryPost } from '../../../types';
 
 interface DriverProfileTemplateProps {
   driver: Driver;
@@ -13,6 +13,10 @@ interface DriverProfileTemplateProps {
     whatsapp: boolean;
     operations: boolean;
     portal: boolean;
+  };
+  delivery?: {
+    posts: DeliveryPost[];
+    note?: string;
   };
 }
 
@@ -28,7 +32,7 @@ const C = {
   slate50: '#f8fafc',
 };
 
-const DriverProfileTemplate: React.FC<DriverProfileTemplateProps> = ({ driver, visibility }) => {
+const DriverProfileTemplate: React.FC<DriverProfileTemplateProps> = ({ driver, visibility, delivery }) => {
   const border = `1px solid ${C.slate200}`;
 
   // Rótulo de campo
@@ -123,6 +127,38 @@ const DriverProfileTemplate: React.FC<DriverProfileTemplateProps> = ({ driver, v
                     <span style={{ fontSize: '9px', fontWeight: 900, color: '#047857', letterSpacing: '0.5px' }}>CNH ANEXADA NO DOSSIÊ DIGITAL</span>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* LOCAL DE ENTREGA DE DOCUMENTOS — DESTAQUE */}
+          {delivery && (delivery.posts.length > 0 || (delivery.note && delivery.note.trim())) && (
+            <div style={{ border: '2px solid #f59e0b', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 14px rgba(245,158,11,0.15)' }}>
+              <div style={{ backgroundColor: '#f59e0b', padding: '10px 18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                <span style={{ fontSize: '12px', fontWeight: 900, color: '#ffffff', letterSpacing: '1px' }}>ENTREGA DOS DOCUMENTOS</span>
+              </div>
+              <div style={{ padding: '18px', backgroundColor: '#fffbeb' }}>
+                {delivery.note && delivery.note.trim() && (
+                  <p style={{ fontSize: '11px', fontWeight: 'bold', color: '#92400e', margin: '0 0 14px', lineHeight: 1.4 }}>{delivery.note}</p>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: delivery.posts.length > 1 ? '1fr 1fr' : '1fr', gap: '12px' }}>
+                  {delivery.posts.map(post => (
+                    <div key={post.id} style={{ backgroundColor: '#ffffff', border: '1px solid #fcd34d', borderRadius: '12px', padding: '12px 14px' }}>
+                      <p style={{ fontSize: '13px', fontWeight: 900, color: '#0f172a', margin: 0, textTransform: 'uppercase' }}>{post.name}</p>
+                      {(post.address || post.city) && (
+                        <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#64748b', margin: '4px 0 0', textTransform: 'uppercase' }}>
+                          {[post.address, post.neighborhood, [post.city, post.state].filter(Boolean).join(' - ')].filter(Boolean).join(', ')}
+                        </p>
+                      )}
+                      <div style={{ display: 'flex', gap: '16px', marginTop: '6px', flexWrap: 'wrap' }}>
+                        {post.phone && <span style={{ fontSize: '10px', fontWeight: 900, color: '#b45309' }}>☎ {post.phone}</span>}
+                        {post.hours && <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#92400e', textTransform: 'uppercase' }}>{post.hours}</span>}
+                      </div>
+                      {post.notes && <p style={{ fontSize: '9px', color: '#a16207', margin: '6px 0 0', fontStyle: 'italic' }}>{post.notes}</p>}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

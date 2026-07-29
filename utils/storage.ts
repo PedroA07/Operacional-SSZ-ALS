@@ -6,7 +6,7 @@ import {
   LoginCredential, EmailTemplate, CustomStatus, Automation, HandoverPost, HandoverComment, HandoverNotification, DutySwapRequest,
   BotGroup, BotAutomation, FreightContract, Beneficiary, MonitoredShip, ShipTerminalConfig, Ship,
   Devolucao, DevolucaoStatus, Liberacao, LiberacaoStatus,
-  FreightRoute, FreightVehicleType
+  FreightRoute, FreightVehicleType, DeliveryPost
 } from '../types';
 import { driverRepository } from './driverRepository';
 import { staffRepository } from './staffRepository';
@@ -366,6 +366,54 @@ export const db = {
   deletePort: async (id: string) => {
     if (!supabase) return false;
     const { error } = await supabase.from('ports').delete().eq('id', id);
+    return !error;
+  },
+
+  // ─── Postos de entrega de documentos ───────────────────────────────
+  getDeliveryPosts: async (): Promise<DeliveryPost[]> => {
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('delivery_posts').select('*').order('name');
+    if (error) { console.error('[getDeliveryPosts]', error.message); return []; }
+    return (data || []).map(p => ({
+      id: p.id,
+      name: p.name,
+      address: p.address || undefined,
+      neighborhood: p.neighborhood || undefined,
+      city: p.city || undefined,
+      state: p.state || undefined,
+      zipCode: p.zip_code || undefined,
+      phone: p.phone || undefined,
+      hours: p.hours || undefined,
+      notes: p.notes || undefined,
+      registrationDate: p.registration_date || undefined,
+    }));
+  },
+
+  saveDeliveryPost: async (p: Partial<DeliveryPost>, user?: User) => {
+    if (!supabase) return false;
+    const id = p.id || `dp-${Date.now()}`;
+    const payload: any = {
+      id,
+      name: (p.name || '').trim(),
+      address: p.address?.trim() || null,
+      neighborhood: p.neighborhood?.trim() || null,
+      city: p.city?.trim() || null,
+      state: p.state?.trim() || null,
+      zip_code: p.zipCode?.trim() || null,
+      phone: p.phone?.trim() || null,
+      hours: p.hours?.trim() || null,
+      notes: p.notes?.trim() || null,
+      registration_date: p.registrationDate || new Date().toISOString(),
+    };
+    const { error } = await supabase.from('delivery_posts').upsert(payload);
+    if (error) { console.error('[saveDeliveryPost]', error.message); return false; }
+    if (user) db.logActivity('PORTO', p.id ? 'EDICAO' : 'CRIACAO', `Posto de entrega ${payload.name}`, { user, entityId: id, entityLabel: payload.name });
+    return true;
+  },
+
+  deleteDeliveryPost: async (id: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.from('delivery_posts').delete().eq('id', id);
     return !error;
   },
 

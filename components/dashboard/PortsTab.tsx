@@ -1,20 +1,23 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Port } from '../../types';
+import { Port, User } from '../../types';
 import { maskCEP, maskCNPJ } from '../../utils/masks';
 import { Icons } from '../../constants/icons';
 import ListFilters from './shared/ListFilters';
 import DatePicker from '../shared/DatePicker';
 import SmartOperationTable from './operations/SmartOperationTable';
+import DeliveryPostsTab from './DeliveryPostsTab';
 
 interface PortsTabProps {
   userId: string;
+  user?: User;
   ports: Port[];
   onSavePort: (port: Partial<Port>, id?: string) => void;
   onDeletePort?: (id: string) => void;
 }
 
-const PortsTab: React.FC<PortsTabProps> = ({ userId, ports, onSavePort, onDeletePort }) => {
+const PortsTab: React.FC<PortsTabProps> = ({ userId, user, ports, onSavePort, onDeletePort }) => {
+  const [activeSubTab, setActiveSubTab] = useState<'portos' | 'postos'>('portos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<Port | null>(null);
@@ -219,9 +222,35 @@ const PortsTab: React.FC<PortsTabProps> = ({ userId, ports, onSavePort, onDelete
 
   return (
     <div className="max-w-full mx-auto space-y-6">
+      {/* Sub-abas: Portos | Postos de Entrega */}
+      <div className="flex items-center gap-2 bg-white rounded-2xl border border-slate-200 p-1.5 shadow-sm w-fit">
+        <button
+          onClick={() => setActiveSubTab('portos')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            activeSubTab === 'portos' ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+          Terminais / Portos
+        </button>
+        <button
+          onClick={() => setActiveSubTab('postos')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            activeSubTab === 'postos' ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          Postos de Entrega
+        </button>
+      </div>
+
+      {activeSubTab === 'postos' ? (
+        <DeliveryPostsTab user={user} />
+      ) : (
+      <>
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1">
-          <ListFilters 
+          <ListFilters
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             sortBy={sortBy}
@@ -450,6 +479,8 @@ const PortsTab: React.FC<PortsTabProps> = ({ userId, ports, onSavePort, onDelete
             </form>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

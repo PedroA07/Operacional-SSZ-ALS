@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
-import { Driver } from '../../../types';
+import React, { useState, useEffect } from 'react';
+import { Driver, DeliveryPost } from '../../../types';
 import { exportElementToPDF } from '../../../utils/pdfService';
 import DriverProfileTemplate from '../forms/DriverProfileTemplate';
+import { db } from '../../../utils/storage';
 
 interface DriverDossierModalProps {
   isOpen: boolean;
@@ -27,6 +28,21 @@ const DriverDossierModal: React.FC<DriverDossierModalProps> = ({ isOpen, onClose
   const toggleOption = (key: keyof typeof options) => {
     setOptions(prev => ({ ...prev, [key]: !prev[key] }));
   };
+
+  // Postos de entrega de documentos
+  const [deliveryPosts, setDeliveryPosts] = useState<DeliveryPost[]>([]);
+  const [selectedPostIds, setSelectedPostIds] = useState<string[]>([]);
+  const [deliveryNote, setDeliveryNote] = useState('');
+
+  useEffect(() => {
+    if (isOpen) db.getDeliveryPosts().then(setDeliveryPosts).catch(() => {});
+  }, [isOpen]);
+
+  const togglePost = (id: string) => {
+    setSelectedPostIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const selectedPosts = deliveryPosts.filter(p => selectedPostIds.includes(p.id));
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -128,8 +144,49 @@ const DriverDossierModal: React.FC<DriverDossierModalProps> = ({ isOpen, onClose
               </button>
             </div>
 
+            {/* LOCAL DE ENTREGA DE DOCUMENTOS */}
+            <div className="space-y-3 pt-6 border-t border-slate-200">
+              <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest px-1">Onde Entregar os Documentos</p>
+              {deliveryPosts.length === 0 ? (
+                <p className="text-[9px] font-bold text-slate-400 px-1 leading-relaxed">
+                  Nenhum posto cadastrado. Cadastre em <span className="text-slate-600 font-black">Portos › Postos de Entrega</span> para destacá-los no dossiê.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-52 overflow-y-auto custom-scrollbar pr-1">
+                  {deliveryPosts.map(post => {
+                    const sel = selectedPostIds.includes(post.id);
+                    return (
+                      <button
+                        key={post.id}
+                        onClick={() => togglePost(post.id)}
+                        className={`w-full p-3 rounded-2xl border-2 transition-all flex items-center justify-between text-left ${sel ? 'bg-amber-50 border-amber-500 shadow-sm' : 'bg-white border-slate-100 opacity-70'}`}
+                      >
+                        <div className="min-w-0">
+                          <p className={`text-[10px] font-black uppercase tracking-tight truncate ${sel ? 'text-amber-900' : 'text-slate-400'}`}>{post.name}</p>
+                          {(post.city || post.state) && <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5 truncate">{[post.city, post.state].filter(Boolean).join(' - ')}</p>}
+                        </div>
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ml-2 transition-all ${sel ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-300'}`}>
+                          {sel ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="4" d="M5 13l4 4L19 7"/></svg> : null}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="space-y-1">
+                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-1 block">Instrução de Entrega (opcional)</label>
+                <textarea
+                  rows={2}
+                  value={deliveryNote}
+                  onChange={e => setDeliveryNote(e.target.value)}
+                  placeholder="Ex: Entregar os documentos originais em um dos pontos abaixo."
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-slate-100 bg-white text-slate-700 text-[10px] font-medium outline-none focus:border-amber-400 transition-all resize-none"
+                />
+              </div>
+            </div>
+
             <div className="mt-auto pt-6">
-              <button 
+              <button
                 onClick={handleGenerate}
                 disabled={isGenerating}
                 className="w-full py-5 bg-blue-600 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
@@ -150,8 +207,8 @@ const DriverDossierModal: React.FC<DriverDossierModalProps> = ({ isOpen, onClose
           <div className="flex-1 bg-slate-200 overflow-auto p-12 custom-scrollbar flex justify-center items-start">
              <div className="origin-top transform scale-[0.6] xl:scale-[0.75] shadow-2xl bg-white">
                 <div id="dossier-preview-container">
-                   <DriverProfileTemplate 
-                     driver={driver} 
+                   <DriverProfileTemplate
+                     driver={driver}
                      visibility={{
                        ...options,
                        driverInfo: options.driverInfo,
@@ -162,7 +219,8 @@ const DriverDossierModal: React.FC<DriverDossierModalProps> = ({ isOpen, onClose
                        whatsapp: options.whatsapp,
                        operations: options.operations,
                        portal: options.portal
-                     }} 
+                     }}
+                     delivery={{ posts: selectedPosts, note: deliveryNote }}
                    />
                 </div>
              </div>
