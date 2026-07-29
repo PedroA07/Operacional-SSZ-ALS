@@ -826,6 +826,7 @@ export interface VehicleDoc {
   name: string;
   kind: 'pdf' | 'image';
   uploadedAt: string;
+  plate?: string; // Placa à qual este documento pertence (um documento por placa cadastrada)
 }
 
 export interface Driver {
