@@ -45,7 +45,7 @@ const TripForm: React.FC<TripFormProps> = ({
   const osPreviewUrlRef = useRef<string | null>(null);
 
   // Cadastro na hora (motorista/cliente/porto) sem fechar a programação
-  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
+  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void; editEntity?: any } | null>(null);
   const [extraDrivers, setExtraDrivers] = useState<Driver[]>([]);
   const [extraCustomers, setExtraCustomers] = useState<Customer[]>([]);
   const [extraPorts, setExtraPorts] = useState<(Port | PreStacking)[]>([]);
@@ -441,6 +441,7 @@ const TripForm: React.FC<TripFormProps> = ({
                   onSelect={(p) => setPort(origemField, p)}
                   mapToAutocomplete={searchService.mapPort}
                   onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setPort(origemField, p); } })}
+                  onEdit={(entity) => setQuickAdd({ type: 'port', name: entity.legalName || entity.name || '', editEntity: entity, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setPort(origemField, p); } })}
                   quickAddLabel="Cadastrar porto ou pré-stacking"
                 />
               )}
@@ -462,6 +463,7 @@ const TripForm: React.FC<TripFormProps> = ({
                   onSelect={(c) => setFormData({...formData, customer: c})}
                   mapToAutocomplete={searchService.mapCustomer}
                   onQuickAdd={(name) => setQuickAdd({ type: 'customer', name, onDone: (c) => { setExtraCustomers(prev => [c, ...prev]); setFormData((f: any) => ({ ...f, customer: c })); } })}
+                  onEdit={(entity) => setQuickAdd({ type: 'customer', name: entity.legalName || entity.name || '', editEntity: entity, onDone: (c) => { setExtraCustomers(prev => [c, ...prev]); setFormData((f: any) => ({ ...f, customer: c })); } })}
                   quickAddLabel="Cadastrar novo cliente"
                 />
               )}
@@ -483,6 +485,7 @@ const TripForm: React.FC<TripFormProps> = ({
                   onSelect={(p) => setFormData({...formData, destination: p})}
                   mapToAutocomplete={searchService.mapPort}
                   onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData((f: any) => ({ ...f, destination: p })); } })}
+                  onEdit={(entity) => setQuickAdd({ type: 'port', name: entity.legalName || entity.name || '', editEntity: entity, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData((f: any) => ({ ...f, destination: p })); } })}
                   quickAddLabel="Cadastrar porto ou pré-stacking"
                 />
               )}
@@ -618,6 +621,12 @@ const TripForm: React.FC<TripFormProps> = ({
               const pt = d.platesTrailer?.find(e => e.isPrimary) || d.platesTrailer?.[0];
               setFormData((f: any) => ({ ...f, driver: { ...d, plateHorse: ph?.plate || d.plateHorse || '', plateTrailer: pt?.plate || d.plateTrailer || '' } }));
             } })}
+            onEdit={(entity: Driver) => setQuickAdd({ type: 'driver', name: entity.name || '', editEntity: entity, onDone: (d: Driver) => {
+              setExtraDrivers(prev => [d, ...prev]);
+              const ph = d.platesHorse?.find(e => e.isPrimary) || d.platesHorse?.[0];
+              const pt = d.platesTrailer?.find(e => e.isPrimary) || d.platesTrailer?.[0];
+              setFormData((f: any) => ({ ...f, driver: { ...d, plateHorse: ph?.plate || d.plateHorse || '', plateTrailer: pt?.plate || d.plateTrailer || '' } }));
+            } })}
             quickAddLabel="Cadastrar novo motorista"
           />
         )}
@@ -695,6 +704,7 @@ const TripForm: React.FC<TripFormProps> = ({
           type={quickAdd.type}
           isOpen={true}
           initialName={quickAdd.name}
+          editEntity={quickAdd.editEntity}
           accent="#2563eb"
           onClose={() => setQuickAdd(null)}
           onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}

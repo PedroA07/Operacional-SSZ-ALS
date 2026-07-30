@@ -72,7 +72,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
   const [swapModalOpen, setSwapModalOpen] = useState(false);
 
   // Cadastro na hora (motorista/cliente/porto) sem fechar o formulário
-  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
+  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void; editEntity?: any } | null>(null);
   const [extraDrivers, setExtraDrivers] = useState<Driver[]>([]);
   const [extraCustomers, setExtraCustomers] = useState<Customer[]>([]);
   const [extraPorts, setExtraPorts] = useState<Port[]>([]);
@@ -529,6 +529,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
           mapToAutocomplete={searchService.mapCustomer}
           initialValue={selectedRemetente ? (selectedRemetente.legalName || selectedRemetente.name) : ''}
           onQuickAdd={(name) => setQuickAdd({ type: 'customer', name, onDone: (c) => { setExtraCustomers(prev => [c, ...prev]); setFormData((p: any) => ({ ...p, remetenteId: c.id })); } })}
+          onEdit={(entity) => setQuickAdd({ type: 'customer', name: entity.legalName || entity.name || '', editEntity: entity, onDone: (c) => { setExtraCustomers(prev => [c, ...prev]); setFormData((p: any) => ({ ...p, remetenteId: c.id })); } })}
           quickAddLabel="Cadastrar novo cliente"
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" strokeWidth="2"/></svg>}
         />
@@ -560,6 +561,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
           mapToAutocomplete={mapDestinatario}
           initialValue={selectedDestinatario ? (selectedDestinatario.legalName || selectedDestinatario.name) : ''}
           onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData((prev: any) => ({ ...prev, destinatarioId: p.id })); } })}
+          onEdit={(entity) => setQuickAdd({ type: 'port', name: entity.legalName || entity.name || '', editEntity: entity, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData((prev: any) => ({ ...prev, destinatarioId: p.id })); } })}
           quickAddLabel="Cadastrar porto ou pré-stacking"
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="2.5"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" strokeWidth="2.5"/></svg>}
         />
@@ -679,6 +681,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
           mapToAutocomplete={searchService.mapDriver}
           initialValue={selectedDriver ? selectedDriver.name : ''}
           onQuickAdd={(name) => setQuickAdd({ type: 'driver', name, onDone: (d) => { setExtraDrivers(prev => [d, ...prev]); setFormData((p: any) => ({ ...p, driverId: d.id })); } })}
+          onEdit={(entity) => setQuickAdd({ type: 'driver', name: entity.name || '', editEntity: entity, onDone: (d) => { setExtraDrivers(prev => [d, ...prev]); setFormData((p: any) => ({ ...p, driverId: d.id })); } })}
           quickAddLabel="Cadastrar novo motorista"
           icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2.5"/></svg>}
         />
@@ -770,6 +773,7 @@ const OrdemColetaForm: React.FC<OrdemColetaFormProps> = ({ user, drivers, custom
           type={quickAdd.type}
           isOpen={true}
           initialName={quickAdd.name}
+          editEntity={quickAdd.editEntity}
           accent="#2563eb"
           onClose={() => setQuickAdd(null)}
           onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}

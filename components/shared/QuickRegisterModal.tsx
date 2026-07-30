@@ -18,6 +18,8 @@ interface QuickRegisterModalProps {
   initialName?: string;
   /** Cor de destaque (hex) do formulário que abriu o modal. */
   accent?: string;
+  /** Entidade existente para edição. Quando presente, o modal edita em vez de criar. */
+  editEntity?: any;
 }
 
 const TYPE_META: Record<QuickRegisterType, { title: string; subtitle: string; idPrefix: string }> = {
@@ -31,7 +33,8 @@ const TYPE_META: Record<QuickRegisterType, { title: string; subtitle: string; id
 const genId = (prefix: string) =>
   (typeof crypto !== 'undefined' && crypto.randomUUID ? `${prefix}-${crypto.randomUUID()}` : `${prefix}-${Date.now()}`);
 
-const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, onClose, onCreated, initialName = '', accent = '#2563eb' }) => {
+const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, onClose, onCreated, initialName = '', accent = '#2563eb', editEntity }) => {
+  const isEdit = !!editEntity;
   const isJuridical = type === 'customer' || type === 'port' || type === 'preStacking';
   // Portos e pré-stackings são "locais": o usuário escolhe qual dos dois cadastrar.
   const isLocation = type === 'port' || type === 'preStacking';
@@ -54,7 +57,32 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
     if (!isOpen) return;
     setError('');
     lastSearchedCnpj.current = '';
-    if (isLocation) setLocationKind(type === 'preStacking' ? 'preStacking' : 'port');
+    // Locais: na edição, detecta porto x pré-stacking pelo prefixo do id
+    if (isLocation) {
+      if (isEdit && editEntity?.id) setLocationKind(String(editEntity.id).startsWith('ps') ? 'preStacking' : 'port');
+      else setLocationKind(type === 'preStacking' ? 'preStacking' : 'port');
+    }
+
+    // Modo edição: pré-preenche com a entidade existente
+    if (isEdit && editEntity) {
+      if (type === 'driver') {
+        setForm({
+          ...editEntity,
+          name: (editEntity.name || '').toUpperCase(),
+          beneficiaryIsDriver: editEntity.beneficiaryIsDriver ?? !editEntity.beneficiaryName,
+        });
+      } else if (type === 'authorizedPerson') {
+        setForm({ name: editEntity.name || '', cpf: editEntity.cpf || '', rg: editEntity.rg || '', veiculo: editEntity.veiculo || '' });
+      } else {
+        setForm({
+          name: editEntity.name || '', legalName: editEntity.legalName || '', cnpj: editEntity.cnpj || '',
+          zipCode: editEntity.zipCode || '', address: editEntity.address || '', neighborhood: editEntity.neighborhood || '',
+          city: editEntity.city || '', state: editEntity.state || '',
+        });
+      }
+      return;
+    }
+
     const nameHint = (initialName || '').toUpperCase();
     if (type === 'driver') {
       setForm({
@@ -72,7 +100,7 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
     } else {
       setForm({ name: nameHint, legalName: '', cnpj: '', zipCode: '', address: '', neighborhood: '', city: '', state: '' });
     }
-  }, [isOpen, type, initialName]);
+  }, [isOpen, type, initialName, editEntity]);
 
   // Busca automática por CEP (entidades jurídicas)
   useEffect(() => {
@@ -167,7 +195,7 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
 
     setIsSaving(true);
     try {
-      const id = genId(meta.idPrefix);
+      const id = isEdit && editEntity?.id ? editEntity.id : genId(meta.idPrefix);
       let ok = false;
       let entity: any = null;
 
@@ -209,6 +237,26 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
           hasAccess: true,
           registrationDate: new Date().toISOString(),
         } as Driver;
+        // Edição: mescla para não perder dados que não estão neste formulário rápido
+        if (isEdit) {
+          entity = {
+            ...editEntity,
+            ...entity,
+            id,
+            operations: editEntity.operations || [],
+            registrationDate: editEntity.registrationDate || (entity as any).registrationDate,
+            horseDocs: editEntity.horseDocs || [],
+            trailerDocs: editEntity.trailerDocs || [],
+            beneficiaryId: editEntity.beneficiaryId,
+            beneficiaryUserId: editEntity.beneficiaryUserId,
+            generatedPassword: editEntity.generatedPassword,
+            tripsCount: editEntity.tripsCount,
+            hasAccess: editEntity.hasAccess ?? (entity as any).hasAccess,
+          };
+          // Preserva múltiplas placas quando a placa primária não mudou
+          if ((editEntity.platesHorse?.length || 0) > 1 && editEntity.plateHorse === (entity as any).plateHorse) (entity as any).platesHorse = editEntity.platesHorse;
+          if ((editEntity.platesTrailer?.length || 0) > 1 && editEntity.plateTrailer === (entity as any).plateTrailer) (entity as any).platesTrailer = editEntity.platesTrailer;
+        }
         ok = await db.saveDriver(entity as Driver);
       } else if (type === 'authorizedPerson') {
         entity = {
@@ -217,7 +265,7 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
           cpf: form.cpf?.trim() || undefined,
           rg: form.rg?.trim() || undefined,
           veiculo: form.veiculo?.trim().toUpperCase() || undefined,
-          createdAt: new Date().toISOString(),
+          createdAt: isEdit ? (editEntity.createdAt || new Date().toISOString()) : new Date().toISOString(),
         } as AuthorizedPerson;
         ok = await db.saveAuthorizedPerson(entity as AuthorizedPerson);
       } else {
@@ -231,9 +279,9 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
           city: (form.city || '').toUpperCase(),
           state: (form.state || '').toUpperCase(),
           zipCode: form.zipCode || '',
-          registrationDate: new Date().toISOString().split('T')[0],
+          registrationDate: isEdit ? (editEntity.registrationDate || new Date().toISOString().split('T')[0]) : new Date().toISOString().split('T')[0],
         };
-        if (effectiveType === 'customer') { (base as Customer).operations = []; entity = base; ok = await db.saveCustomer(base); }
+        if (effectiveType === 'customer') { (base as Customer).operations = isEdit ? (editEntity.operations || []) : []; entity = base; ok = await db.saveCustomer(base); }
         else if (effectiveType === 'port') { entity = base; ok = await db.savePort(base); }
         else { entity = base; ok = await db.savePreStacking(base); }
       }
@@ -268,8 +316,8 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
         {/* Cabeçalho */}
         <div className="px-7 py-5 flex items-center justify-between shrink-0" style={{ backgroundColor: accent }}>
           <div>
-            <p className="text-[8px] font-black text-white/60 uppercase tracking-widest mb-0.5">Cadastro na Hora</p>
-            <h3 className="font-black text-white text-sm uppercase tracking-widest">{meta.title}</h3>
+            <p className="text-[8px] font-black text-white/60 uppercase tracking-widest mb-0.5">{isEdit ? 'Editar Cadastro' : 'Cadastro na Hora'}</p>
+            <h3 className="font-black text-white text-sm uppercase tracking-widest">{isEdit ? meta.title.replace(/^Nov[oa]/, 'Editar') : meta.title}</h3>
           </div>
           <button
             type="button"
@@ -286,8 +334,8 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
           {/* ── CLIENTE / PORTO / PRÉ-STACKING ── */}
           {isJuridical && (
             <>
-              {/* Seletor Porto x Pré-Stacking (somente para locais) */}
-              {isLocation && (
+              {/* Seletor Porto x Pré-Stacking (somente para locais, ao criar) */}
+              {isLocation && !isEdit && (
                 <div className="space-y-1.5">
                   <label className={labelClass}>Tipo de Local</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -585,7 +633,7 @@ const QuickRegisterModal: React.FC<QuickRegisterModalProps> = ({ type, isOpen, o
               className="flex-1 py-4 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all active:scale-[0.98] disabled:opacity-50"
               style={{ backgroundColor: accent }}
             >
-              {isSaving ? 'Salvando...' : 'Cadastrar e Selecionar'}
+              {isSaving ? 'Salvando...' : (isEdit ? 'Salvar Alterações' : 'Cadastrar e Selecionar')}
             </button>
           </div>
         </form>

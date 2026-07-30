@@ -127,7 +127,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
   const [mode, setMode] = useState<'viagem' | 'personalizado'>('viagem');
 
   // Cadastro na hora sem fechar o formulário
-  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
+  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void; editEntity?: any } | null>(null);
   const [extraDrivers, setExtraDrivers] = useState<Driver[]>([]);
   const [extraCustomers, setExtraCustomers] = useState<Customer[]>([]);
   const allDrivers = [...extraDrivers.filter(e => !drivers.some(d => d.id === e.id)), ...drivers];
@@ -657,6 +657,7 @@ const PreStackingForm: React.FC<PreStackingFormProps> = ({ user, drivers, custom
       {quickAdd && (
         <QuickRegisterModal
           type={quickAdd.type}
+          editEntity={quickAdd.editEntity}
           isOpen={true}
           initialName={quickAdd.name}
           accent="#059669"

@@ -54,7 +54,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
   useEffect(() => () => { if (osPreviewUrl) URL.revokeObjectURL(osPreviewUrl); }, [osPreviewUrl]);
 
   // Cadastro na hora (motorista/cliente) sem fechar a programação
-  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
+  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void; editEntity?: any } | null>(null);
   const [extraDrivers, setExtraDrivers] = useState<Driver[]>([]);
   const [extraCustomers, setExtraCustomers] = useState<Customer[]>([]);
   const allDrivers = [...extraDrivers.filter(e => !drivers.some(d => d.id === e.id)), ...drivers];
@@ -431,6 +431,7 @@ const NewTripModal: React.FC<NewTripModalProps> = ({ isOpen, onClose, onSuccess,
       {quickAdd && (
         <QuickRegisterModal
           type={quickAdd.type}
+          editEntity={quickAdd.editEntity}
           isOpen={true}
           initialName={quickAdd.name}
           accent="#2563eb"
