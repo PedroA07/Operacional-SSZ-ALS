@@ -16,6 +16,7 @@ import SimpleToast from './components/shared/SimpleToast';
 import FeedbackModal from './components/shared/FeedbackModal';
 import { db, supabase } from './utils/storage';
 import { Icons } from './constants/icons';
+import { buildLastTripDates, computeAutoStatusChange } from './utils/driverActivity';
 
 // Tabs carregadas sob demanda — reduz o bundle inicial significativamente
 const OverviewTab        = lazy(() => import('./components/dashboard/OverviewTab'));
@@ -302,6 +303,35 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       window.removeEventListener('als_force_global_refresh', handleGlobalRefresh);
     };
   }, [loadAllData, loadTripsOnly]);
+
+  // Inativa motoristas sem viagens há mais de 3 meses e reativa quem recebeu
+  // nova programação. Roda quando drivers/trips carregam; auto-estabiliza.
+  const autoStatusRunningRef = useRef(false);
+  useEffect(() => {
+    if (isLoadingInitial || autoStatusRunningRef.current) return;
+    if (drivers.length === 0 || trips.length === 0) return;
+
+    const lastTrips = buildLastTripDates(trips);
+    const now = Date.now();
+    const changes: Driver[] = [];
+    for (const d of drivers) {
+      const lastMs = lastTrips.get(d.id) ?? lastTrips.get(d.name) ?? 0;
+      const nextStatus = computeAutoStatusChange(d, lastMs, now);
+      if (nextStatus && nextStatus !== d.status) {
+        changes.push({ ...d, status: nextStatus, statusLastChangeDate: new Date(now).toISOString() });
+      }
+    }
+    if (changes.length === 0) return;
+
+    autoStatusRunningRef.current = true;
+    (async () => {
+      for (const d of changes) {
+        try { await db.saveDriver(d); } catch { /* ignora falha individual */ }
+      }
+      await loadAllData(false);
+      autoStatusRunningRef.current = false;
+    })();
+  }, [drivers, trips, isLoadingInitial, loadAllData]);
 
   const handleDeleteTripRequest = (id: string) => {
     const trip = trips.find(t => t.id === id);
