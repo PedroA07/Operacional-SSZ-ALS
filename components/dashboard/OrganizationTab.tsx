@@ -10,6 +10,7 @@ import { advanceService } from '../../services/advanceService';
 import { db, supabase } from '../../utils/storage';
 import FeedbackModal from '../shared/FeedbackModal';
 import DateTimePicker from '../shared/DateTimePicker';
+import DatePicker from '../shared/DatePicker';
 import ImageViewer from '../shared/ImageViewer';
 import PreStackingForm from './forms/PreStackingForm';
 import OrdemColetaForm from './forms/OrdemColetaForm';
@@ -555,6 +556,9 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: 
   }, []);
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategoryFilters, setSelectedCategoryFilters] = useState<string[]>([]);
+  // Filtro opcional por período (data da programação)
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [settingsModal, setSettingsModal] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<Trip | null>(null);
   const [terminalVessels, setTerminalVessels] = useState<TerminalVessel[]>([]);
@@ -1086,6 +1090,16 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: 
           if (!selectedCategoryFilters.includes(tripCat)) return false;
         }
 
+        // Filtro opcional por período (data da programação)
+        if (dateFrom || dateTo) {
+          const dt = trip.dateTime;
+          if (!dt) return false;
+          const raw = dt.includes('T') ? dt.split('T')[0] : dt.split(' ')[0];
+          const normalized = raw.includes('/') ? raw.split('/').reverse().join('-') : raw;
+          if (dateFrom && normalized < dateFrom) return false;
+          if (dateTo && normalized > dateTo) return false;
+        }
+
         if (!trip.isRemovedFromOrg) {
           // Viagem agendada ou com data de agendamento definida: permanece visível
           if (trip.isScheduled) return true;
@@ -1106,7 +1120,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: 
         if (dateA !== dateB) return dateA - dateB;
         return (a.driver.name || '').localeCompare(b.driver.name || '');
       });
-  }, [propTrips, pendingUpdates, finalizingIds, activeView, hiddenTripTypesColeta, hiddenTripTypesEntrega, selectedCategoryFilters]);
+  }, [propTrips, pendingUpdates, finalizingIds, activeView, hiddenTripTypesColeta, hiddenTripTypesEntrega, selectedCategoryFilters, dateFrom, dateTo]);
 
   // Limpeza periódica de atualizações expiradas para liberar memória
   useEffect(() => {
@@ -3699,6 +3713,31 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ userId, user, trips: 
             })}
           </div>
         )}
+
+        {/* Filtro por período (data da programação) */}
+        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
+          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">Período:</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[8px] font-black text-slate-400 uppercase">De</span>
+            <div className="w-40">
+              <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Data inicial" />
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[8px] font-black text-slate-400 uppercase">Até</span>
+            <div className="w-40">
+              <DatePicker value={dateTo} onChange={setDateTo} placeholder="Data final" />
+            </div>
+          </div>
+          {(dateFrom || dateTo) && (
+            <button
+              onClick={() => { setDateFrom(''); setDateTo(''); }}
+              className="px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider bg-red-50 text-red-500 border border-red-100 hover:bg-red-500 hover:text-white transition-all"
+            >
+              Limpar período
+            </button>
+          )}
+        </div>
       </div>
 
       {settingsModal && (

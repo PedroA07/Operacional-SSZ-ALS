@@ -84,11 +84,14 @@ const DocsTab: React.FC<DocsTabProps> = ({ trips, driver, canSeeContracts = true
       });
     });
 
-    return items.filter(item =>
-      (item.os || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.doc.parsedData?.container || '').toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    return items
+      .filter(item =>
+        (item.os || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.doc.parsedData?.container || '').toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      // Mais recente para o mais antigo (pela data de upload do contrato)
+      .sort((a, b) => new Date(b.doc.uploadDate || 0).getTime() - new Date(a.doc.uploadDate || 0).getTime());
   }, [trips, driverContracts, searchQuery]);
 
   const handleContractClick = (url: string, title: string) => {
