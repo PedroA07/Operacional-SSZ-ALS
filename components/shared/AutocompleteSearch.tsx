@@ -16,11 +16,17 @@ interface AutocompleteSearchProps {
   onQuickAdd?: (query: string) => void;
   /** Rótulo da ação de cadastro (ex.: "Cadastrar novo cliente"). */
   quickAddLabel?: string;
+  /** Habilita o botão de editar em cada resultado. Recebe a entidade original. */
+  onEdit?: (entity: any) => void;
 }
+
+// Iniciais para o avatar quando não há foto
+const getInitials = (text?: string) =>
+  (text || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
 
 const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
   label, placeholder, data, onSelect, onChange, mapToAutocomplete, icon, required, initialValue = '',
-  onQuickAdd, quickAddLabel = 'Cadastrar na hora'
+  onQuickAdd, quickAddLabel = 'Cadastrar na hora', onEdit
 }) => {
   const [query, setQuery] = useState(initialValue);
   const [isOpen, setIsOpen] = useState(false);
@@ -64,10 +70,17 @@ const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
           item.location?.toLowerCase().includes(searchNorm) ||
           item.details?.plateHorse?.toLowerCase().includes(searchNorm)
         );
-      })
-      .slice(0, 6);
+      });
 
-    setResults(filtered);
+    // Remove duplicados por id (ex.: item recém-editado presente em duas listas)
+    const seen = new Set<string>();
+    const deduped = filtered.filter(item => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    }).slice(0, 6);
+
+    setResults(deduped);
     setIsOpen(true);
   };
 
@@ -131,56 +144,95 @@ const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({
           )}
           {results.length > 0 && (
           <div className="max-h-[450px] overflow-y-auto custom-scrollbar p-3 space-y-2">
-            {results.map((item) => (
-              <button
+            {results.map((item) => {
+              const photo = item.type === 'DRIVER' ? item.originalData?.photo : undefined;
+              const avatarTheme = item.type === 'DRIVER'
+                ? 'from-blue-500 to-blue-600'
+                : item.type === 'CUSTOMER'
+                  ? 'from-indigo-500 to-indigo-600'
+                  : item.type === 'PORT'
+                    ? 'from-emerald-500 to-emerald-600'
+                    : 'from-slate-500 to-slate-600';
+              return (
+              <div
                 key={item.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => handleSelectItem(item)}
-                className="w-full text-left p-5 rounded-[1.8rem] hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 group flex flex-col gap-3"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSelectItem(item); }}
+                className="w-full text-left p-4 rounded-[1.8rem] hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 group flex gap-3.5 items-start cursor-pointer"
               >
-                {/* Cabeçalho do Item */}
-                <div className="flex justify-between items-start w-full">
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[12px] font-black text-slate-900 uppercase leading-tight block whitespace-normal break-words group-hover:text-blue-600 transition-colors">
-                      {item.mainText}
-                    </span>
-                    {item.type !== 'DRIVER' && item.subText && (
-                      <span className="text-[9px] font-bold text-slate-400 uppercase mt-1 block whitespace-normal break-words">
-                        FAN: {item.subText}
-                      </span>
-                    )}
-                  </div>
-                  {item.document && (
-                    <div className="flex flex-col items-end shrink-0 ml-4">
-                      <span className="text-[9px] font-mono font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
-                        {item.document}
-                      </span>
+                {/* Avatar / Foto */}
+                <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0 shadow-sm ring-1 ring-slate-200/60">
+                  {photo ? (
+                    <img src={photo} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${avatarTheme}`}>
+                      {item.type === 'DRIVER'
+                        ? <span className="text-[12px] font-black text-white">{getInitials(item.mainText)}</span>
+                        : (
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                        )}
                     </div>
                   )}
                 </div>
-                
-                {/* Layout Condicional para Motorista */}
-                {item.type === 'DRIVER' ? (
-                  <div className="grid grid-cols-2 gap-2 w-full pt-2 border-t border-slate-100/50">
-                    <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100/30 flex flex-col">
-                       <span className="text-[7px] font-black text-blue-400 uppercase tracking-widest mb-1">Equipamento</span>
-                       <span className="text-[10px] font-mono font-bold text-blue-700">{item.details?.plateHorse} / {item.details?.plateTrailer}</span>
+
+                {/* Conteúdo */}
+                <div className="flex-1 min-w-0 flex flex-col gap-2">
+                  <div className="flex justify-between items-start w-full gap-2">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[12px] font-black text-slate-900 uppercase leading-tight block whitespace-normal break-words group-hover:text-blue-600 transition-colors">
+                        {item.mainText}
+                      </span>
+                      {item.type !== 'DRIVER' && item.subText && (
+                        <span className="text-[9px] font-bold text-slate-400 uppercase mt-0.5 block whitespace-normal break-words">
+                          FAN: {item.subText}
+                        </span>
+                      )}
                     </div>
-                    <div className="bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100/30 flex flex-col">
-                       <span className="text-[7px] font-black text-emerald-400 uppercase tracking-widest mb-1">Contato Direto</span>
-                       <span className="text-[10px] font-mono font-bold text-emerald-700">{item.location}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {item.document && (
+                        <span className="text-[9px] font-mono font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                          {item.document}
+                        </span>
+                      )}
+                      {onEdit && (item.type === 'DRIVER' || item.type === 'CUSTOMER' || item.type === 'PORT') && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onEdit(item.originalData); setIsOpen(false); }}
+                          title="Editar cadastro"
+                          className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 bg-slate-100 hover:bg-blue-600 hover:text-white transition-all active:scale-90"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                      )}
                     </div>
                   </div>
-                ) : item.location ? (
-                  <div className="flex items-center gap-2 pt-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500/40"></div>
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-tight">
-                      {item.location}
-                    </span>
-                  </div>
-                ) : null}
-              </button>
-            ))}
+
+                  {/* Layout Condicional para Motorista */}
+                  {item.type === 'DRIVER' ? (
+                    <div className="grid grid-cols-2 gap-2 w-full">
+                      <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100/30 flex flex-col">
+                        <span className="text-[7px] font-black text-blue-400 uppercase tracking-widest mb-1">Equipamento</span>
+                        <span className="text-[10px] font-mono font-bold text-blue-700">{item.details?.plateHorse} / {item.details?.plateTrailer}</span>
+                      </div>
+                      <div className="bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100/30 flex flex-col">
+                        <span className="text-[7px] font-black text-emerald-400 uppercase tracking-widest mb-1">Contato Direto</span>
+                        <span className="text-[10px] font-mono font-bold text-emerald-700">{item.location}</span>
+                      </div>
+                    </div>
+                  ) : item.location ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500/40"></div>
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-tight">
+                        {item.location}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              );
+            })}
           </div>
           )}
           {results.length > 0 && onQuickAdd ? (

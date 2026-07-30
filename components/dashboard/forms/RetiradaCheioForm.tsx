@@ -67,7 +67,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
   const [formData, setFormData] = useState<typeof defaultFormData>(initialFormData ?? defaultFormData);
 
   // Cadastro na hora sem fechar o formulário
-  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
+  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void; editEntity?: any } | null>(null);
   const [extraDrivers, setExtraDrivers] = useState<Driver[]>([]);
   const [extraCustomers, setExtraCustomers] = useState<Customer[]>([]);
   const [extraPorts, setExtraPorts] = useState<Port[]>([]);
@@ -192,6 +192,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
             mapToAutocomplete={searchService.mapPort}
             initialValue={selectedTerminal ? (selectedTerminal.legalName || selectedTerminal.name) : ''}
             onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData(prev => ({ ...prev, terminalId: p.id })); } })}
+            onEdit={(entity) => setQuickAdd({ type: 'port', name: entity.legalName || entity.name || '', editEntity: entity, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData(prev => ({ ...prev, terminalId: p.id })); } })}
             quickAddLabel="Cadastrar porto ou pré-stacking"
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -210,6 +211,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
           mapToAutocomplete={searchService.mapCustomer}
           initialValue={selectedCliente ? (selectedCliente.legalName || selectedCliente.name) : ''}
           onQuickAdd={(name) => setQuickAdd({ type: 'customer', name, onDone: (c) => { setExtraCustomers(prev => [c, ...prev]); setFormData(prev => ({ ...prev, clienteId: c.id })); } })}
+          onEdit={(entity) => setQuickAdd({ type: 'customer', name: entity.legalName || entity.name || '', editEntity: entity, onDone: (c) => { setExtraCustomers(prev => [c, ...prev]); setFormData(prev => ({ ...prev, clienteId: c.id })); } })}
           quickAddLabel="Cadastrar novo cliente"
           icon={
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -323,6 +325,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
           mapToAutocomplete={searchService.mapDriver}
           initialValue={selectedDriver ? selectedDriver.name : ''}
           onQuickAdd={(name) => setQuickAdd({ type: 'driver', name, onDone: (d) => { setExtraDrivers(prev => [d, ...prev]); setFormData(prev => ({ ...prev, driverId: d.id })); } })}
+          onEdit={(entity) => setQuickAdd({ type: 'driver', name: entity.name || '', editEntity: entity, onDone: (d) => { setExtraDrivers(prev => [d, ...prev]); setFormData(prev => ({ ...prev, driverId: d.id })); } })}
           quickAddLabel="Cadastrar novo motorista"
           icon={
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -407,6 +410,7 @@ const RetiradaCheioForm: React.FC<RetiradaCheioFormProps> = ({ user, drivers, cu
           type={quickAdd.type}
           isOpen={true}
           initialName={quickAdd.name}
+          editEntity={quickAdd.editEntity}
           accent="#4f46e5"
           onClose={() => setQuickAdd(null)}
           onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}

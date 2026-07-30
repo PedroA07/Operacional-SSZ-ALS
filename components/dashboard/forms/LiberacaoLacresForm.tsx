@@ -41,7 +41,7 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, custome
   const [authorizedPersons, setAuthorizedPersons] = useState<AuthorizedPerson[]>([]);
 
   // Cadastro na hora sem fechar o formulário
-  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void } | null>(null);
+  const [quickAdd, setQuickAdd] = useState<{ type: QuickRegisterType; name: string; onDone: (e: any) => void; editEntity?: any } | null>(null);
   const [extraPorts, setExtraPorts] = useState<Port[]>([]);
 
   const defaultFormData = {
@@ -231,6 +231,7 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, custome
             mapToAutocomplete={searchService.mapPort}
             initialValue={selectedLocal ? (selectedLocal.legalName || selectedLocal.name) : (formData.localRetirada || '')}
             onQuickAdd={(name) => setQuickAdd({ type: 'port', name, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData(prev => ({ ...prev, localId: p.id, localRetirada: (p.legalName || p.name).toUpperCase() })); } })}
+            onEdit={(entity) => setQuickAdd({ type: 'port', name: entity.legalName || entity.name || '', editEntity: entity, onDone: (p) => { setExtraPorts(prev => [p, ...prev]); setFormData(prev => ({ ...prev, localId: p.id, localRetirada: (p.legalName || p.name).toUpperCase() })); } })}
             quickAddLabel="Cadastrar porto ou pré-stacking"
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -390,6 +391,7 @@ const LiberacaoLacresForm: React.FC<LiberacaoLacresFormProps> = ({ user, custome
           type={quickAdd.type}
           isOpen={true}
           initialName={quickAdd.name}
+          editEntity={quickAdd.editEntity}
           accent="#e11d48"
           onClose={() => setQuickAdd(null)}
           onCreated={(entity) => { quickAdd.onDone(entity); setQuickAdd(null); }}
