@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Driver, FrotaLegal, FrotaLegalStatus } from '../../types';
 import { maskPhone, normalizeSearch } from '../../utils/masks';
 import ListFilters from './shared/ListFilters';
+import CustomSelect from '../shared/CustomSelect';
 
 interface FrotaLegalTabProps {
   drivers: Driver[];
@@ -68,24 +69,23 @@ const FrotaLegalTab: React.FC<FrotaLegalTabProps> = ({ drivers, onSaveDriver }) 
 
   const StatusRow = ({ d, kind }: { d: Driver; kind: 'cavalo' | 'carreta' }) => {
     const fl = current(d);
-    const value = kind === 'cavalo' ? fl.cavaloStatus : fl.carretaStatus;
+    const value = (kind === 'cavalo' ? fl.cavaloStatus : fl.carretaStatus) || 'Pendente';
+    const dot = value === 'Liberado' ? 'bg-emerald-500'
+      : value === 'Bloqueado' ? 'bg-red-500'
+      : value === 'Em Análise' ? 'bg-amber-500' : 'bg-slate-400';
     return (
       <div className="space-y-1.5">
         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{kind === 'cavalo' ? 'Cavalo' : 'Carreta'}</span>
-        <div className="flex flex-wrap gap-1.5">
-          {STATUSES.map(s => {
-            const active = value === s.value;
-            return (
-              <button
-                key={s.value}
-                type="button"
-                onClick={() => setFL(d, kind === 'cavalo' ? { cavaloStatus: s.value } : { carretaStatus: s.value })}
-                className={`px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-wider border-2 transition-all ${active ? s.on : s.off}`}
-              >
-                {s.label}
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-2">
+          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
+          <div className="flex-1">
+            <CustomSelect
+              value={value}
+              onChange={(v) => setFL(d, kind === 'cavalo' ? { cavaloStatus: v as FrotaLegalStatus } : { carretaStatus: v as FrotaLegalStatus })}
+              options={STATUSES.map(s => ({ value: s.value, label: s.label.toUpperCase() }))}
+              inputClassName="w-full px-3 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-[10px] font-black uppercase outline-none focus:border-amber-400"
+            />
+          </div>
         </div>
       </div>
     );
