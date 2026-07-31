@@ -9,6 +9,7 @@ import DriverModal from './drivers/DriverModal';
 import DriverDossierAction from './drivers/DriverDossierAction';
 import DriverVinculosCell from './drivers/DriverVinculosCell';
 import AuthorizedPersonsTab from './AuthorizedPersonsTab';
+import FrotaLegalTab from './FrotaLegalTab';
 
 interface DriversTabProps {
   userId: string;
@@ -20,7 +21,7 @@ interface DriversTabProps {
 }
 
 const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onSaveDriver, onDeleteDriver, availableOps }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'motoristas' | 'autorizados'>('motoristas');
+  const [activeSubTab, setActiveSubTab] = useState<'motoristas' | 'frotaLegal' | 'autorizados'>('motoristas');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
@@ -347,6 +348,15 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
           Motoristas
         </button>
         <button
+          onClick={() => setActiveSubTab('frotaLegal')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            activeSubTab === 'frotaLegal' ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          Frota Legal
+        </button>
+        <button
           onClick={() => setActiveSubTab('autorizados')}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
             activeSubTab === 'autorizados' ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'
@@ -359,6 +369,8 @@ const DriversTab: React.FC<DriversTabProps> = ({ userId, drivers, customers, onS
 
       {activeSubTab === 'autorizados' ? (
         <AuthorizedPersonsTab />
+      ) : activeSubTab === 'frotaLegal' ? (
+        <FrotaLegalTab drivers={drivers} onSaveDriver={onSaveDriver} />
       ) : (
       <>
       <div className="flex flex-col lg:flex-row gap-4 items-start">

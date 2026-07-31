@@ -263,7 +263,8 @@ export const db = {
       ...c,
       legalName: c.legal_name || c.legalName,
       zipCode: c.zip_code || c.zipCode,
-      registrationDate: c.registration_date || c.registrationdate || c.registrationDate
+      registrationDate: c.registration_date || c.registrationdate || c.registrationDate,
+      requiresFrotaLegal: c.requires_frota_legal ?? c.requiresFrotaLegal ?? false
     }));
   },
 
@@ -284,13 +285,19 @@ export const db = {
       operations: c.operations,
       legal_name: c.legalName,
       zip_code: c.zipCode,
-      registrationDate: c.registrationDate
+      registrationDate: c.registrationDate,
+      requires_frota_legal: c.requiresFrotaLegal ?? false
     };
 
     Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
 
     // Log removed
-    const { error } = await supabase.from('customers').upsert(payload);
+    let { error } = await supabase.from('customers').upsert(payload);
+    // Coluna nova pode não existir se a migração ainda não foi aplicada
+    if (error && /requires_frota_legal|column/i.test(error.message || '')) {
+      delete payload.requires_frota_legal;
+      ({ error } = await supabase.from('customers').upsert(payload));
+    }
     if (error) {
       console.error("ERRO DETALHADO CLIENTE:", {
         message: error.message,

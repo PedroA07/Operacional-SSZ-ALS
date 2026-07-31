@@ -820,6 +820,16 @@ export interface PlateEntry {
   isPrimary: boolean;
 }
 
+export type FrotaLegalStatus = 'Liberado' | 'Bloqueado' | 'Em Análise' | 'Pendente';
+
+export interface FrotaLegal {
+  enrolled: boolean;              // Motorista vinculado à Frota Legal
+  cavaloStatus?: FrotaLegalStatus;
+  carretaStatus?: FrotaLegalStatus;
+  notes?: string;
+  updatedAt?: string;
+}
+
 export interface VehicleDoc {
   id: string;
   url: string;
@@ -847,6 +857,7 @@ export interface Driver {
   platesTrailer?: PlateEntry[];
   horseDocs?: VehicleDoc[];
   trailerDocs?: VehicleDoc[];
+  frotaLegal?: FrotaLegal;
   driverType: 'Frota' | 'Externo' | 'Motoboy';
   status: 'Ativo' | 'Inativo';
   statusLastChangeDate?: string;
@@ -899,6 +910,7 @@ export interface Customer {
   zipCode?: string;
   registrationDate?: string;
   operations?: string[];
+  requiresFrotaLegal?: boolean;  // Exige que o motorista tenha cadastro Frota Legal
 }
 
 export interface Port { 
