@@ -824,6 +824,7 @@ export type FrotaLegalStatus = 'Liberado' | 'Bloqueado' | 'Em Análise' | 'Pende
 
 export interface FrotaLegal {
   enrolled: boolean;              // Motorista vinculado à Frota Legal
+  motoristaStatus?: FrotaLegalStatus;
   cavaloStatus?: FrotaLegalStatus;
   carretaStatus?: FrotaLegalStatus;
   notes?: string;

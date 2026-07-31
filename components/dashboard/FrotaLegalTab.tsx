@@ -1,9 +1,17 @@
 
 import React, { useState, useMemo } from 'react';
 import { Driver, FrotaLegal, FrotaLegalStatus } from '../../types';
-import { maskPhone, normalizeSearch } from '../../utils/masks';
+import { maskPhone, maskCPF, normalizeSearch } from '../../utils/masks';
 import ListFilters from './shared/ListFilters';
 import CustomSelect from '../shared/CustomSelect';
+import { exportFrotaLegalExcel } from '../../utils/frotaLegalExcel';
+
+// Cor de fundo/texto por status (padrão da planilha)
+const statusCellCls = (s?: FrotaLegalStatus) =>
+  s === 'Liberado' ? 'bg-emerald-100 text-emerald-700'
+  : s === 'Bloqueado' ? 'bg-red-100 text-red-600'
+  : s === 'Em Análise' ? 'bg-blue-100 text-blue-600'
+  : 'bg-amber-100 text-amber-700';
 
 interface FrotaLegalTabProps {
   drivers: Driver[];
@@ -23,12 +31,13 @@ const badgeCls = (s?: FrotaLegalStatus) =>
   : s === 'Em Análise' ? 'bg-amber-50 text-amber-600 border-amber-200'
   : 'bg-slate-100 text-slate-500 border-slate-200';
 
-const defaultFL = (): FrotaLegal => ({ enrolled: true, cavaloStatus: 'Pendente', carretaStatus: 'Pendente' });
+const defaultFL = (): FrotaLegal => ({ enrolled: true, motoristaStatus: 'Pendente', cavaloStatus: 'Pendente', carretaStatus: 'Pendente' });
 
 const FrotaLegalTab: React.FC<FrotaLegalTabProps> = ({ drivers, onSaveDriver }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name_asc');
   const [onlyEnrolled, setOnlyEnrolled] = useState(false);
+  const [view, setView] = useState<'table' | 'cards'>('table');
   // Edições locais (por motorista) ainda não salvas
   const [edits, setEdits] = useState<Record<string, FrotaLegal>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -99,26 +108,31 @@ const FrotaLegalTab: React.FC<FrotaLegalTabProps> = ({ drivers, onSaveDriver }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drivers, searchQuery, sortBy, onlyEnrolled, edits]);
 
+  const statusesOf = (fl: FrotaLegal) => [fl.motoristaStatus, fl.cavaloStatus, fl.carretaStatus];
   const enrolled = drivers.filter(d => current(d).enrolled);
   const enrolledCount = enrolled.length;
-  const liberadosCount = enrolled.filter(d => { const f = current(d); return f.cavaloStatus === 'Liberado' && f.carretaStatus === 'Liberado'; }).length;
+  const liberadosCount = enrolled.filter(d => statusesOf(current(d)).every(s => s === 'Liberado')).length;
   const pendenciasCount = enrolledCount - liberadosCount;
 
-  const StatusRow = ({ d, kind }: { d: Driver; kind: 'cavalo' | 'carreta' }) => {
+  const kindField = (kind: 'motorista' | 'cavalo' | 'carreta'): keyof FrotaLegal =>
+    kind === 'motorista' ? 'motoristaStatus' : kind === 'cavalo' ? 'cavaloStatus' : 'carretaStatus';
+
+  const StatusRow = ({ d, kind }: { d: Driver; kind: 'motorista' | 'cavalo' | 'carreta' }) => {
     const fl = current(d);
-    const value = (kind === 'cavalo' ? fl.cavaloStatus : fl.carretaStatus) || 'Pendente';
+    const value = (fl[kindField(kind)] as FrotaLegalStatus) || 'Pendente';
+    const label = kind === 'motorista' ? 'Motorista' : kind === 'cavalo' ? 'Cavalo' : 'Carreta';
     const dot = value === 'Liberado' ? 'bg-emerald-500'
       : value === 'Bloqueado' ? 'bg-red-500'
-      : value === 'Em Análise' ? 'bg-amber-500' : 'bg-slate-400';
+      : value === 'Em Análise' ? 'bg-blue-500' : 'bg-amber-500';
     return (
       <div className="space-y-1.5">
-        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{kind === 'cavalo' ? 'Cavalo' : 'Carreta'}</span>
+        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
         <div className="flex items-center gap-2">
           <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
           <div className="flex-1">
             <CustomSelect
               value={value}
-              onChange={(v) => setFL(d, kind === 'cavalo' ? { cavaloStatus: v as FrotaLegalStatus } : { carretaStatus: v as FrotaLegalStatus })}
+              onChange={(v) => setFL(d, { [kindField(kind)]: v as FrotaLegalStatus })}
               options={STATUSES.map(s => ({ value: s.value, label: s.label.toUpperCase() }))}
               inputClassName="w-full px-3 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-[10px] font-black uppercase outline-none focus:border-amber-400"
             />
@@ -126,6 +140,28 @@ const FrotaLegalTab: React.FC<FrotaLegalTabProps> = ({ drivers, onSaveDriver }) 
         </div>
       </div>
     );
+  };
+
+  // Célula de status para a visão em tabela (cor + seletor)
+  const TableStatusCell = ({ d, kind }: { d: Driver; kind: 'motorista' | 'cavalo' | 'carreta' }) => {
+    const fl = current(d);
+    const value = (fl[kindField(kind)] as FrotaLegalStatus) || 'Pendente';
+    return (
+      <CustomSelect
+        value={value}
+        onChange={(v) => setFL(d, { [kindField(kind)]: v as FrotaLegalStatus, enrolled: true })}
+        options={STATUSES.map(s => ({ value: s.value, label: s.label.toUpperCase() }))}
+        inputClassName={`w-full min-w-[110px] px-2.5 py-2 rounded-lg border border-transparent text-[10px] font-black uppercase outline-none ${statusCellCls(value)}`}
+      />
+    );
+  };
+
+  const doExport = () => {
+    const rows = filtered.map(d => {
+      const fl = current(d);
+      return { driver: d, motoristaStatus: fl.motoristaStatus, cavaloStatus: fl.cavaloStatus, carretaStatus: fl.carretaStatus };
+    });
+    exportFrotaLegalExcel(rows);
   };
 
   return (
@@ -140,12 +176,30 @@ const FrotaLegalTab: React.FC<FrotaLegalTabProps> = ({ drivers, onSaveDriver }) 
             placeholder="BUSCAR MOTORISTA, CPF OU PLACA..."
           />
         </div>
-        <button
-          onClick={() => setOnlyEnrolled(v => !v)}
-          className={`px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm h-[68px] shrink-0 border-2 ${onlyEnrolled ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300'}`}
-        >
-          {onlyEnrolled ? 'Somente Vinculados' : 'Mostrar Todos'}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1 bg-white rounded-2xl border-2 border-slate-200 p-1 h-[68px]">
+            <button onClick={() => setView('table')} title="Tabela" className={`px-3 h-full rounded-xl text-[9px] font-black uppercase transition-all ${view === 'table' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-50'}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+            <button onClick={() => setView('cards')} title="Cartões" className={`px-3 h-full rounded-xl text-[9px] font-black uppercase transition-all ${view === 'cards' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-50'}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 5a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM13 5a1 1 0 011-1h5a1 1 0 011 1v6a1 1 0 01-1 1h-5a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h6a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4z"/></svg>
+            </button>
+          </div>
+          <button
+            onClick={() => setOnlyEnrolled(v => !v)}
+            className={`px-4 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm h-[68px] border-2 ${onlyEnrolled ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300'}`}
+          >
+            {onlyEnrolled ? 'Vinculados' : 'Todos'}
+          </button>
+          <button
+            onClick={doExport}
+            title="Exportar para Excel"
+            className="px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm h-[68px] bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Excel
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 px-1">
@@ -161,13 +215,13 @@ const FrotaLegalTab: React.FC<FrotaLegalTabProps> = ({ drivers, onSaveDriver }) 
         <div className="bg-white rounded-3xl border border-dashed border-slate-200 py-20 text-center">
           <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Nenhum motorista encontrado</p>
         </div>
-      ) : (
+      ) : view === 'cards' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filtered.map(d => {
             const fl = current(d);
             const dirty = isDirty(d);
-            const allClear = fl.enrolled && fl.cavaloStatus === 'Liberado' && fl.carretaStatus === 'Liberado';
-            const hasBlock = fl.enrolled && (fl.cavaloStatus === 'Bloqueado' || fl.carretaStatus === 'Bloqueado');
+            const allClear = fl.enrolled && statusesOf(fl).every(s => s === 'Liberado');
+            const hasBlock = fl.enrolled && statusesOf(fl).some(s => s === 'Bloqueado');
             const hasPend = fl.enrolled && !allClear;
             const cardBorder = !fl.enrolled ? 'border-slate-200'
               : allClear ? 'border-emerald-300 ring-1 ring-emerald-200'
@@ -208,6 +262,7 @@ const FrotaLegalTab: React.FC<FrotaLegalTabProps> = ({ drivers, onSaveDriver }) 
 
                 {fl.enrolled ? (
                   <div className="p-5 space-y-4 flex-1">
+                    <StatusRow d={d} kind="motorista" />
                     <StatusRow d={d} kind="cavalo" />
                     <StatusRow d={d} kind="carreta" />
                     <div className="space-y-1">
@@ -250,6 +305,74 @@ const FrotaLegalTab: React.FC<FrotaLegalTabProps> = ({ drivers, onSaveDriver }) 
               </div>
             );
           })}
+        </div>
+      ) : (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-slate-800 text-white">
+                  <th className="text-left px-4 py-3 text-[9px] font-black uppercase tracking-widest">Motorista</th>
+                  <th className="text-left px-4 py-3 text-[9px] font-black uppercase tracking-widest">CPF</th>
+                  <th className="text-left px-3 py-3 text-[9px] font-black uppercase tracking-widest">Status</th>
+                  <th className="text-left px-3 py-3 text-[9px] font-black uppercase tracking-widest">Cavalo</th>
+                  <th className="text-left px-3 py-3 text-[9px] font-black uppercase tracking-widest">Status</th>
+                  <th className="text-left px-3 py-3 text-[9px] font-black uppercase tracking-widest">Carreta</th>
+                  <th className="text-left px-3 py-3 text-[9px] font-black uppercase tracking-widest">Status</th>
+                  <th className="px-3 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((d, i) => {
+                  const dirty = isDirty(d);
+                  return (
+                    <tr key={d.id} className={`border-b border-slate-100 ${i % 2 ? 'bg-slate-50/40' : 'bg-white'} hover:bg-blue-50/30`}>
+                      <td className="px-4 py-2 text-[11px] font-black text-slate-800 uppercase whitespace-nowrap">{d.name}</td>
+                      <td className="px-4 py-2 text-[11px] font-mono text-slate-500 whitespace-nowrap">{maskCPF(d.cpf)}</td>
+                      <td className="px-3 py-2"><TableStatusCell d={d} kind="motorista" /></td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-mono font-bold text-slate-700">{onlyAlnum(d.plateHorse) || '—'}</span>
+                          {d.plateHorse && (
+                            <button type="button" onClick={() => copyClean(`tph-${d.id}`, d.plateHorse)} title="Copiar cavalo" className={`transition-colors ${copiedKey === `tph-${d.id}` ? 'text-emerald-500' : 'text-slate-300 hover:text-blue-600'}`}>
+                              {copiedKey === `tph-${d.id}`
+                                ? <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                                : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg>}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2"><TableStatusCell d={d} kind="cavalo" /></td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-mono font-bold text-slate-700">{onlyAlnum(d.plateTrailer) || '—'}</span>
+                          {d.plateTrailer && (
+                            <button type="button" onClick={() => copyClean(`tpt-${d.id}`, d.plateTrailer)} title="Copiar carreta" className={`transition-colors ${copiedKey === `tpt-${d.id}` ? 'text-emerald-500' : 'text-slate-300 hover:text-blue-600'}`}>
+                              {copiedKey === `tpt-${d.id}`
+                                ? <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                                : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"/></svg>}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2"><TableStatusCell d={d} kind="carreta" /></td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {dirty ? (
+                          <button onClick={() => save(d)} disabled={savingId === d.id} className="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase bg-slate-900 text-white hover:bg-amber-600 transition-all">
+                            {savingId === d.id ? '...' : 'Salvar'}
+                          </button>
+                        ) : current(d).enrolled ? (
+                          <span className="text-[8px] font-black text-emerald-500 uppercase">✓ Salvo</span>
+                        ) : (
+                          <span className="text-[8px] font-bold text-slate-300 uppercase">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
