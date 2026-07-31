@@ -47,7 +47,8 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ userId, customers, onSaveCu
     zipCode: '',
     cnpj: '',
     registrationDate: new Date().toISOString().split('T')[0],
-    operations: []
+    operations: [],
+    requiresFrotaLegal: false
   };
 
   const [form, setForm] = useState<Partial<Customer>>(initialForm);
@@ -488,6 +489,26 @@ const CustomersTab: React.FC<CustomersTabProps> = ({ userId, customers, onSaveCu
                 </div>
               </div>
               
+              {/* FROTA LEGAL */}
+              <div className="p-6 bg-amber-50/60 rounded-[2.5rem] border-2 border-amber-100 flex items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-600 flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-black text-slate-700 uppercase tracking-tight">Exige Frota Legal</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5 leading-snug">Só motoristas com cadastro Frota Legal aparecem na programação deste cliente</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, requiresFrotaLegal: !form.requiresFrotaLegal })}
+                  className={`relative w-12 h-7 rounded-full transition-all shrink-0 ${form.requiresFrotaLegal ? 'bg-amber-500' : 'bg-slate-300'}`}
+                >
+                  <span className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${form.requiresFrotaLegal ? 'left-6' : 'left-1'}`} />
+                </button>
+              </div>
+
               <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl hover:bg-blue-600 transition-all mt-6 active:scale-[0.98]">Salvar Dados do Cliente</button>
             </form>
           </div>

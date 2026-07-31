@@ -92,6 +92,12 @@ const TripForm: React.FC<TripFormProps> = ({
     isScheduled: false
   });
 
+  // Cliente que exige Frota Legal: só motoristas vinculados e não bloqueados
+  const requiresFrotaLegal = !!formData.customer?.requiresFrotaLegal;
+  const driverOptions = requiresFrotaLegal
+    ? allDrivers.filter(d => d.frotaLegal?.enrolled && d.frotaLegal?.cavaloStatus !== 'Bloqueado' && d.frotaLegal?.carretaStatus !== 'Bloqueado')
+    : allDrivers;
+
   const hasInitialized = useRef<string | null>(null);
 
   useEffect(() => {
@@ -598,10 +604,17 @@ const TripForm: React.FC<TripFormProps> = ({
             })()}
           </div>
         ) : (
+          <>
+          {requiresFrotaLegal && (
+            <div className="mb-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200">
+              <svg className="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <p className="text-[8px] font-black text-amber-700 uppercase tracking-wide">Cliente exige Frota Legal · exibindo apenas motoristas vinculados e liberados</p>
+            </div>
+          )}
           <AutocompleteSearch
             label="Buscar Motorista"
             placeholder="Nome ou Placa..."
-            data={allDrivers}
+            data={driverOptions}
             onSelect={(d: Driver) => {
               const ph = d.platesHorse?.find(e => e.isPrimary) || d.platesHorse?.[0];
               const pt = d.platesTrailer?.find(e => e.isPrimary) || d.platesTrailer?.[0];
@@ -629,6 +642,7 @@ const TripForm: React.FC<TripFormProps> = ({
             } })}
             quickAddLabel="Cadastrar novo motorista"
           />
+          </>
         )}
 
         {/* Modal de troca */}
