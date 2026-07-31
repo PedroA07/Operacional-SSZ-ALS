@@ -99,7 +99,10 @@ const FrotaLegalTab: React.FC<FrotaLegalTabProps> = ({ drivers, onSaveDriver }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drivers, searchQuery, sortBy, onlyEnrolled, edits]);
 
-  const enrolledCount = drivers.filter(d => (edits[d.id] ?? d.frotaLegal)?.enrolled).length;
+  const enrolled = drivers.filter(d => current(d).enrolled);
+  const enrolledCount = enrolled.length;
+  const liberadosCount = enrolled.filter(d => { const f = current(d); return f.cavaloStatus === 'Liberado' && f.carretaStatus === 'Liberado'; }).length;
+  const pendenciasCount = enrolledCount - liberadosCount;
 
   const StatusRow = ({ d, kind }: { d: Driver; kind: 'cavalo' | 'carreta' }) => {
     const fl = current(d);
@@ -145,9 +148,13 @@ const FrotaLegalTab: React.FC<FrotaLegalTabProps> = ({ drivers, onSaveDriver }) 
         </button>
       </div>
 
-      <div className="flex items-center justify-between px-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
         <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Frota Legal</h3>
-        <span className="text-[10px] font-black text-slate-400">{enrolledCount} vinculado{enrolledCount === 1 ? '' : 's'} · {filtered.length} exibido{filtered.length === 1 ? '' : 's'}</span>
+        <div className="flex items-center gap-2">
+          <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase bg-emerald-50 text-emerald-600 border border-emerald-200">{liberadosCount} liberado{liberadosCount === 1 ? '' : 's'}</span>
+          <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase bg-amber-50 text-amber-600 border border-amber-200">{pendenciasCount} com pendência{pendenciasCount === 1 ? '' : 's'}</span>
+          <span className="text-[10px] font-black text-slate-400">{enrolledCount} vinculado{enrolledCount === 1 ? '' : 's'}</span>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -159,8 +166,24 @@ const FrotaLegalTab: React.FC<FrotaLegalTabProps> = ({ drivers, onSaveDriver }) 
           {filtered.map(d => {
             const fl = current(d);
             const dirty = isDirty(d);
+            const allClear = fl.enrolled && fl.cavaloStatus === 'Liberado' && fl.carretaStatus === 'Liberado';
+            const hasBlock = fl.enrolled && (fl.cavaloStatus === 'Bloqueado' || fl.carretaStatus === 'Bloqueado');
+            const hasPend = fl.enrolled && !allClear;
+            const cardBorder = !fl.enrolled ? 'border-slate-200'
+              : allClear ? 'border-emerald-300 ring-1 ring-emerald-200'
+              : hasBlock ? 'border-red-300 ring-1 ring-red-200'
+              : 'border-amber-300 ring-1 ring-amber-200';
             return (
-              <div key={d.id} className={`bg-white rounded-3xl border shadow-sm flex flex-col overflow-hidden transition-all ${fl.enrolled ? 'border-amber-200' : 'border-slate-200'}`}>
+              <div key={d.id} className={`bg-white rounded-3xl border shadow-sm flex flex-col overflow-hidden transition-all ${cardBorder}`}>
+                {fl.enrolled && (
+                  <div className={`px-4 py-1.5 text-[8px] font-black uppercase tracking-widest text-center flex items-center justify-center gap-1.5 ${allClear ? 'bg-emerald-500 text-white' : hasBlock ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'}`}>
+                    {allClear
+                      ? <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>Tudo Liberado</>
+                      : hasBlock
+                        ? <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>Bloqueado · Pendências</>
+                        : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 9v2m0 4h.01M12 3l9 16H3L12 3z"/></svg>Com Pendências</>}
+                  </div>
+                )}
                 <div className="p-5 flex items-start gap-3 border-b border-slate-100">
                   <div className="w-12 h-12 rounded-2xl bg-slate-100 border overflow-hidden shrink-0 shadow-inner">
                     {d.photo ? <img src={d.photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-white"><img src="/logo.jpg" alt="ALS" className="w-6 h-6 object-contain opacity-60" /></div>}
